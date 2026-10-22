@@ -15,3 +15,4 @@ previews.txt
 *.db-journal
 followup_previews.txt
 .env.server
+docs/LendersReport*.md
