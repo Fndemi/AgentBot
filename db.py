@@ -478,7 +478,8 @@ def replies_without_message_id():
     """(reply id, INBOX UID) for replies stored before Message-IDs were kept."""
     with conn() as c:
         return [(r[0], r[1]) for r in c.execute(
-            "SELECT id, imap_uid FROM replies WHERE message_id IS NULL AND imap_uid NOT LIKE '%:%'")]
+            "SELECT id, imap_uid FROM replies WHERE message_id IS NULL AND imap_uid NOT LIKE '%:%'"
+            " AND imap_uid NOT LIKE '%/%'")]
 
 def set_reply_message_id(reply_id, message_id):
     with conn() as c:

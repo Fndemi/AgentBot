@@ -42,6 +42,15 @@ def no_need_scores(monkeypatch):
     monkeypatch.setattr(targeting, "site_emails", lambda website: [])
 
 
+@pytest.fixture(autouse=True)
+def same_mailbox_and_sender(monkeypatch):
+    """Tests don't depend on .env: one mailbox (mail keys without an account) and the
+    sender name the expected emails are written with."""
+    monkeypatch.setattr(config, "IMAP_USER", "florence@talksasa.co.ke")
+    monkeypatch.setattr(config, "FIRST_IMAP_USER", "florence@talksasa.co.ke")
+    monkeypatch.setattr(config, "SENDER_NAME", "Florence")
+
+
 @pytest.fixture
 def leads(tmp_path, monkeypatch):
     """A fresh database with three emailed leads, one of them on gmail.com."""

@@ -529,7 +529,7 @@ const ICON = {
 const ico = (n, cls = "") => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICON[n]}</svg>`;
 
 /* ======================= vocabulary ======================= */
-const OPERATOR = "Florence";
+const OPERATOR = "Mary";
 const LABEL = {
   interested:     { text: "Interested",     tone: "pos"  },
   question:       { text: "Question",       tone: "info" },
@@ -751,8 +751,8 @@ function demoTimeline(id) {
     const saved = id % 5 !== 0 || s > 1;
     emails.push({ id: id * 10 + s, step: s, sent_on: d.toISOString().slice(0, 10), sent_at: null,
       subject: saved ? (s === 1 ? `A quick chat about SMS for ${l.company}?` : `Re: A quick chat about SMS for ${l.company}?`) : null,
-      body: saved ? (s === 1 ? `Hello ${l.company} team,\n\nMy name is Florence from TalkSasa Communications. We help Kenyan organisations reach members and customers by SMS, with reminders, alerts and updates sent under your own name.\n\nI'm not writing to sell you anything today. I'd like to understand how you communicate with your members now and whether we can work together.\n\nWould a short visit or a 15-minute call this week or next work for you?\n\nKind regards,\nFlorence\nTalkSasa Communications`
-        : s === 2 ? `Hello again,\n\nJust checking whether you saw my note last week. Would a short visit or call next week suit you?\n\nKind regards,\nFlorence` : `Hello,\n\nI won't keep emailing. If SMS is ever useful for ${l.company}, just reply to this message.\n\nKind regards,\nFlorence`) : null });
+      body: saved ? (s === 1 ? `Hello ${l.company} team,\n\nMy name is ${OPERATOR} from TalkSasa Communications. We help Kenyan organisations reach members and customers by SMS, with reminders, alerts and updates sent under your own name.\n\nI'm not writing to sell you anything today. I'd like to understand how you communicate with your members now and whether we can work together.\n\nWould a short visit or a 15-minute call this week or next work for you?\n\nKind regards,\n${OPERATOR}\nTalkSasa Communications`
+        : s === 2 ? `Hello again,\n\nJust checking whether you saw my note last week. Would a short visit or call next week suit you?\n\nKind regards,\n${OPERATOR}` : `Hello,\n\nI won't keep emailing. If SMS is ever useful for ${l.company}, just reply to this message.\n\nKind regards,\n${OPERATOR}`) : null });
   }
   return { lead: l, emails, replies: S.data.replies.filter(r => r.lead_id === id).map(r => ({ ...r })) };
 }

@@ -433,6 +433,26 @@ def approved_waiting(quiet=False):
     return [l for l in leads if l["id"] not in low_ids]
 
 
+def spread(leads, n):
+    """The first n of leads (in sending order) with at most MAX_PER_INDUSTRY from one
+    industry. Slots the other industries can't fill go to the next leads in order, so the
+    daily limit isn't left unused. Sending order is kept."""
+    cap = config.MAX_PER_INDUSTRY
+    if not cap:
+        return leads[:n]
+    counts, picked = {}, set()
+    for l in leads:
+        key = personalise.industry_key(l)
+        if counts.get(key, 0) < cap and len(picked) < n:
+            counts[key] = counts.get(key, 0) + 1
+            picked.add(l["id"])
+    for l in leads:
+        if len(picked) >= n:
+            break
+        picked.add(l["id"])
+    return [l for l in leads if l["id"] in picked]
+
+
 def bounce_gate():
     """Why sending must pause, or None. Mail providers start putting a domain's email in
     spam when too many of the addresses it writes to don't exist, so sending pauses while
@@ -493,10 +513,10 @@ def plan(dry_run=False):
         if not dry_run:
             ranking.fill_years()
             targeting.score_unscored()
-        leads = approved_waiting()[:remaining - len(due)]
+        leads = spread(approved_waiting(), remaining - len(due))
         # Write personal lines for any of today's leads that don't have them yet
         if not dry_run and leads and (personalise.run(leads) or any(l["confidence"] is None for l in leads)):
-            leads = approved_waiting(quiet=True)[:remaining - len(due)]
+            leads = spread(approved_waiting(quiet=True), remaining - len(due))
     return due + [(lead, 0) for lead in leads]
 
 

@@ -3,14 +3,14 @@ Hello {company} team,
 
 {opener}
 
-I'm Florence from TalkSasa Communications in Nairobi. We help fintechs send OTPs, transaction alerts and loan repayment reminders by SMS.
+I'm {sender} from TalkSasa Communications in Nairobi. We help fintechs send OTPs, transaction alerts and loan repayment reminders by SMS.
 
 Who handles SMS on your side today? If it's worth comparing, I can send over our rates and API docs.
 
 {attachment_line}
 
 Kind regards,
-Florence
+{sender}
 TalkSasa Communications Ltd
 +254 762 000 008
 +254 712 295 880

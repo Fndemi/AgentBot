@@ -178,6 +178,18 @@ def test_highest_score_first_and_none_below_min_score(world, monkeypatch):
     assert [l["company"] for l in sender.approved_waiting()] == ["high", "mid"]
 
 
+def test_max_per_industry_mixes_the_batch_and_fills_spare_slots(monkeypatch):
+    import sender
+    leads = [{"id": i, "industry": ind} for i, ind in enumerate(
+        ["digital_lender"] * 5 + ["school", "church"])]
+    monkeypatch.setattr(config, "MAX_PER_INDUSTRY", 2)
+    assert [l["id"] for l in sender.spread(leads, 4)] == [0, 1, 5, 6]
+    # only two other leads: the spare slots go to the next lenders, in order
+    assert [l["id"] for l in sender.spread(leads, 6)] == [0, 1, 2, 3, 5, 6]
+    monkeypatch.setattr(config, "MAX_PER_INDUSTRY", 0)
+    assert [l["id"] for l in sender.spread(leads, 4)] == [0, 1, 2, 3]
+
+
 def test_sender_scores_waiting_leads_first(world, monkeypatch):
     monkeypatch.setattr(targeting, "site_text", lambda website: SITE)
     db.add_lead("New Fintech", "newfin.co.ke", "fintech", "info@newfin.co.ke", "manual")

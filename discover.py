@@ -1,4 +1,4 @@
-"""Finds new companies with a web search (DuckDuckGo, no API key) and adds them as leads.
+"""Finds new companies with a web search (websearch.py: Tavily, or DuckDuckGo) and adds them as leads.
 
   python main.py discover                  go through PRIORITY order
   python main.py discover sacco --max 5    one category, stop after 5 new leads
@@ -20,6 +20,7 @@ from bs4 import BeautifulSoup
 
 import db
 import scraper
+import websearch
 
 TOWNS = ["Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret", "Thika", "Nyeri", "Machakos"]
 
@@ -344,12 +345,7 @@ def look_at(url):
 
 
 def search(query):
-    from ddgs import DDGS
-    try:
-        return DDGS().text(query, max_results=RESULTS_PER_QUERY) or []
-    except Exception as e:
-        print(f"    search failed: {e}")
-        return []
+    return websearch.search(query, RESULTS_PER_QUERY)
 
 
 def save_csv(row):

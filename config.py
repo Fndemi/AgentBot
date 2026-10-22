@@ -22,6 +22,9 @@ SEND_DELAY_SECONDS = int(env("SEND_DELAY_SECONDS", "90"))  # gap between emails
 # First emails go to the highest need score first (targeting.py); a lead scored below
 # MIN_SCORE, or not scored yet, is left waiting. Follow-ups don't depend on it.
 MIN_SCORE = int(env("MIN_SCORE", "50"))
+# At most this many first emails a day to one industry, so a high-scoring industry doesn't
+# take every slot. Slots no other industry can fill still go to it. 0 = no cap.
+MAX_PER_INDUSTRY = int(env("MAX_PER_INDUSTRY", "0"))
 # Bounce gate: sending pauses while more than BOUNCE_LIMIT_PERCENT of the companies emailed in
 # the last BOUNCE_WINDOW_DAYS have bounced. It reopens by itself as those sends age out of the
 # window. With fewer than BOUNCE_MIN_SENDS companies in the window there is too little to judge.
@@ -38,6 +41,10 @@ FOLLOWUP_AFTER_DAYS = int(env("FOLLOWUP_AFTER_DAYS", "5"))
 IMAP_HOST = env("IMAP_HOST")
 IMAP_USER = env("IMAP_USER", SMTP_USER)
 IMAP_PASS = env("IMAP_PASS", SMTP_PASS)
+# The mailbox replies were first read from. Mail read there is remembered by folder and UID
+# alone; UIDs restart in every mailbox, so mail read in any other one is remembered with
+# its account in front.
+FIRST_IMAP_USER = env("FIRST_IMAP_USER", IMAP_USER)
 POLL_MINUTES = int(env("POLL_MINUTES", "5"))
 
 # AI classifier: "ollama" (local, free, open source) or "groq" (free tier API)
@@ -65,3 +72,9 @@ WEBSITE = env("WEBSITE", "https://talksasa.com")
 # PDF attached to every email. Path is relative to this folder. Empty = no attachment.
 ATTACH_PDF = env("ATTACH_PDF", "TalkSasa_Overview.pdf")
 PROFILE_URL = env("PROFILE_URL", "")  # optional, e.g. a company profile PDF or page
+
+# Web search for discover.py (websearch.py): Tavily basic search, falling back to DuckDuckGo
+# when the key is missing, Tavily fails or this month's TAVILY_MONTHLY_CAP calls are used
+SEARCH_PROVIDER = env("SEARCH_PROVIDER", "duckduckgo").strip().lower()
+TAVILY_API_KEY = env("TAVILY_API_KEY", "")
+TAVILY_MONTHLY_CAP = int(env("TAVILY_MONTHLY_CAP", "900"))

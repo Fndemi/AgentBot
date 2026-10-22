@@ -3,7 +3,7 @@ Hello {company} team,
 Just following up on my email about sending {uses} by SMS. If that's something you're looking at, {offer}
 
 Kind regards,
-Florence
+{sender}
 TalkSasa Communications Ltd
 +254 762 000 008
 +254 712 295 880

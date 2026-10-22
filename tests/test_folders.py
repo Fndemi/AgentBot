@@ -38,6 +38,14 @@ def test_same_email_in_two_folders_is_stored_once(leads, ai, alerts, monkeypatch
     assert len(stored()) == 1 and len(alerts) == 1
 
 
+def test_a_new_mailbox_reuses_uids_without_losing_replies(leads, ai, alerts, monkeypatch):
+    import config
+    run(monkeypatch, reply())  # read from the first mailbox as INBOX UID 1
+    monkeypatch.setattr(config, "IMAP_USER", "sales@talksasa.co.ke")
+    run(monkeypatch, reply("<r2@nyerihigh.com>"))  # the new mailbox's own UID 1
+    assert [r[3] for r in stored()] == ["1", "sales@talksasa.co.ke/1"]
+
+
 def test_moved_after_it_was_stored_is_not_stored_again(leads, ai, alerts, monkeypatch):
     run(monkeypatch, reply())  # stored from INBOX
     run(monkeypatch, folders={"clients responses": {b"3": reply()}})  # later moved

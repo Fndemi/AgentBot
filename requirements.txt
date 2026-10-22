@@ -5,6 +5,7 @@ python-dotenv
 streamlit
 pandas
 ddgs
+tavily-python
 fastapi
 uvicorn
 python-whois

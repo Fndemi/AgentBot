@@ -207,9 +207,15 @@ def mail_folders(box):
     return sorted(names, key=lambda n: n.upper() != "INBOX")
 
 
+def first_mailbox():
+    return (config.IMAP_USER or "").lower() == (config.FIRST_IMAP_USER or "").lower()
+
+
 def mail_key(folder, uid):
-    """How a message is remembered: its UID in INBOX (as it always was), folder:UID elsewhere."""
-    return uid if folder.upper() == "INBOX" else f"{folder}:{uid}"
+    """How a message is remembered: its UID in INBOX (as it always was), folder:UID elsewhere,
+    with "account/" in front for any mailbox but the first one."""
+    key = uid if folder.upper() == "INBOX" else f"{folder}:{uid}"
+    return key if first_mailbox() else f"{config.IMAP_USER.lower()}/{key}"
 
 
 def quoted(folder):
@@ -252,7 +258,7 @@ def check_once(catch_up=False):
     for folder in mail_folders(box) if since else []:
         if box.select(quoted(folder))[0] != "OK":
             continue
-        if folder.upper() == "INBOX":
+        if folder.upper() == "INBOX" and first_mailbox():  # those UIDs are the first mailbox's
             fill_message_ids(box)
         for uid in box.uid("search", None, "SINCE", since)[1][0].split():
             key = mail_key(folder, uid.decode())
