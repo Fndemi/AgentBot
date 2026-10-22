@@ -9,10 +9,11 @@ st.title("LeadBot — bulk SMS outreach")
 db.init()
 
 with db.conn() as c:
-    leads = pd.read_sql(f"SELECT * FROM leads WHERE {db.real()}", c)
-    replies = pd.read_sql(
+    # rows as dicts: pandas reads them the same from SQLite and PostgreSQL
+    leads = pd.DataFrame([dict(r) for r in c.execute(f"SELECT * FROM leads WHERE {db.real()}")])
+    replies = pd.DataFrame([dict(r) for r in c.execute(
         "SELECT r.received_at, l.company, r.from_email, r.label, r.summary, r.body "
-        f"FROM replies r LEFT JOIN leads l ON l.id = r.lead_id WHERE {db.real('l')} ORDER BY r.id DESC", c)
+        f"FROM replies r LEFT JOIN leads l ON l.id = r.lead_id WHERE {db.real('l')} ORDER BY r.id DESC")])
 
 cols = st.columns(5)
 for col, status in zip(cols, ["verified", "sent", "replied", "bounced", "unsubscribed"]):

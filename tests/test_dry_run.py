@@ -2,7 +2,6 @@
 follow-up, no score or start-year saved, no WHOIS or website lookup, no AI. Every way
 out to the network is made to fail the test."""
 import socket
-import sqlite3
 import sys
 
 import pytest
@@ -51,9 +50,13 @@ def ready(tmp_path, monkeypatch):
         c.execute("UPDATE sent SET sent_on='2026-01-05'")  # long past its follow-up day
 
 
+TABLES = ("leads", "sent", "replies", "skipped", "lead_events", "suppression", "alert_outbox",
+          "send_claims", "locks")
+
+
 def dump():
-    with sqlite3.connect(config.DB_PATH) as c:
-        return list(c.iterdump())
+    with db.conn() as c:
+        return {t: [tuple(r) for r in c.execute(f"SELECT * FROM {t} ORDER BY 1")] for t in TABLES}
 
 
 def test_dry_run_changes_and_reaches_nothing(ready, unreachable, capsys):

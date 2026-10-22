@@ -28,7 +28,6 @@ import os
 import re
 import secrets
 import smtplib
-import sqlite3
 import ssl
 import sys
 import time
@@ -45,6 +44,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel
 
 import config
+import db
 
 HERE = Path(__file__).parent
 COOKIE = "lb_session"
@@ -73,14 +73,14 @@ MIN_PASSWORD = 10
 # ---------------------------------------------------------------- database
 
 def conn():
-    c = sqlite3.connect(config.DB_PATH, timeout=10)
-    c.row_factory = sqlite3.Row
-    c.execute("PRAGMA foreign_keys = ON")
+    c = db.conn()
+    if not db.postgres():  # PostgreSQL always checks them
+        c.execute("PRAGMA foreign_keys = ON")
     return c
 
 
 def _cols(c, table):
-    return {r["name"] for r in c.execute(f"PRAGMA table_info({table})")}
+    return db.columns(c, table)
 
 
 def now_utc():
@@ -95,6 +95,7 @@ def iso(ts):
 
 
 def ensure_schema():
+    db.init()  # the CRM's tables refer to leads, which PostgreSQL needs to exist first
     with conn() as c:
         c.executescript("""
         CREATE TABLE IF NOT EXISTS users (
@@ -836,7 +837,7 @@ def report(days: int = 0, user=Depends(current_user)):
         if g in order:
             items.sort(key=lambda x: order[g].index(x["name"]) if x["name"] in order[g] else 99)
         else:
-            items.sort(key=lambda x: -x["emailed"])
+            items.sort(key=lambda x: (-x["emailed"], x["name"]))  # ties by name, on any database
         out[g] = items
     return {"total": finish(total), "groups": out, "days": days, "min_sample": MIN_SAMPLE,
             "has_scores": bool(sc["score"]), "has_source": bool(sc["source"])}
@@ -899,7 +900,7 @@ def create_user(body: NewUserIn, admin=Depends(admin_only)):
             c.execute("""INSERT INTO users (name, email, phone, role, password_hash, must_change)
                          VALUES (?,?,?,?,?,1)""",
                       (name, email, body.phone.strip(), body.role, hash_password(body.temp_password)))
-        except sqlite3.IntegrityError:
+        except db.IntegrityError:
             raise HTTPException(409, "Someone with that email already has an account.")
         log_event(c, None, admin["id"], "user_created", f"{email} ({body.role})")
     return {"ok": True}
@@ -972,7 +973,7 @@ def _cli():
             try:
                 c.execute("INSERT INTO users (name, email, role, password_hash, must_change) VALUES (?,?,?,?,0)",
                           (name, email, "admin", hash_password(pw)))
-            except sqlite3.IntegrityError:
+            except db.IntegrityError:
                 sys.exit("That email already has an account. Use: python crm.py reset-password " + email)
         print(f"Admin account created for {email}. Open http://127.0.0.1:8000/login to sign in.")
     elif cmd == "reset-password" and len(sys.argv) > 2:

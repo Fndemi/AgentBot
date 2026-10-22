@@ -7,7 +7,9 @@ load_dotenv()
 def env(key, default=None):
     return os.getenv(key, default)
 
-# Database
+# Database: PostgreSQL when DATABASE_URL is set (postgresql://user:password@host:5432/name),
+# otherwise the SQLite file DB_PATH
+DATABASE_URL = env("DATABASE_URL", "")
 DB_PATH = env("DB_PATH", "leads.db")
 
 # Sending (SMTP)

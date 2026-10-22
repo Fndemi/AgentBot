@@ -8,7 +8,6 @@ Then open http://localhost:8000
 Reads the same database as the bot (DB_PATH in .env, default leads.db).
 """
 import os
-import sqlite3
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -32,13 +31,11 @@ ALLOWED_STATUSES = {"new", "verified", "invalid", "sent", "replied", "meeting", 
 
 
 def conn():
-    c = sqlite3.connect(config.DB_PATH)
-    c.row_factory = sqlite3.Row
-    return c
+    return db.conn()
 
 
 def columns(c, table):
-    return {r["name"] for r in c.execute(f"PRAGMA table_info({table})")}
+    return db.columns(c, table)
 
 
 def ensure_schema():
@@ -116,7 +113,7 @@ def all_data():
             LEFT JOIN sent s ON s.lead_id = l.id
             LEFT JOIN replies r ON r.lead_id = l.id
             WHERE {db.real('l')}
-            GROUP BY 1 ORDER BY leads DESC""")]
+            GROUP BY 1 ORDER BY leads DESC, industry""")]  # ties by name, on any database
 
     last_check = None
     if HEARTBEAT.exists():

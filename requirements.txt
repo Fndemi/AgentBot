@@ -5,6 +5,7 @@ python-dotenv
 streamlit
 pandas
 ddgs
+psycopg[binary]
 tavily-python
 fastapi
 uvicorn

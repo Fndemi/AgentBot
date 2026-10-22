@@ -95,8 +95,8 @@ def test_second_run_waits_its_turn(waiting, smtp):
 def test_lock_holds_across_processes(waiting, smtp):
     root = Path(__file__).resolve().parent.parent
     code = ("import sys; sys.path.insert(0, sys.argv[1]); import config; config.DB_PATH = sys.argv[2]; "
-            "import db; print(db.acquire_lock('send', 'other-process', 60))")
-    out = subprocess.run([sys.executable, "-c", code, str(root), config.DB_PATH],
+            "config.DATABASE_URL = sys.argv[3]; import db; print(db.acquire_lock('send', 'other-process', 60))")
+    out = subprocess.run([sys.executable, "-c", code, str(root), config.DB_PATH, config.DATABASE_URL],
                          capture_output=True, text=True, check=True).stdout.strip()
     assert out == "True"
     sender.run()

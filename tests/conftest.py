@@ -1,8 +1,16 @@
 """Shared fixtures. Every test gets its own temporary database; the AI and Telegram are
-replaced by fakes, so nothing real is called, read or sent."""
+replaced by fakes, so nothing real is called, read or sent.
+
+The database is a SQLite file. With TEST_DATABASE_URL set (a PostgreSQL you can create
+schemas in), every test gets its own empty PostgreSQL schema instead:
+    TEST_DATABASE_URL=postgresql://user:pw@127.0.0.1:5432/test python -m pytest
+"""
+import os
 import sys
+import uuid
 from pathlib import Path
 
+import psycopg
 import pytest
 
 HERE = Path(__file__).resolve().parent
@@ -17,6 +25,25 @@ import notify  # noqa: E402
 import sender  # noqa: E402
 import targeting  # noqa: E402
 from fakemail import SENT_ID  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def database(monkeypatch):
+    """Never the real database from .env: SQLite (each test sets its own DB_PATH), or a
+    fresh PostgreSQL schema per test when TEST_DATABASE_URL is set."""
+    url = os.environ.get("TEST_DATABASE_URL", "")
+    if not url:
+        monkeypatch.setattr(config, "DATABASE_URL", "")
+        yield
+        return
+    schema = "test_" + uuid.uuid4().hex[:12]
+    with psycopg.connect(url, autocommit=True) as c:
+        c.execute(f"CREATE SCHEMA {schema}")
+    monkeypatch.setattr(config, "DATABASE_URL",
+                        f"{url}{'&' if '?' in url else '?'}options=-csearch_path%3D{schema}")
+    yield
+    with psycopg.connect(url, autocommit=True) as c:
+        c.execute(f"DROP SCHEMA {schema} CASCADE")
 
 
 @pytest.fixture(autouse=True)

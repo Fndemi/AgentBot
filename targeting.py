@@ -234,14 +234,14 @@ def import_lenders(src=CBK_DCP_URL, source=CBK_DCP_SOURCE, source_url=CBK_DCP_UR
             if e["email"] in blocked:
                 suppressed.append(row)
                 continue
-            cur = c.execute(
+            lead_id = c.execute(
                 "INSERT INTO leads (company, website, industry, email, phone, physical_address,"
                 " date_licensed, source, source_url, discovered_at, imported_at)"
-                " VALUES (?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                " VALUES (?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id",
                 (e["name"], e["website"], INDUSTRY, e["email"], e["phone"], e["address"],
-                 e["licensed"], source, source_url))
-            db.log_event(c, cur.lastrowid, "discovered", source=source, url=source_url)
-            added.append(cur.lastrowid)
+                 e["licensed"], source, source_url)).fetchone()[0]
+            db.log_event(c, lead_id, "discovered", source=source, url=source_url)
+            added.append(lead_id)
             by_email[e["email"]] = e["name"]
             for key in name_keys(e["name"]):
                 by_name[key] = e["name"]
@@ -250,7 +250,8 @@ def import_lenders(src=CBK_DCP_URL, source=CBK_DCP_SOURCE, source_url=CBK_DCP_UR
     # The same check as `main.py verify`: the address looks right and its domain takes mail
     invalid = []
     for lead_id in added:
-        lead = db.conn().execute("SELECT email FROM leads WHERE id=?", (lead_id,)).fetchone()
+        with db.conn() as c:
+            lead = c.execute("SELECT email FROM leads WHERE id=?", (lead_id,)).fetchone()
         email = lead["email"]
         ok = bool(verify.SYNTAX.match(email)) and verify.domain_ok(domain_of(email))
         db.set_status(lead_id, "verified" if ok else "invalid", "verify")

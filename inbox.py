@@ -3,7 +3,6 @@ import email
 import html as html_lib
 import imaplib
 import re
-import sqlite3
 import time
 from datetime import date, datetime, timedelta
 from email.errors import HeaderParseError
@@ -287,7 +286,7 @@ def check_once(catch_up=False):
 
 # Errors about the mail server connection or the database, not about one email. They stop the
 # check, as before, and the next check tries again; anything else is that email's own problem.
-CHECK_ERRORS = (imaplib.IMAP4.error, OSError, sqlite3.Error)
+CHECK_ERRORS = (imaplib.IMAP4.error, OSError) + db.Error
 
 
 def set_aside(folder, uid, key, error, catch_up, newly_skipped):

@@ -11,25 +11,21 @@ Routes:
 Works with older and newer databases: if the sent table has no step,
 sent_subject or sent_body column yet, those fields come back as null.
 """
-import sqlite3
 from datetime import date
 
 from fastapi import APIRouter, HTTPException
 
-import config
 import db
 
 router = APIRouter()
 
 
 def _conn():
-    c = sqlite3.connect(config.DB_PATH)
-    c.row_factory = sqlite3.Row
-    return c
+    return db.conn()
 
 
 def _cols(c, table):
-    return {r["name"] for r in c.execute(f"PRAGMA table_info({table})")}
+    return db.columns(c, table)
 
 
 def _pick(cols, *names):

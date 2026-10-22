@@ -38,7 +38,7 @@ def count(provider):
     with db.conn() as c:
         c.execute(SCHEMA)
         c.execute("INSERT INTO search_usage (month, provider, calls) VALUES (?, ?, 1)"
-                  " ON CONFLICT (month, provider) DO UPDATE SET calls = calls + 1",
+                  " ON CONFLICT (month, provider) DO UPDATE SET calls = search_usage.calls + 1",
                   (this_month(), provider))
 
 
