@@ -173,6 +173,25 @@ def ensure_schema():
         c.execute("DELETE FROM sessions WHERE expires_at < ?", (now_utc(),))
 
 
+# Summaries are stored as the inbox check wrote them (they also go to Telegram). On the
+# dashboard and CRM screens they are shown without the words about the AI.
+SCREEN_WORDING = [
+    (re.compile(r"\bnot read by the AI\b"), "not labelled automatically"),
+    (re.compile(r"\bThe AI could not read this reply\b"), "This reply couldn't be labelled automatically"),
+    (re.compile(r"\bThe AI thinks this may be\b"), "This may be"),
+    (re.compile(r"\bThe AI was unsure \(label "), "Unsure of the label ("),
+    (re.compile(r"\bAI summary:"), "Summary:"),
+    (re.compile(r"\b[Tt]he AI\b"), "LeadBot"),
+    (re.compile(r"\bAI\b"), "automatic"),
+]
+
+
+def screen_text(text):
+    for pattern, words in SCREEN_WORDING:
+        text = pattern.sub(words, text) if text else text
+    return text
+
+
 def log_event(c, lead_id, user_id, action, detail=""):
     c.execute("INSERT INTO crm_events (lead_id, user_id, action, detail) VALUES (?,?,?,?)",
               (lead_id, user_id, action, detail))
@@ -510,7 +529,7 @@ def open_leads(scope: str = "open", user=Depends(current_user)):
                 last = c.execute("SELECT label, summary, subject, body, received_at FROM replies WHERE id = ?",
                                  (r["last_reply_id"],)).fetchone()
             r["last_label"] = last["label"] if last else None
-            r["last_summary"] = (last["summary"] or (last["body"] or "")[:160]) if last else ""
+            r["last_summary"] = (screen_text(last["summary"]) or (last["body"] or "")[:160]) if last else ""
             r["last_received"] = iso(last["received_at"]) if last else None
             r["last_answer"] = iso(r["last_answer"])
             r["claimed_at"] = iso(r["claimed_at"])
@@ -549,7 +568,7 @@ def lead_detail(lead_id: int, user=Depends(current_user)):
         for r in c.execute("""SELECT id, from_email, subject, body, label, summary, received_at,
                 COALESCE(handled,0) AS handled FROM replies WHERE lead_id = ? ORDER BY id""", (lead_id,)):
             items.append({"kind": "in", "id": r["id"], "at": iso(r["received_at"]), "subject": r["subject"],
-                          "body": r["body"], "label": r["label"], "summary": r["summary"],
+                          "body": r["body"], "label": r["label"], "summary": screen_text(r["summary"]),
                           "from": r["from_email"], "handled": bool(r["handled"]), "who": lead["company"]})
         for r in c.execute("SELECT * FROM crm_messages WHERE lead_id = ? ORDER BY id", (lead_id,)):
             items.append({"kind": "out", "id": r["id"], "at": iso(r["sent_at"]), "subject": r["subject"],

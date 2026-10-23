@@ -16,6 +16,7 @@ from datetime import date
 from fastapi import APIRouter, HTTPException
 
 import db
+from crm import screen_text
 
 router = APIRouter()
 
@@ -71,6 +72,7 @@ def lead_emails(lead_id: int):
         for r in replies:
             r["received_at"] = _iso_utc(r["received_at"])
             r["handled"] = bool(r["handled"])
+            r["summary"] = screen_text(r["summary"])
 
     return {"lead": dict(lead), "emails": emails, "replies": replies}
 

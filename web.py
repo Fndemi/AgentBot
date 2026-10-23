@@ -19,7 +19,7 @@ import config
 import db
 
 app = FastAPI(title="LeadBot")
-from crm import install as install_crm
+from crm import install as install_crm, screen_text
 install_crm(app)
 from web_extra import router as extra_router
 app.include_router(extra_router)
@@ -79,6 +79,7 @@ def all_data():
             ORDER BY r.id DESC LIMIT 500""")]
         for r in replies:
             r["handled"] = bool(r["handled"])
+            r["summary"] = screen_text(r["summary"])
             # SQLite CURRENT_TIMESTAMP is UTC without a zone; mark it so the browser converts it
             if r["received_at"] and "T" not in r["received_at"]:
                 r["received_at"] = r["received_at"].replace(" ", "T") + "Z"
@@ -145,6 +146,7 @@ def lead_emails(lead_id: int):
             SELECT id, received_at, label, summary, body
             FROM replies WHERE lead_id = ? ORDER BY id""", (lead_id,))]
     for r in replies:
+        r["summary"] = screen_text(r["summary"])
         if r["received_at"] and "T" not in r["received_at"]:
             r["received_at"] = r["received_at"].replace(" ", "T") + "Z"
     return {"lead_id": lead_id, "sent": sent, "replies": replies}

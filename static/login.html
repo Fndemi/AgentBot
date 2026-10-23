@@ -88,6 +88,12 @@ input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px
 .btn:hover { background: var(--primary-hover); }
 .btn[disabled] { opacity: .6; cursor: default; }
 .err { background: var(--neg-bg); color: var(--neg); border-radius: 8px; padding: 9px 12px; font-size: 13px; }
+.pwfield { position: relative; display: block; }
+.pwfield input { width: 100%; padding-right: 42px; }
+.eye { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; display: grid; place-items: center;
+  border: 0; border-radius: 6px; background: transparent; color: var(--fg-3); cursor: pointer; }
+.eye:hover { background: var(--hover); color: var(--fg); }
+.eye svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .foot { font-size: 12px; color: var(--fg-3); text-align: center; }
 </style>
 
@@ -143,6 +149,22 @@ input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px
   // Sales can't open the dashboard, so they always land in the CRM
   let role = null;
   const dest = () => role === "admin" || nextUrl.startsWith("/crm") ? nextUrl : "/crm";
+
+  const EYE = '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const EYE_OFF = '<svg viewBox="0 0 24 24"><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.5 0 10 8 10 8a17.6 17.6 0 0 1-2.16 3.19"/><path d="M6.61 6.61A17.4 17.4 0 0 0 2 12s3.5 8 10 8a9.7 9.7 0 0 0 5.39-1.61"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="m2 2 20 20"/></svg>';
+  document.querySelectorAll("input[type=password]").forEach(inp => {
+    const wrap = document.createElement("span"); wrap.className = "pwfield";
+    inp.replaceWith(wrap); wrap.append(inp);
+    const b = document.createElement("button"); b.type = "button"; b.className = "eye";
+    const show = (on) => {
+      inp.type = on ? "text" : "password"; b.setAttribute("aria-pressed", on);
+      b.setAttribute("aria-label", on ? "Hide password" : "Show password"); b.title = on ? "Hide password" : "Show password";
+      b.innerHTML = on ? EYE_OFF : EYE;
+    };
+    show(false);
+    b.onclick = () => { show(inp.type === "password"); inp.focus(); };
+    wrap.append(b);
+  });
 
   function showErr(el, msg) { el.textContent = msg; el.hidden = !msg; }
   function showChange() { $("signin").hidden = true; $("change").hidden = false; $("cur").focus(); }

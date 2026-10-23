@@ -120,7 +120,6 @@ svg.i.sm { width: 14px; height: 14px; }
 @keyframes ping { 75%, 100% { transform: scale(2.2); opacity: 0; } }
 .bar { height: 4px; border-radius: 999px; background: var(--muted); overflow: hidden; }
 .bar span { display: block; height: 100%; border-radius: 999px; background: var(--primary); }
-.side-note { padding: 0 8px; font-size: 11px; color: var(--fg-3); }
 
 /* ---------- frame ---------- */
 .shell { padding: 8px 8px 8px 240px; min-height: 100vh; }
@@ -311,10 +310,10 @@ tbody tr:hover td { background: color-mix(in srgb, var(--hover) 60%, transparent
 .feedback .err { color: var(--neg); }
 .feedback .ok { color: var(--pos); }
 .rbody { padding: 24px 32px 40px; display: grid; gap: 24px; }
-.ai { max-width: 680px; border: 1px solid var(--primary-line); background: var(--primary-soft); border-radius: 8px; padding: 14px 16px; }
-.ai .who { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--primary); }
-.ai .who span { font-weight: 400; color: var(--fg-2); }
-.ai p { margin-top: 4px; }
+.sumbox { max-width: 680px; border: 1px solid var(--line); background: var(--muted); border-radius: 8px; padding: 14px 16px; }
+.sumbox .who { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--fg-2); }
+.sumbox .who span { font-weight: 400; color: var(--fg-3); }
+.sumbox p { margin-top: 4px; }
 .orig { max-width: 680px; }
 .orig .lbl { font-size: 12px; font-weight: 500; color: var(--fg-3); }
 .orig h3 { margin: 4px 0 16px; font-size: 16px; font-weight: 600; }
@@ -482,7 +481,7 @@ tr.orgrow:focus-visible { outline-offset: -2px; }
     <a class="navlink" href="/crm"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="lbl">CRM</span></a>
     <button class="navlink signout" data-act="logout"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span class="lbl">Sign out</span></button>
   </div>
-  <div class="side-foot"><p class="eyebrow">Bot</p><div id="botcard"></div><p class="side-note">Runs on this computer only</p></div>
+  <div class="side-foot"><p class="eyebrow">Bot</p><div id="botcard"></div></div>
 </aside>
 
 <div class="shell">
@@ -708,7 +707,7 @@ function timelineHTML(id, { outOnly = false } = {}) {
     const r = it.r;
     return `<li><span class="node in" aria-hidden="true">${ico("inbox")}</span>
       <div class="hd"><b>Reply</b>${tag(r.label)}<time class="tnum">${it.at ? fullDate(it.at) : ""}</time></div>
-      <div class="box"><p class="rsum"><small>AI summary</small>${esc(r.summary || "No summary")}</p>
+      <div class="box"><p class="rsum"><small>Summary</small>${esc(r.summary || "No summary")}</p>
         ${r.label !== "bounce" ? `<a class="textlink" href="#replies-${r.id}" data-act="close-org-nav" style="margin-top:8px">Open reply ${ico("arrowR", "sm")}</a>` : ""}</div></li>`;
   }).join("")}</ol>`;
 }
@@ -1104,7 +1103,7 @@ function renderReader(r) {
       <div class="feedback" aria-live="polite">${err ? `<p class="err" role="alert">Couldn't save. ${esc(err)}</p>` : ok ? `<p class="ok">${esc(ok)}</p>` : ""}</div>
     </div>
     <div class="rbody">
-      <section class="ai" aria-label="LeadBot's reading"><p class="who">${/not read by the AI/.test(r.summary || "") ? `${ico("inbox", "sm")}LeadBot's note <span>· not read by the AI, read the original</span>` : `${ico("sparkles", "sm")}LeadBot's reading · AI-generated <span>· may be wrong, check the original</span>`}</p><p>${esc(r.summary || "No summary was produced.")}</p></section>
+      <section class="sumbox" aria-label="Summary"><p class="who">${/not labelled automatically/.test(r.summary || "") ? `${ico("inbox", "sm")}LeadBot's note <span>· read the original</span>` : "Summary"}</p><p>${esc(r.summary || "No summary was produced.")}</p></section>
       ${lead ? `<details class="sentsec" data-sent="${lead.id}" ${S.sentOpen.has(lead.id) ? "open" : ""}><summary>${ico("send", "sm")}What you sent them <span class="n">· ${seqText(lead.step)}</span>${ico("chevR", "sm chev")}</summary>
         <div>${S.sentOpen.has(lead.id) ? timelineHTML(lead.id, { outOnly: true }) : ""}</div></details>` : ""}
       <section class="orig" aria-label="Original email"><p class="lbl">Original email</p><h3>${esc(r.subject || "(no subject)")}</h3><div class="letter">${esc(r.body || "(empty message)")}</div></section>

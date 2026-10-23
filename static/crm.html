@@ -194,8 +194,8 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .m-subj { padding: 4px 14px 0; font-size: 13px; font-weight: 500; }
 .m-text { padding: 8px 14px 12px; font-size: 13.5px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--fg); }
 .m-text.clamp { max-height: 9.5em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
-.m-ai { margin: 0 14px 10px; padding: 8px 10px; border-radius: 8px; background: var(--muted); font-size: 12.5px; color: var(--fg-2); }
-.m-ai b { color: var(--fg); font-weight: 500; }
+.m-sum { margin: 0 14px 10px; padding: 8px 10px; border-radius: 8px; background: var(--muted); font-size: 12.5px; color: var(--fg-2); }
+.m-sum b { color: var(--fg); font-weight: 500; }
 .m-foot { display: flex; gap: 6px; padding: 0 10px 10px; flex-wrap: wrap; }
 .missing { color: var(--fg-3); font-style: italic; }
 
@@ -234,6 +234,9 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .formgrid .full { grid-column: 1 / -1; }
 .formgrid .hint { font-weight: 400; color: var(--fg-3); }
 .pw { display: flex; gap: 6px; }
+.pwfield { position: relative; display: block; }
+.pwfield .input { padding-right: 40px; }
+.pwfield .eye { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; }
 .formfoot { display: flex; align-items: center; gap: 10px; padding: 0 16px 16px; flex-wrap: wrap; }
 .note-ok { font-size: 12.5px; color: var(--pos); }
 .note-err { font-size: 12.5px; color: var(--neg); }
@@ -297,6 +300,8 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
   <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
   <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></symbol>
   <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.5 0 10 8 10 8a17.6 17.6 0 0 1-2.16 3.19"/><path d="M6.61 6.61A17.4 17.4 0 0 0 2 12s3.5 8 10 8a9.7 9.7 0 0 0 5.39-1.61"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="m2 2 20 20"/></symbol>
   <symbol id="i-archive" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="5" rx="1"/><path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/></symbol>
 </svg>
 
@@ -637,7 +642,7 @@ function msgHTML(m) {
   const long = (m.body || "").length > 600;
   if (m.kind === "note") return `<article class="msg note"><div class="m-head"><span class="avatar sm">${esc(initials(m.who))}</span><b>${esc(m.who)}</b><span class="muted">added a note</span><span class="when" title="${esc(fullWhen(m.at))}">${esc(when(m.at))}</span></div><div class="m-text">${text}</div></article>`;
   if (m.kind === "in") {
-    const ai = m.summary ? `<div class="m-ai"><b>AI summary:</b> ${esc(m.summary)}</div>` : "";
+    const ai = m.summary ? `<div class="m-sum"><b>Summary:</b> ${esc(m.summary)}</div>` : "";
     const waiting = !m.handled && m.label !== "bounce";  // every reply but a bounce needs reading
     const actions = state.detail.can_act ? `<div class="m-foot">${state.detail.can_reply ? `<button class="btn sm" data-a="reply-to" data-id="${m.id}">Reply to this</button>` : ""}${waiting ? `<button class="btn ghost sm" data-a="done" data-id="${m.id}"><svg class="i"><use href="#i-check"/></svg>Mark done</button>` : ""}</div>` : "";
     return `<article class="msg in"><div class="m-head"><b>${esc(m.from || m.who)}</b>${m.label ? chip(LABELS, m.label) : ""}${waiting ? '<span class="chip pri plain">Waiting</span>' : ""}<span class="when" title="${esc(fullWhen(m.at))}">${esc(when(m.at))}</span></div>
@@ -646,7 +651,7 @@ function msgHTML(m) {
   const who = m.kind === "bot" ? `LeadBot <span class="muted">· ${m.step > 1 ? "follow-up " + (m.step - 1) : "first email"}</span>` : esc(m.who) + (m.to ? ` <span class="muted">to ${esc(m.to)}</span>` : "");
   const st = m.status === "dry_run" ? '<span class="chip warn plain">Test only, not sent</span>' : m.status === "failed" ? '<span class="chip neg plain">Failed to send</span>' : "";
   return `<article class="msg ${m.status === "failed" ? "failed" : ""}"><div class="m-head"><b>${who}</b>${st}<span class="when" title="${esc(fullWhen(m.at))}">${esc(when(m.at))}</span></div>
-    ${m.subject ? `<div class="m-subj">${esc(m.subject)}</div>` : ""}<div class="m-text ${long ? "clamp" : ""}">${text}</div>${long ? `<div class="m-foot"><button class="btn ghost sm" data-a="expand">Show full email</button></div>` : ""}${m.error ? `<div class="m-ai" style="color:var(--neg)">${esc(m.error)}</div>` : ""}</article>`;
+    ${m.subject ? `<div class="m-subj">${esc(m.subject)}</div>` : ""}<div class="m-text ${long ? "clamp" : ""}">${text}</div>${long ? `<div class="m-foot"><button class="btn ghost sm" data-a="expand">Show full email</button></div>` : ""}${m.error ? `<div class="m-sum" style="color:var(--neg)">${esc(m.error)}</div>` : ""}</article>`;
 }
 
 function composerHTML(lead, canReply, canAct) {
@@ -831,6 +836,23 @@ $("f-add").addEventListener("submit", async (e) => {
 });
 
 /* ---------------- account ---------------- */
+function addEyes(root) {
+  root.querySelectorAll("input[type=password]").forEach(inp => {
+    const wrap = document.createElement("span"); wrap.className = "pwfield";
+    inp.replaceWith(wrap); wrap.append(inp);
+    const b = document.createElement("button"); b.type = "button"; b.className = "iconbtn eye";
+    const show = (on) => {
+      inp.type = on ? "text" : "password"; b.setAttribute("aria-pressed", on);
+      b.setAttribute("aria-label", on ? "Hide password" : "Show password"); b.title = on ? "Hide password" : "Show password";
+      b.innerHTML = `<svg class="i"><use href="#i-${on ? "eye-off" : "eye"}"/></svg>`;
+    };
+    show(false);
+    b.onclick = () => { show(inp.type === "password"); inp.focus(); };
+    inp.form?.addEventListener("reset", () => show(false));
+    wrap.append(b);
+  });
+}
+addEyes($("f-pw"));
 $("f-pw").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target, msg = $("pw-msg"); msg.className = "note-err";
