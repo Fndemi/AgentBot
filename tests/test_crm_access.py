@@ -134,3 +134,42 @@ def test_sales_lead_page_leaves_out_score_reasons_source_and_backup_email(team):
     assert d["thread"] and d["can_act"] and d["can_reply"]
     full = team["admin"].get(f"/api/crm/leads/{lead_id}").json()["lead"]
     assert full["source_email"] == "old@cbk-listed.com" and full["score_reasons"] == ["+40 licensed lender"]
+
+
+def test_every_reply_but_a_bounce_waits_and_unsubscribed_leads_cannot_be_emailed(team):
+    asha = team["asha"]
+    _, not_interested = add_lead("a@nope.com", label="not_interested")
+    _, auto = add_lead("b@away.com", status="sent", label="out_of_office")
+    unsub_lead, unsub = add_lead("c@stop.com", status="unsubscribed", label="unsubscribe")
+    db.unsubscribe("c@stop.com")
+    _, bounce = add_lead("d@gone.com", status="bounced", label="bounce")
+
+    rows = {l["email"]: l for l in asha.get("/api/crm/leads?scope=open").json()["leads"]}
+    assert all(rows[e]["waiting"] == 1 for e in ("a@nope.com", "b@away.com", "c@stop.com"))
+    assert "d@gone.com" not in rows
+    assert rows["c@stop.com"]["can_email"] is False and rows["a@nope.com"]["can_email"] is True
+
+    d = asha.get(f"/api/crm/leads/{unsub_lead}").json()
+    assert d["can_reply"] is False
+    assert asha.post(f"/api/crm/leads/{unsub_lead}/reply", json={"body": "Sorry to see you go"}).status_code == 409
+    assert asha.post(f"/api/crm/replies/{unsub}/done").status_code == 200
+    assert handled(unsub) == 1 and handled(not_interested) == 0 and handled(auto) == 0 and handled(bounce) == 0
+    assert db.is_suppressed("c@stop.com")
+
+
+def test_replies_marked_handled_by_the_old_rule_wait_again_once(team):
+    import crm
+    lead_id, unanswered = add_lead("e@old.com", label="not_interested")
+    answered_lead, answered = add_lead("f@old.com", label="out_of_office")
+    _, bounce = add_lead("g@old.com", label="bounce")
+    with crm.conn() as c:
+        c.execute("UPDATE replies SET handled = 1")
+        c.execute("INSERT INTO crm_messages (lead_id, user_id, status, sent_at) VALUES (?, ?, 'sent', '2999-01-01 00:00:00')",
+                  (answered_lead, team["ids"]["asha"]))
+        c.execute("DELETE FROM crm_migrations")  # as on a database from before this change
+    crm.ensure_schema()
+    assert (handled(unanswered), handled(answered), handled(bounce)) == (0, 1, 1)
+
+    team["admin"].post(f"/api/crm/replies/{unanswered}/done")
+    crm.ensure_schema()  # starting again doesn't undo what someone marked done
+    assert handled(unanswered) == 1

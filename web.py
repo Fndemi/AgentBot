@@ -43,9 +43,8 @@ def ensure_schema():
     db.init()
     with conn() as c:
         if "handled" not in columns(c, "replies"):
+            # every new reply waits for someone to read it (crm.py decides what shows as waiting)
             c.execute("ALTER TABLE replies ADD COLUMN handled INTEGER DEFAULT 0")
-            # Replies that never needed you count as handled already
-            c.execute("UPDATE replies SET handled = 1 WHERE label NOT IN ('interested','question','needs_review')")
 
 
 ensure_schema()

@@ -565,7 +565,7 @@ function renderList() {
       <span class="l1">${l.waiting ? '<span class="dot" title="Waiting for an answer"></span>' : ""}<b class="truncate">${esc(l.company || l.email)}</b>
         <span class="when">${esc(when(l.last_received))}</span></span>
       <span class="l2">${esc(l.last_summary || "No message text saved.")}</span>
-      <span class="l3">${scoreHTML(l.score)}${l.last_label ? chip(LABELS, l.last_label) : ""}${chip(STAGES, l.status)}
+      <span class="l3">${scoreHTML(l.score)}${l.last_label ? chip(LABELS, l.last_label) : ""}${chip(STAGES, l.status)}${l.can_email ? "" : '<span class="chip neg plain">Can\'t be emailed</span>'}
         <span class="truncate" style="margin-left:auto">${l.owner ? (l.mine ? "You" : esc(l.owner)) : "Unclaimed"}</span></span>
     </button>`).join("");
 }
@@ -606,11 +606,11 @@ function renderDetail() {
     ? `<span class="owner"><span class="avatar sm">${esc(initials(lead.owner))}</span>${lead.mine ? "You're handling this" : esc(lead.owner) + " is handling this"}</span>`
     : `<span class="owner muted">Nobody has claimed this lead</span>`;
   let buttons = "";
-  if (!lead.claimed_by) buttons += `<button class="btn primary sm" data-a="claim">Claim lead</button>`;
-  if (lead.claimed_by && (lead.mine || admin)) buttons += `<button class="btn ghost sm" data-a="release">Release</button>`;
-  if (admin) buttons += `<select class="select" data-a="assign" style="width:auto;height:28px;font-size:12.5px" aria-label="Assign to">
+  if (can_reply && !lead.claimed_by) buttons += `<button class="btn primary sm" data-a="claim">Claim lead</button>`;
+  if (can_reply && lead.claimed_by && (lead.mine || admin)) buttons += `<button class="btn ghost sm" data-a="release">Release</button>`;
+  if (can_reply && admin) buttons += `<select class="select" data-a="assign" style="width:auto;height:28px;font-size:12.5px" aria-label="Assign to">
       <option value="">Assign to…</option>${state.users.filter(u => u.active).map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join("")}</select>`;
-  const stageSel = can_act && !["unsubscribed", "bounced", "invalid"].includes(lead.status)
+  const stageSel = can_act && can_reply
     ? `<select class="select" data-a="stage" style="width:auto;height:28px;font-size:12.5px" aria-label="Stage">
         ${["replied", "meeting", "client", "lost"].map(s => `<option value="${s}" ${lead.status === s ? "selected" : ""}>${STAGES[s][0]}</option>`).join("")}
         ${["replied", "meeting", "client", "lost"].includes(lead.status) ? "" : `<option selected disabled>${esc((STAGES[lead.status] || [lead.status])[0])}</option>`}
@@ -638,8 +638,9 @@ function msgHTML(m) {
   if (m.kind === "note") return `<article class="msg note"><div class="m-head"><span class="avatar sm">${esc(initials(m.who))}</span><b>${esc(m.who)}</b><span class="muted">added a note</span><span class="when" title="${esc(fullWhen(m.at))}">${esc(when(m.at))}</span></div><div class="m-text">${text}</div></article>`;
   if (m.kind === "in") {
     const ai = m.summary ? `<div class="m-ai"><b>AI summary:</b> ${esc(m.summary)}</div>` : "";
-    const actions = state.detail.can_act ? `<div class="m-foot">${state.detail.can_reply ? `<button class="btn sm" data-a="reply-to" data-id="${m.id}">Reply to this</button>` : ""}${!m.handled && ["interested", "question", "needs_review"].includes(m.label) ? `<button class="btn ghost sm" data-a="done" data-id="${m.id}"><svg class="i"><use href="#i-check"/></svg>Mark done</button>` : ""}</div>` : "";
-    return `<article class="msg in"><div class="m-head"><b>${esc(m.from || m.who)}</b>${m.label ? chip(LABELS, m.label) : ""}${!m.handled && ["interested", "question", "needs_review"].includes(m.label) ? '<span class="chip pri plain">Waiting</span>' : ""}<span class="when" title="${esc(fullWhen(m.at))}">${esc(when(m.at))}</span></div>
+    const waiting = !m.handled && m.label !== "bounce";  // every reply but a bounce needs reading
+    const actions = state.detail.can_act ? `<div class="m-foot">${state.detail.can_reply ? `<button class="btn sm" data-a="reply-to" data-id="${m.id}">Reply to this</button>` : ""}${waiting ? `<button class="btn ghost sm" data-a="done" data-id="${m.id}"><svg class="i"><use href="#i-check"/></svg>Mark done</button>` : ""}</div>` : "";
+    return `<article class="msg in"><div class="m-head"><b>${esc(m.from || m.who)}</b>${m.label ? chip(LABELS, m.label) : ""}${waiting ? '<span class="chip pri plain">Waiting</span>' : ""}<span class="when" title="${esc(fullWhen(m.at))}">${esc(when(m.at))}</span></div>
       ${m.subject ? `<div class="m-subj">${esc(m.subject)}</div>` : ""}<div class="m-text ${long ? "clamp" : ""}">${text}</div>${long ? `<div class="m-foot"><button class="btn ghost sm" data-a="expand">Show full email</button></div>` : ""}${ai}${actions}</article>`;
   }
   const who = m.kind === "bot" ? `LeadBot <span class="muted">· ${m.step > 1 ? "follow-up " + (m.step - 1) : "first email"}</span>` : esc(m.who) + (m.to ? ` <span class="muted">to ${esc(m.to)}</span>` : "");
@@ -650,6 +651,7 @@ function msgHTML(m) {
 
 function composerHTML(lead, canReply, canAct) {
   if (!canAct) return `<div class="locked">${esc(lead.owner)} is handling this lead, so only they or an admin can reply. You can still read the conversation.</div>`;
+  if (!canReply) return `<div class="locked">${lead.status === "unsubscribed" ? "This lead unsubscribed" : "This lead's email bounced or isn't valid"}, so they can't be emailed. Read their reply, then press Mark done.</div>`;
   const ins = state.detail.thread.filter(m => m.kind === "in" && !["bounce", "out_of_office"].includes(m.label));
   const target = ins.find(m => m.id === state.replyTo) || ins[ins.length - 1];
   const to = (target?.from || lead.email || "").replace(/.*<([^>]+)>.*/, "$1");

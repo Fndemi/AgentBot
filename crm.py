@@ -64,6 +64,7 @@ CRM_SENT_FOLDER = os.getenv("CRM_SENT_FOLDER", "Sent")
 
 ROLES = ("admin", "sales")
 ACTIONABLE = ("interested", "question", "needs_review")
+NO_EMAIL = ("unsubscribed", "bounced", "invalid")   # never emailed again
 CLOSED = ("client", "lost", "unsubscribed", "bounced", "invalid")
 CRM_STATUSES = ("replied", "meeting", "client", "lost")
 EMAIL_RE = re.compile(r"^[^@\s<>\"',;]+@[^@\s<>\"',;]+\.[A-Za-z]{2,}$")
@@ -147,6 +148,11 @@ def ensure_schema():
         CREATE INDEX IF NOT EXISTS idx_crm_messages_lead ON crm_messages(lead_id);
         CREATE INDEX IF NOT EXISTS idx_crm_notes_lead ON crm_notes(lead_id);
         CREATE INDEX IF NOT EXISTS idx_crm_events_lead ON crm_events(lead_id);
+        -- one-time data changes, so each runs once and never undoes what people did since
+        CREATE TABLE IF NOT EXISTS crm_migrations (
+            name TEXT PRIMARY KEY,
+            done_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
         """)
         lc = _cols(c, "leads")
         if "claimed_by" not in lc:
@@ -155,7 +161,15 @@ def ensure_schema():
             c.execute("ALTER TABLE leads ADD COLUMN claimed_at TEXT")
         if "handled" not in _cols(c, "replies"):
             c.execute("ALTER TABLE replies ADD COLUMN handled INTEGER DEFAULT 0")
-            c.execute("UPDATE replies SET handled = 1 WHERE label NOT IN ('interested','question','needs_review')")
+        # Every reply but a bounce now needs someone to read it. Replies an older version marked
+        # handled by itself (not interested, auto-replies, unsubscribes) go back to waiting,
+        # unless someone has answered the lead since. Once only: Mark done after this sticks.
+        if not c.execute("SELECT 1 FROM crm_migrations WHERE name = 'review_all_replies'").fetchone():
+            c.execute("""UPDATE replies SET handled = 0
+                         WHERE COALESCE(handled, 0) = 1 AND COALESCE(label, '') != 'bounce'
+                           AND NOT EXISTS (SELECT 1 FROM crm_messages m WHERE m.lead_id = replies.lead_id
+                                           AND m.status != 'failed' AND m.sent_at >= replies.received_at)""")
+            c.execute("INSERT INTO crm_migrations (name) VALUES ('review_all_replies')")
         c.execute("DELETE FROM sessions WHERE expires_at < ?", (now_utc(),))
 
 
@@ -420,6 +434,10 @@ SALES_FIELDS = ("id", "company", "email", "phone", "industry", "website", "score
                 "claimed_by", "claimed_at", "created_at")
 
 
+def _can_email(c, lead):
+    return lead["status"] not in NO_EMAIL and not db.is_suppressed(lead["email"] or "")
+
+
 def _score_cols(c):
     """The targeting step adds score, score_reasons and source to leads; older databases don't have them."""
     lc = _cols(c, "leads")
@@ -460,24 +478,28 @@ def open_leads(scope: str = "open", user=Depends(current_user)):
         raise HTTPException(400, "Unknown view.")
     closed = ",".join("'%s'" % s for s in CLOSED)
     actionable = ",".join("'%s'" % s for s in ACTIONABLE)
+    no_email = ",".join("'%s'" % s for s in NO_EMAIL)
+    waiting = "COALESCE(r.handled,0) = 0 AND COALESCE(r.label,'') != 'bounce'"   # every reply but a bounce
     me = int(user["id"])
     if scope == "closed":
         where = f"l.status IN ('client','lost')"
     else:
-        where = (f"l.status NOT IN ({closed}) AND (l.status IN ('replied','meeting') OR EXISTS "
-                 f"(SELECT 1 FROM replies x WHERE x.lead_id = l.id AND x.label IN ({actionable})))")
+        where = (f"((l.status NOT IN ({closed}) AND (l.status IN ('replied','meeting') OR EXISTS "
+                 f"(SELECT 1 FROM replies x WHERE x.lead_id = l.id AND x.label IN ({actionable})))) OR EXISTS "
+                 f"(SELECT 1 FROM replies r WHERE r.lead_id = l.id AND {waiting}))")
     if scope == "mine" or (scope == "closed" and user["role"] != "admin"):
         where += " AND l.claimed_by = %d" % me
     elif user["role"] != "admin":
         where += " AND (l.claimed_by IS NULL OR l.claimed_by = %d)" % me
+    suppressed = db.suppressed_emails()
     with conn() as c:
         names = _user_names(c)
         sc = _score_cols(c)
         rows = [dict(r) for r in c.execute(f"""
             SELECT l.id, l.company, l.email, l.industry, l.status, l.website, l.claimed_by, l.claimed_at,
                    {('l.' + sc['score']) if sc['score'] else 'NULL'} AS score,
-                   (SELECT COUNT(*) FROM replies r WHERE r.lead_id = l.id AND COALESCE(r.handled,0) = 0
-                        AND r.label IN ({actionable})) AS waiting,
+                   (SELECT COUNT(*) FROM replies r WHERE r.lead_id = l.id AND {waiting}) AS waiting,
+                   CASE WHEN l.status IN ({no_email}) THEN 0 ELSE 1 END AS can_email,
                    (SELECT r.id FROM replies r WHERE r.lead_id = l.id AND r.label NOT IN ('bounce','out_of_office')
                         ORDER BY r.id DESC LIMIT 1) AS last_reply_id,
                    (SELECT MAX(m.sent_at) FROM crm_messages m WHERE m.lead_id = l.id AND m.status != 'failed') AS last_answer
@@ -494,6 +516,7 @@ def open_leads(scope: str = "open", user=Depends(current_user)):
             r["claimed_at"] = iso(r["claimed_at"])
             r["owner"] = names.get(r["claimed_by"])
             r["mine"] = r["claimed_by"] == user["id"]
+            r["can_email"] = bool(r["can_email"]) and (r["email"] or "").lower().strip() not in suppressed
             del r["last_reply_id"]
     # Waiting on us first, newest reply first
     rows.sort(key=lambda r: r["last_received"] or "", reverse=True)
@@ -539,13 +562,13 @@ def lead_detail(lead_id: int, user=Depends(current_user)):
                    "who": names.get(r["user_id"], "LeadBot")}
                   for r in c.execute("SELECT * FROM crm_events WHERE lead_id = ? ORDER BY id DESC LIMIT 50", (lead_id,))
                   ] if admin else []  # the history names colleagues and who a lead was assigned to
+        can_reply = _can_email(c, row)
     # bot rows only have a date; put them at the start of that day so order stays sensible
     items.sort(key=lambda x: (x["at"] or "") if "T" in (x["at"] or "") else (x["at"] or "") + "T00:00:00Z")
     lead["owner"] = names.get(lead.get("claimed_by"))
     lead["mine"] = lead.get("claimed_by") == user["id"]
     lead["claimed_at"] = iso(lead.get("claimed_at"))
     lead["created_at"] = iso(lead.get("created_at"))
-    can_reply = lead["status"] not in ("unsubscribed", "bounced", "invalid")
     return {"lead": lead, "thread": items, "events": events, "can_reply": can_reply,
             "can_act": user["role"] == "admin" or not lead.get("claimed_by") or lead["mine"]}
 
@@ -719,7 +742,7 @@ def send_reply(lead_id: int, body: ReplyIn, user=Depends(current_user)):
     with conn() as c:
         lead = _lead_or_404(c, lead_id, user)
         _require_owner_or_free(lead, user)
-        if lead["status"] in ("unsubscribed", "bounced", "invalid"):
+        if not _can_email(c, lead):
             raise HTTPException(409, "This lead unsubscribed or their address bounced. Don't email them.")
         orig = None
         if body.reply_id:
