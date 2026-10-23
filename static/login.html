@@ -140,13 +140,18 @@ input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px
     if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Something went wrong. Try again.");
     return data;
   }
+  // Sales can't open the dashboard, so they always land in the CRM
+  let role = null;
+  const dest = () => role === "admin" || nextUrl.startsWith("/crm") ? nextUrl : "/crm";
+
   function showErr(el, msg) { el.textContent = msg; el.hidden = !msg; }
   function showChange() { $("signin").hidden = true; $("change").hidden = false; $("cur").focus(); }
 
   // Already signed in? Go straight on, or finish setting the password.
   fetch("/api/auth/me", { credentials: "same-origin" }).then(r => r.ok ? r.json() : null).then(d => {
     if (!d) return;
-    if (d.user.must_change) showChange(); else location.replace(nextUrl);
+    role = d.user.role;
+    if (d.user.must_change) showChange(); else location.replace(dest());
   }).catch(() => {});
 
   $("f-signin").addEventListener("submit", async (e) => {
@@ -158,8 +163,9 @@ input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px
     btn.disabled = true;
     try {
       const d = await post("/api/auth/login", { email, password });
+      role = d.user.role;
       if (d.must_change) { $("cur").value = password; showChange(); $("new1").focus(); }
-      else location.replace(nextUrl);
+      else location.replace(dest());
     } catch (err) { showErr($("e-signin"), err.message); $("password").select(); }
     finally { btn.disabled = false; }
   });
@@ -173,7 +179,7 @@ input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px
     btn.disabled = true;
     try {
       await post("/api/auth/password", { current: $("cur").value, new: $("new1").value });
-      location.replace(nextUrl);
+      location.replace(dest());
     } catch (err) { showErr($("e-change"), err.message); }
     finally { btn.disabled = false; }
   });

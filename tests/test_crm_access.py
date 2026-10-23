@@ -1,0 +1,136 @@
+"""Who sees what in the CRM and the dashboard, and which replies wait for someone to read
+them. Run against the real web app (web.py with the CRM installed) and a temporary
+database; no email is sent: the CRM's mail sending is replaced by one that fails the test."""
+import pytest
+from fastapi.testclient import TestClient
+
+import config
+import db
+
+PASSWORD = "correct horse battery"
+
+
+@pytest.fixture
+def app(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "crm.db"))
+    import crm  # imported here, after the test database is chosen: web.py sets up its schema on import
+    import web
+    crm.ensure_schema()
+    web.ensure_schema()
+    crm._fails.clear()
+    monkeypatch.setattr(crm, "CRM_FROM_EMAIL", "sales@talksasa.co.ke")
+    monkeypatch.setattr(crm, "_deliver", lambda msg: pytest.fail("the CRM tried to send an email"))
+    monkeypatch.setattr(crm, "_file_in_sent", lambda msg: None)
+    return web.app
+
+
+def add_user(name, email, role):
+    import crm
+    with crm.conn() as c:
+        c.execute("INSERT INTO users (name, email, role, password_hash, must_change) VALUES (?,?,?,?,0)",
+                  (name, email, role, crm.hash_password(PASSWORD)))
+        return c.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()["id"]
+
+
+def signed_in(app, email):
+    client = TestClient(app)
+    assert client.post("/api/auth/login", json={"email": email, "password": PASSWORD}).status_code == 200
+    return client
+
+
+def add_lead(email, claimed_by=None, status="replied", label="interested", **cols):
+    db.add_lead(email.split("@")[1], email.split("@")[1], "school", email, "search")
+    lead_id = db.find_lead_by_email(email)["id"]
+    sets = dict(status=status, claimed_by=claimed_by, **cols)
+    with db.conn() as c:
+        c.execute(f"UPDATE leads SET {', '.join(k + ' = ?' for k in sets)} WHERE id = ?", (*sets.values(), lead_id))
+    reply_id = db.add_reply(lead_id, email, "Re: Hi", "Tell me more", label, "a reply", "uid-" + email)
+    return lead_id, reply_id
+
+
+@pytest.fixture
+def team(app):
+    """An admin, two sales people, and a lead for each case: Asha's, Ben's and unclaimed."""
+    ids = {"admin": add_user("Ada", "ada@talksasa.co.ke", "admin"),
+           "asha": add_user("Asha", "asha@talksasa.co.ke", "sales"),
+           "ben": add_user("Ben", "ben@talksasa.co.ke", "sales")}
+    leads = {"asha": add_lead("info@asha-school.com", ids["asha"]),
+             "ben": add_lead("info@ben-school.com", ids["ben"]),
+             "free": add_lead("info@free-school.com")}
+    return {"ids": ids, "leads": leads,
+            "admin": signed_in(app, "ada@talksasa.co.ke"), "asha": signed_in(app, "asha@talksasa.co.ke")}
+
+
+def handled(reply_id):
+    with db.conn() as c:
+        return c.execute("SELECT COALESCE(handled, 0) h FROM replies WHERE id = ?", (reply_id,)).fetchone()["h"]
+
+
+def test_sales_get_403_on_the_dashboard_and_its_routes(team):
+    lead_id, reply_id = team["leads"]["free"]
+    gets = ["/", "/api/all", f"/api/leads/{lead_id}/emails", "/api/sent-today", "/api/crm/report"]
+    for path in gets:
+        assert team["asha"].get(path, follow_redirects=False).status_code == 403, path
+        assert team["admin"].get(path).status_code == 200, path  # admins keep the dashboard
+    posts = [(f"/api/leads/{lead_id}/status", {"status": "client"}),
+             (f"/api/replies/{reply_id}/handled", {"handled": True})]
+    for path, body in posts:
+        assert team["asha"].post(path, json=body).status_code == 403, path
+    assert db.find_lead_by_email("info@free-school.com")["status"] == "replied"  # nothing changed
+    assert handled(reply_id) == 0
+
+
+def test_sales_get_404_on_a_colleagues_lead(team):
+    asha, (ben_lead, ben_reply) = team["asha"], team["leads"]["ben"]
+    assert asha.get(f"/api/crm/leads/{ben_lead}").status_code == 404
+    for path, body in [(f"/api/crm/leads/{ben_lead}/claim", None), (f"/api/crm/leads/{ben_lead}/release", None),
+                       (f"/api/crm/leads/{ben_lead}/notes", {"body": "hi"}),
+                       (f"/api/crm/leads/{ben_lead}/status", {"status": "lost"}),
+                       (f"/api/crm/leads/{ben_lead}/reply", {"body": "Hello"}),
+                       (f"/api/crm/replies/{ben_reply}/done", None)]:
+        r = asha.post(path, json=body) if body else asha.post(path)
+        assert r.status_code == 404, path
+        assert "Ben" not in r.text
+    lead = db.find_lead_by_email("info@ben-school.com")
+    assert lead["claimed_by"] == team["ids"]["ben"] and lead["status"] == "replied" and handled(ben_reply) == 0
+    assert team["admin"].get(f"/api/crm/leads/{ben_lead}").status_code == 200
+
+
+def test_sales_lists_show_only_unclaimed_and_their_own(team):
+    asha, admin, L = team["asha"], team["admin"], team["leads"]
+    with db.conn() as c:  # one of Asha's and one of Ben's leads are won (which marks their replies done)
+        c.execute("UPDATE leads SET status = 'client' WHERE id IN (?, ?)", (L["asha"][0], L["ben"][0]))
+        c.execute("UPDATE replies SET handled = 1 WHERE lead_id IN (?, ?)", (L["asha"][0], L["ben"][0]))
+    add_lead("info@asha-open.com", team["ids"]["asha"])
+    add_lead("info@ben-open.com", team["ids"]["ben"])
+
+    def emails(client, scope):
+        return {l["email"] for l in client.get(f"/api/crm/leads?scope={scope}").json()["leads"]}
+
+    assert emails(asha, "open") == {"info@asha-open.com", "info@free-school.com"}
+    assert emails(asha, "mine") == {"info@asha-open.com"}
+    assert emails(asha, "closed") == {"info@asha-school.com"}
+    assert asha.get("/api/crm/leads?scope=open").json()["counts"] == {"waiting": 2, "unclaimed": 1, "mine": 1}
+    assert emails(admin, "open") == {"info@asha-open.com", "info@ben-open.com", "info@free-school.com"}
+    assert emails(admin, "closed") == {"info@asha-school.com", "info@ben-school.com"}
+    assert [u["name"] for u in asha.get("/api/crm/users").json()["users"]] == ["Asha"]
+
+
+def test_sales_lead_page_leaves_out_score_reasons_source_and_backup_email(team):
+    lead_id, _ = team["leads"]["free"]
+    with db.conn() as c:
+        c.execute("UPDATE leads SET score = 72, score_reasons = ?, source = 'CBK DCP directory Sep 2026', "
+                  "source_email = 'old@cbk-listed.com', phone = '+254 700 000000' WHERE id = ?",
+                  ('["+40 licensed lender"]', lead_id))
+    team["admin"].post(f"/api/crm/leads/{lead_id}/assign", json={"user_id": team["ids"]["ben"]})
+    team["admin"].post(f"/api/crm/leads/{lead_id}/release")
+    d = team["asha"].get(f"/api/crm/leads/{lead_id}").json()
+    lead = d["lead"]
+    assert (lead["company"], lead["email"], lead["phone"], lead["industry"], lead["score"]) == \
+        ("free-school.com", "info@free-school.com", "+254 700 000000", "school", 72)
+    for hidden in ("score_reasons", "source", "source_email", "source_url", "source_query"):
+        assert hidden not in lead
+    assert d["events"] == [] and "Ben" not in str(d)  # the history would say who it was assigned to
+    assert d["thread"] and d["can_act"] and d["can_reply"]
+    full = team["admin"].get(f"/api/crm/leads/{lead_id}").json()["lead"]
+    assert full["source_email"] == "old@cbk-listed.com" and full["score_reasons"] == ["+40 licensed lender"]

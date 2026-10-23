@@ -240,6 +240,14 @@ def _too_many(key):
 
 PUBLIC_PATHS = {"/login", "/api/auth/login", "/favicon.ico"}
 WHILE_MUST_CHANGE = {"/login", "/api/auth/me", "/api/auth/password", "/api/auth/logout"}
+# The dashboard (web.py, web_extra.py) and the What's working report: admins only
+ADMIN_PATHS = {"/", "/api/all", "/api/sent-today", "/api/crm/report"}
+ADMIN_PREFIXES = ("/api/leads/", "/api/replies/")
+
+
+def admin_path(path):
+    path = path.rstrip("/") or "/"
+    return path in ADMIN_PATHS or (path + "/").startswith(ADMIN_PREFIXES)
 
 
 def _safe_next(path):
@@ -269,6 +277,12 @@ def install(app):
             if path.startswith("/api/"):
                 return JSONResponse({"detail": "Set a new password first."}, 403)
             return RedirectResponse("/login", 303)
+        if user["role"] != "admin" and admin_path(path):
+            if path.startswith("/api/"):
+                return JSONResponse({"detail": "Only an admin can see this."}, 403)
+            return HTMLResponse("<!doctype html><meta charset='utf-8'><title>LeadBot</title>"
+                                "<p style='font-family:system-ui;margin:40px'>Only an admin can see the dashboard. "
+                                "<a href='/crm'>Go to the CRM</a></p>", 403, headers={"Cache-Control": "no-store"})
         request.state.user = user
         response = await call_next(request)
         if not path.startswith("/api/"):
@@ -388,11 +402,22 @@ def change_password(body: PasswordIn, request: Request, user=Depends(current_use
 
 # ---------------------------------------------------------------- leads
 
-def _lead_or_404(c, lead_id):
+def _sees(user, lead):
+    """Sales see leads nobody has claimed and their own; admins see every lead."""
+    return user["role"] == "admin" or lead["claimed_by"] in (None, user["id"])
+
+
+def _lead_or_404(c, lead_id, user):
+    """A colleague's lead is "not found" for sales, so they can't tell it exists."""
     lead = c.execute("SELECT * FROM leads WHERE id = ?", (lead_id,)).fetchone()
-    if not lead:
+    if not lead or not _sees(user, lead):
         raise HTTPException(404, "Lead not found.")
     return lead
+
+
+# What sales see of a lead; admins see every column
+SALES_FIELDS = ("id", "company", "email", "phone", "industry", "website", "score", "status",
+                "claimed_by", "claimed_at", "created_at")
 
 
 def _score_cols(c):
@@ -435,13 +460,16 @@ def open_leads(scope: str = "open", user=Depends(current_user)):
         raise HTTPException(400, "Unknown view.")
     closed = ",".join("'%s'" % s for s in CLOSED)
     actionable = ",".join("'%s'" % s for s in ACTIONABLE)
+    me = int(user["id"])
     if scope == "closed":
         where = f"l.status IN ('client','lost')"
     else:
         where = (f"l.status NOT IN ({closed}) AND (l.status IN ('replied','meeting') OR EXISTS "
                  f"(SELECT 1 FROM replies x WHERE x.lead_id = l.id AND x.label IN ({actionable})))")
-        if scope == "mine":
-            where += " AND l.claimed_by = %d" % int(user["id"])
+    if scope == "mine" or (scope == "closed" and user["role"] != "admin"):
+        where += " AND l.claimed_by = %d" % me
+    elif user["role"] != "admin":
+        where += " AND (l.claimed_by IS NULL OR l.claimed_by = %d)" % me
     with conn() as c:
         names = _user_names(c)
         sc = _score_cols(c)
@@ -479,9 +507,12 @@ def open_leads(scope: str = "open", user=Depends(current_user)):
 @router.get("/api/crm/leads/{lead_id}")
 def lead_detail(lead_id: int, user=Depends(current_user)):
     with conn() as c:
-        lead = dict(_lead_or_404(c, lead_id))
+        row = _lead_or_404(c, lead_id, user)
+        admin = user["role"] == "admin"
+        lead = dict(row) if admin else {k: row[k] for k in SALES_FIELDS if k in row.keys()}
         names = _user_names(c)
-        lead["score_reasons"] = _reasons(lead.get("score_reasons"))
+        if admin:
+            lead["score_reasons"] = _reasons(lead.get("score_reasons"))
         sc = _cols(c, "sent")
         subj = "sent_subject" if "sent_subject" in sc else ("subject" if "subject" in sc else None)
         body = "sent_body" if "sent_body" in sc else ("body" if "body" in sc else None)
@@ -506,7 +537,8 @@ def lead_detail(lead_id: int, user=Depends(current_user)):
                           "who": names.get(r["user_id"], "Someone")})
         events = [{"action": r["action"], "detail": r["detail"], "at": iso(r["created_at"]),
                    "who": names.get(r["user_id"], "LeadBot")}
-                  for r in c.execute("SELECT * FROM crm_events WHERE lead_id = ? ORDER BY id DESC LIMIT 50", (lead_id,))]
+                  for r in c.execute("SELECT * FROM crm_events WHERE lead_id = ? ORDER BY id DESC LIMIT 50", (lead_id,))
+                  ] if admin else []  # the history names colleagues and who a lead was assigned to
     # bot rows only have a date; put them at the start of that day so order stays sensible
     items.sort(key=lambda x: (x["at"] or "") if "T" in (x["at"] or "") else (x["at"] or "") + "T00:00:00Z")
     lead["owner"] = names.get(lead.get("claimed_by"))
@@ -527,13 +559,15 @@ def _require_owner_or_free(lead, user):
 @router.post("/api/crm/leads/{lead_id}/claim")
 def claim(lead_id: int, user=Depends(current_user)):
     with conn() as c:
-        lead = _lead_or_404(c, lead_id)
+        lead = _lead_or_404(c, lead_id, user)
         if lead["claimed_by"] == user["id"]:
             return {"ok": True}
         # Only succeeds if nobody grabbed it in the meantime
         cur = c.execute("UPDATE leads SET claimed_by = ?, claimed_at = ? WHERE id = ? AND claimed_by IS NULL",
                         (user["id"], now_utc(), lead_id))
         if cur.rowcount == 0:
+            if user["role"] != "admin":
+                raise HTTPException(409, "Someone else claimed this lead just now.")
             owner = _user_names(c).get(lead["claimed_by"], "someone else")
             raise HTTPException(409, f"{owner} already claimed this lead.")
         log_event(c, lead_id, user["id"], "claimed")
@@ -543,7 +577,7 @@ def claim(lead_id: int, user=Depends(current_user)):
 @router.post("/api/crm/leads/{lead_id}/release")
 def release(lead_id: int, user=Depends(current_user)):
     with conn() as c:
-        lead = _lead_or_404(c, lead_id)
+        lead = _lead_or_404(c, lead_id, user)
         if not lead["claimed_by"]:
             return {"ok": True}
         if lead["claimed_by"] != user["id"] and user["role"] != "admin":
@@ -560,7 +594,7 @@ class AssignIn(BaseModel):
 @router.post("/api/crm/leads/{lead_id}/assign")
 def assign(lead_id: int, body: AssignIn, admin=Depends(admin_only)):
     with conn() as c:
-        _lead_or_404(c, lead_id)
+        _lead_or_404(c, lead_id, admin)
         target = c.execute("SELECT id, name, active FROM users WHERE id = ?", (body.user_id,)).fetchone()
         if not target or not target["active"]:
             raise HTTPException(400, "That person isn't an active user.")
@@ -581,7 +615,7 @@ def add_note(lead_id: int, body: NoteIn, user=Depends(current_user)):
     if len(text) > 5000:
         raise HTTPException(400, "Keep notes under 5,000 characters.")
     with conn() as c:
-        _lead_or_404(c, lead_id)
+        _lead_or_404(c, lead_id, user)
         c.execute("INSERT INTO crm_notes (lead_id, user_id, body) VALUES (?,?,?)", (lead_id, user["id"], text))
     return {"ok": True}
 
@@ -595,7 +629,7 @@ def crm_status(lead_id: int, body: StatusIn, user=Depends(current_user)):
     if body.status not in CRM_STATUSES:
         raise HTTPException(400, "Unknown stage.")
     with conn() as c:
-        lead = _lead_or_404(c, lead_id)
+        lead = _lead_or_404(c, lead_id, user)
         _require_owner_or_free(lead, user)
         if lead["status"] in ("unsubscribed", "bounced"):
             raise HTTPException(409, "This lead unsubscribed or bounced, so its stage can't change here.")
@@ -612,7 +646,9 @@ def reply_done(reply_id: int, user=Depends(current_user)):
         r = c.execute("SELECT lead_id FROM replies WHERE id = ?", (reply_id,)).fetchone()
         if not r:
             raise HTTPException(404, "Reply not found.")
-        _require_owner_or_free(_lead_or_404(c, r["lead_id"]), user)
+        if r["lead_id"] is None and user["role"] != "admin":
+            raise HTTPException(404, "Reply not found.")
+        _require_owner_or_free(_lead_or_404(c, r["lead_id"], user), user)
         c.execute("UPDATE replies SET handled = 1 WHERE id = ?", (reply_id,))
         log_event(c, r["lead_id"], user["id"], "marked_done")
     return {"ok": True}
@@ -681,7 +717,7 @@ def send_reply(lead_id: int, body: ReplyIn, user=Depends(current_user)):
     if len(text) > 20000:
         raise HTTPException(400, "That message is too long.")
     with conn() as c:
-        lead = _lead_or_404(c, lead_id)
+        lead = _lead_or_404(c, lead_id, user)
         _require_owner_or_free(lead, user)
         if lead["status"] in ("unsubscribed", "bounced", "invalid"):
             raise HTTPException(409, "This lead unsubscribed or their address bounced. Don't email them.")
@@ -779,7 +815,7 @@ def _band(score):
 
 
 @router.get("/api/crm/report")
-def report(days: int = 0, user=Depends(current_user)):
+def report(days: int = 0, user=Depends(admin_only)):
     """Reply results by segment, score band and source, counted per lead that was emailed.
 
     days = 0 means all time; otherwise only leads first emailed in the last N days.
@@ -872,8 +908,8 @@ def list_users(user=Depends(current_user)):
     for r in rows:
         r["active"], r["must_change"] = bool(r["active"]), bool(r["must_change"])
         r["last_login"] = iso(r["last_login"])
-    if user["role"] != "admin":  # sales only need names for "who's handling this"
-        rows = [{"id": r["id"], "name": r["name"], "active": r["active"]} for r in rows]
+    if user["role"] != "admin":  # sales don't see who handles the other leads
+        rows = [{"id": r["id"], "name": r["name"], "active": r["active"]} for r in rows if r["id"] == user["id"]]
     return {"users": rows}
 
 

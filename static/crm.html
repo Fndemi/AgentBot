@@ -313,8 +313,8 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
   <div>
     <p class="eyebrow">Workspace</p>
     <nav class="nav">
-      <a class="navlink" href="/"><svg class="i"><use href="#i-grid"/></svg>Dashboard</a>
-      <button class="navlink" data-go="report"><svg class="i"><use href="#i-chart"/></svg>What's working</button>
+      <a class="navlink" href="/" id="nav-dash" hidden><svg class="i"><use href="#i-grid"/></svg>Dashboard</a>
+      <button class="navlink" data-go="report" id="nav-report" hidden><svg class="i"><use href="#i-chart"/></svg>What's working</button>
       <button class="navlink" data-go="team" id="nav-team" hidden><svg class="i"><use href="#i-users"/></svg>Team</button>
       <button class="navlink" data-go="account"><svg class="i"><use href="#i-user"/></svg>My account</button>
     </nav>
@@ -364,7 +364,7 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
 
     <div class="view" id="v-team" hidden>
       <div class="page">
-        <div><h1>Team</h1><p class="lead">Admins can manage people and reassign any lead. Sales can see every open lead, claim them and reply.</p></div>
+        <div><h1>Team</h1><p class="lead">Admins can manage people and reassign any lead. Sales see the leads nobody has claimed and their own, and can claim them and reply.</p></div>
         <div class="panel">
           <h3>Add a person</h3>
           <form id="f-add" novalidate>
@@ -484,7 +484,7 @@ $("theme").onclick = () => {
 /* ---------------- navigation ---------------- */
 const TITLES = { open: "Open leads", mine: "My leads", closed: "Won and lost", report: "What's working", team: "Team", account: "My account" };
 function go(view, opts = {}) {
-  if (view === "team" && state.me?.role !== "admin") view = "open";
+  if ((view === "team" || view === "report") && state.me?.role !== "admin") view = "open";
   state.view = view;
   $("v-leads").hidden = !["open", "mine", "closed"].includes(view);
   $("v-team").hidden = view !== "team"; $("v-account").hidden = view !== "account"; $("v-report").hidden = view !== "report";
@@ -853,7 +853,7 @@ async function start() {
   state.me = me.user; state.dryRun = me.dry_run; state.fromEmail = me.from_email || "";
   $("me-name").textContent = me.user.name; $("me-av").textContent = initials(me.user.name);
   $("me-role").textContent = me.user.role === "admin" ? "Admin" : "Sales";
-  $("nav-team").hidden = me.user.role !== "admin"; $("drybar").hidden = !me.dry_run;
+  $("nav-team").hidden = $("nav-dash").hidden = $("nav-report").hidden = me.user.role !== "admin"; $("drybar").hidden = !me.dry_run;
   await loadUsers();
   const [v, sel] = location.hash.slice(1).split("/");
   if (sel) state.sel = +sel;
