@@ -74,6 +74,8 @@ ACTIONABLE = ("interested", "question", "needs_review")
 NO_EMAIL = ("unsubscribed", "bounced", "invalid")   # never emailed again
 CLOSED = ("client", "lost", "unsubscribed", "bounced", "invalid")
 CRM_STATUSES = ("replied", "meeting", "client", "lost")
+WON_OR_LOST = ("client", "lost")
+MINE = "l.status NOT IN ('client','lost')"   # My leads: claimed by you and not won or lost yet
 EMAIL_RE = re.compile(r"^[^@\s<>\"',;]+@[^@\s<>\"',;]+\.[A-Za-z]{2,}$")
 MIN_PASSWORD = 10
 
@@ -531,6 +533,8 @@ def open_leads(scope: str = "open", user=Depends(current_user)):
     me = int(user["id"])
     if scope == "closed":
         where = f"l.status IN ('client','lost')"
+    elif scope == "mine":  # every lead you're handling, whether or not it has written back
+        where = MINE
     else:
         where = (f"((l.status NOT IN ({closed}) AND (l.status IN ('replied','meeting') OR EXISTS "
                  f"(SELECT 1 FROM replies x WHERE x.lead_id = l.id AND x.label IN ({actionable})))) OR EXISTS "
@@ -566,13 +570,14 @@ def open_leads(scope: str = "open", user=Depends(current_user)):
             r["mine"] = r["claimed_by"] == user["id"]
             r["can_email"] = bool(r["can_email"]) and (r["email"] or "").lower().strip() not in suppressed
             del r["last_reply_id"]
+        mine = c.execute(f"SELECT COUNT(*) FROM leads l WHERE {MINE} AND l.claimed_by = ?", (me,)).fetchone()[0]
     # Waiting on us first, newest reply first
     rows.sort(key=lambda r: r["last_received"] or "", reverse=True)
     rows.sort(key=lambda r: r["waiting"] == 0)
     counts = {"open": len(rows),
               "waiting": sum(1 for r in rows if r["waiting"]),
               "unclaimed": sum(1 for r in rows if not r["claimed_by"]),
-              "mine": sum(1 for r in rows if r["mine"])}
+              "mine": mine}  # the same leads My leads shows
     return {"leads": rows, "counts": counts, "me": user["id"]}
 
 
@@ -696,6 +701,8 @@ def release(lead_id: int, user=Depends(current_user)):
             return {"ok": True}
         if lead["claimed_by"] != user["id"] and user["role"] != "admin":
             raise HTTPException(403, "Only the person handling this lead or an admin can release it.")
+        if lead["status"] in WON_OR_LOST and user["role"] != "admin":
+            raise HTTPException(409, "A won or lost lead stays with the person who closed it. An admin can reassign it.")
         c.execute("UPDATE leads SET claimed_by = NULL, claimed_at = NULL WHERE id = ?", (lead_id,))
         log_event(c, lead_id, user["id"], "released")
     return {"ok": True}
@@ -747,8 +754,16 @@ def crm_status(lead_id: int, body: StatusIn, user=Depends(current_user)):
         _require_owner_or_free(lead, user)
         if lead["status"] in ("unsubscribed", "bounced"):
             raise HTTPException(409, "This lead unsubscribed or bounced, so its stage can't change here.")
-        c.execute("UPDATE leads SET status = ? WHERE id = ?", (body.status, lead_id))
-        if body.status in ("client", "lost"):
+        if not lead["claimed_by"]:  # whoever moves it on is handling it, as when replying
+            c.execute("UPDATE leads SET claimed_by = ?, claimed_at = ? WHERE id = ?", (user["id"], now_utc(), lead_id))
+            log_event(c, lead_id, user["id"], "claimed", "by setting the stage")
+        if lead["status"] != body.status:  # as db.set_status: first meeting/client date, and the lead's history
+            c.execute("UPDATE leads SET status = ? WHERE id = ?", (body.status, lead_id))
+            if body.status in ("meeting", "client"):
+                c.execute(f"UPDATE leads SET {body.status}_at = COALESCE({body.status}_at, ?) WHERE id = ?",
+                          (now_utc(), lead_id))
+            db.log_event(c, lead_id, "status_changed", old=lead["status"], new=body.status, by="crm")
+        if body.status in WON_OR_LOST:
             c.execute("UPDATE replies SET handled = 1 WHERE lead_id = ?", (lead_id,))
         log_event(c, lead_id, user["id"], "stage", body.status)
     return {"ok": True}

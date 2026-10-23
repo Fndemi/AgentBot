@@ -202,3 +202,46 @@ def test_organisations_lists_everyone_emailed_with_the_same_limits_for_sales(tea
     assert "Ben" not in str(sales)
     assert set(orgs(team["admin"])) == {L["asha"][0], L["ben"][0], L["free"][0], quiet, by_team}
     assert never not in orgs(team["admin"])
+
+
+def ids_in(client, scope):
+    return {l["id"] for l in client.get(f"/api/crm/leads?scope={scope}").json()["leads"]}
+
+
+def test_my_leads_show_every_lead_you_handle_until_it_is_won_or_lost(team):
+    asha, me = team["asha"], team["ids"]["asha"]
+    quiet, quiet_reply = add_lead("info@quiet.com", status="sent", label="out_of_office")
+    assert asha.post(f"/api/crm/leads/{quiet}/claim").status_code == 200
+    asha.post(f"/api/crm/replies/{quiet_reply}/done")      # nothing waiting, never written back
+    lost, _ = add_lead("info@gone-cold.com", me, status="lost", label="not_interested")
+    assert ids_in(asha, "mine") == {team["leads"]["asha"][0], quiet}
+    assert quiet not in ids_in(asha, "open")              # not an open lead, but still yours
+    assert ids_in(asha, "closed") == {lost}
+    assert asha.get("/api/crm/leads?scope=open").json()["counts"]["mine"] == 2   # the badge counts the same
+
+
+def test_setting_a_stage_claims_an_unclaimed_lead_and_records_it(team):
+    asha, me = team["asha"], team["ids"]["asha"]
+    free = team["leads"]["free"][0]
+    assert asha.post(f"/api/crm/leads/{free}/status", json={"status": "meeting"}).status_code == 200
+    lead = db.find_lead_by_email("info@free-school.com")
+    assert lead["claimed_by"] == me and lead["status"] == "meeting" and lead["meeting_at"]
+    asha.post(f"/api/crm/leads/{free}/status", json={"status": "client"})
+    lead = db.find_lead_by_email("info@free-school.com")
+    assert lead["client_at"] and free in ids_in(asha, "closed")   # Asha won it, so it's in her Won and lost
+    with db.conn() as c:
+        changes = [r["detail"] for r in c.execute("SELECT detail FROM lead_events WHERE lead_id = ? AND "
+                                                  "event_type = 'status_changed' ORDER BY id", (free,))]
+    assert len(changes) == 2 and all('"by": "crm"' in d for d in changes)
+
+
+def test_a_won_or_lost_lead_stays_with_whoever_closed_it(team):
+    asha, me = team["asha"], team["ids"]["asha"]
+    won = team["leads"]["asha"][0]
+    asha.post(f"/api/crm/leads/{won}/status", json={"status": "client"})
+    r = asha.post(f"/api/crm/leads/{won}/release")
+    assert r.status_code == 409 and "admin" in r.json()["detail"]
+    assert db.find_lead_by_email("info@asha-school.com")["claimed_by"] == me and won in ids_in(asha, "closed")
+    assert team["admin"].post(f"/api/crm/leads/{won}/release").status_code == 200   # an admin still can
+    open_lead, _ = add_lead("info@still-open.com", me)
+    assert asha.post(f"/api/crm/leads/{open_lead}/release").status_code == 200       # open leads release as before

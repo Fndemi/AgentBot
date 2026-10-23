@@ -986,7 +986,9 @@ function renderDetail() {
   let buttons = "";
   if (can_reply && can_act) buttons += `<button class="btn sm" data-a="mode" data-m="new"><svg class="i"><use href="#i-mail"/></svg>New email</button>`;
   if (can_reply && !lead.claimed_by) buttons += `<button class="btn primary sm" data-a="claim">Claim lead</button>`;
-  if (can_reply && lead.claimed_by && (lead.mine || admin)) buttons += `<button class="btn ghost sm" data-a="release">Release</button>`;
+  // a won or lost lead stays with whoever closed it; an admin can still release or reassign it
+  if (can_reply && lead.claimed_by && (lead.mine || admin) && (admin || !["client", "lost"].includes(lead.status)))
+    buttons += `<button class="btn ghost sm" data-a="release">Release</button>`;
   if (can_reply && admin) buttons += `<select class="select" data-a="assign" style="width:auto;height:28px;font-size:12.5px" aria-label="Assign to">
       <option value="">Assign to…</option>${state.users.filter(u => u.active).map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join("")}</select>`;
   const stageSel = can_act && can_reply
@@ -1173,6 +1175,12 @@ $("detail").addEventListener("change", async (e) => {
   const s = e.target.closest("select[data-a]"); if (!s) return;
   const id = state.sel;
   try {
+    if (s.dataset.a === "stage" && ["client", "lost"].includes(s.value)) {
+      const name = state.detail.lead.company || state.detail.lead.email;
+      if (!confirm(`Mark ${name} as ${s.value === "client" ? "a client (won)" : "lost"}? Its replies are marked done and it moves to Won and lost.`)) {
+        renderDetail(); return;  // puts the stage picker back
+      }
+    }
     if (s.dataset.a === "stage") await act(() => api(`/api/crm/leads/${id}/status`, { method: "POST", body: { status: s.value } }), "Stage updated.");
     if (s.dataset.a === "assign" && s.value) {
       const name = s.options[s.selectedIndex].text;
