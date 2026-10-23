@@ -210,7 +210,7 @@ def ids_in(client, scope):
 
 def test_my_leads_show_every_lead_you_handle_until_it_is_won_or_lost(team):
     asha, me = team["asha"], team["ids"]["asha"]
-    quiet, quiet_reply = add_lead("info@quiet.com", status="sent", label="out_of_office")
+    quiet, quiet_reply = add_lead("info@quiet.com", status="sent", label="not_interested")
     assert asha.post(f"/api/crm/leads/{quiet}/claim").status_code == 200
     asha.post(f"/api/crm/replies/{quiet_reply}/done")      # nothing waiting, never written back
     lost, _ = add_lead("info@gone-cold.com", me, status="lost", label="not_interested")

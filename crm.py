@@ -484,6 +484,15 @@ SALES_FIELDS = ("id", "company", "email", "phone", "industry", "website", "score
                 "claimed_by", "claimed_at", "created_at")
 
 
+def _has_response(c, lead_id):
+    """Whether the organisation has written back: any reply but a bounce or an auto-reply."""
+    return c.execute("SELECT 1 FROM replies WHERE lead_id = ? AND COALESCE(label, '') NOT IN ('bounce', 'out_of_office')"
+                     " LIMIT 1", (lead_id,)).fetchone() is not None
+
+
+NOT_YET = "This organisation hasn't replied yet, so nobody can claim it. You can claim it once it writes back."
+
+
 def _can_email(c, lead):
     return lead["status"] not in NO_EMAIL and not db.is_suppressed(lead["email"] or "")
 
@@ -658,6 +667,7 @@ def lead_detail(lead_id: int, user=Depends(current_user)):
                   for r in c.execute("SELECT * FROM crm_events WHERE lead_id = ? ORDER BY id DESC LIMIT 50", (lead_id,))
                   ] if admin else []  # the history names colleagues and who a lead was assigned to
         can_reply = _can_email(c, row)
+        has_response = _has_response(c, lead_id)
     # bot rows only have a date; put them at the start of that day so order stays sensible
     items.sort(key=lambda x: (x["at"] or "") if "T" in (x["at"] or "") else (x["at"] or "") + "T00:00:00Z")
     lead["owner"] = names.get(lead.get("claimed_by"))
@@ -666,7 +676,8 @@ def lead_detail(lead_id: int, user=Depends(current_user)):
     lead["created_at"] = iso(lead.get("created_at"))
     return {"lead": lead, "thread": items, "events": events, "can_reply": can_reply,
             "can_act": user["role"] == "admin" or not lead.get("claimed_by") or lead["mine"],
-            "can_download": user["role"] == "admin" or lead["mine"]}
+            "can_download": user["role"] == "admin" or lead["mine"],
+            "has_response": has_response}
 
 
 def _require_owner_or_free(lead, user):
@@ -681,6 +692,8 @@ def claim(lead_id: int, user=Depends(current_user)):
         lead = _lead_or_404(c, lead_id, user)
         if lead["claimed_by"] == user["id"]:
             return {"ok": True}
+        if not lead["claimed_by"] and not _has_response(c, lead_id):
+            raise HTTPException(409, NOT_YET)
         # Only succeeds if nobody grabbed it in the meantime
         cur = c.execute("UPDATE leads SET claimed_by = ?, claimed_at = ? WHERE id = ? AND claimed_by IS NULL",
                         (user["id"], now_utc(), lead_id))
@@ -754,7 +767,10 @@ def crm_status(lead_id: int, body: StatusIn, user=Depends(current_user)):
         _require_owner_or_free(lead, user)
         if lead["status"] in ("unsubscribed", "bounced"):
             raise HTTPException(409, "This lead unsubscribed or bounced, so its stage can't change here.")
-        if not lead["claimed_by"]:  # whoever moves it on is handling it, as when replying
+        responded = _has_response(c, lead_id)
+        if not lead["claimed_by"] and not responded and user["role"] != "admin":
+            raise HTTPException(409, NOT_YET)
+        if not lead["claimed_by"] and responded:  # whoever moves it on is handling it, as when replying
             c.execute("UPDATE leads SET claimed_by = ?, claimed_at = ? WHERE id = ?", (user["id"], now_utc(), lead_id))
             log_event(c, lead_id, user["id"], "claimed", "by setting the stage")
         if lead["status"] != body.status:  # as db.set_status: first meeting/client date, and the lead's history
@@ -1037,6 +1053,9 @@ def _open_for_email(c, lead_id, user):
     _require_owner_or_free(lead, user)
     if not _can_email(c, lead):
         raise HTTPException(409, "This lead unsubscribed or their address bounced. Don't email them.")
+    if not lead["claimed_by"] and user["role"] != "admin" and not _has_response(c, lead_id):
+        raise HTTPException(409, "This organisation hasn't replied yet, so it can't be claimed or emailed from here. "
+                                 "You can once it writes back.")
     return lead
 
 
@@ -1060,7 +1079,7 @@ def _send(c, lead, user, to, subject, msg, plain, files, in_reply_to, event):
     for f in files:
         c.execute("""INSERT INTO crm_attachments (message_id, lead_id, filename, content_type, size, data)
                      VALUES (?,?,?,?,?,?)""", (message_id, lead_id, f["filename"], f["content_type"], f["size"], f["data"]))
-    if not lead["claimed_by"]:
+    if not lead["claimed_by"] and _has_response(c, lead_id):  # one that hasn't replied stays unclaimed (admins)
         c.execute("UPDATE leads SET claimed_by = ?, claimed_at = ? WHERE id = ?", (user["id"], now_utc(), lead_id))
         log_event(c, lead_id, user["id"], "claimed", "by emailing")
     c.execute("UPDATE leads SET crm_emailed_at = ? WHERE id = ? AND crm_emailed_at IS NULL", (now_utc(), lead_id))

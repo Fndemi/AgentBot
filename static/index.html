@@ -1158,6 +1158,7 @@ function renderReader(r) {
         <button class="btn ${r.handled ? "" : "primary"}" data-act="handled" ${busy ? "disabled" : ""} aria-keyshortcuts="h">${p === "handled" ? spin : r.handled ? "" : ico("check")}${r.handled ? "Move back to needs action" : "Mark handled"}</button>
         ${lead && st !== "meeting" && st !== "client" ? `<button class="btn" data-act="meeting" ${busy ? "disabled" : ""}>${p === "meeting" ? spin : ""}Set meeting</button>` : ""}
         ${lead ? (st === "client" ? `<span class="won">${ico("check")}Client</span>` : `<button class="btn" data-act="client" ${busy ? "disabled" : ""}>${p === "client" ? spin : ""}Mark as client</button>`) : ""}
+        ${lead && r.label !== "bounce" ? `<a class="btn" href="/crm#orgs/${lead.id}">${ico("send")}Reply in CRM</a>` : ""}
         <button class="btn ghost" data-act="copy">${ico("copy")}Copy email</button>
       </div>
       <div class="feedback" aria-live="polite">${err ? `<p class="err" role="alert">Couldn't save. ${esc(err)}</p>` : ok ? `<p class="ok">${esc(ok)}</p>` : ""}</div>

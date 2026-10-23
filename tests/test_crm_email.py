@@ -69,18 +69,15 @@ def test_a_reply_is_html_with_a_plain_version_signature_and_grey_quote(team, out
 
 
 def test_a_new_email_claims_the_lead_and_stops_the_bots_emails(team, outbox):
-    import ranking
-    lead_id, _ = add_lead("info@quiet-school.com", status="sent", label="out_of_office")
+    lead_id, _ = add_lead("info@quiet-school.com", status="sent", label="question")   # it has written back
     db.record_sent(lead_id, "<first@talksasa.co.ke>", "school")
-    waiting_id, _ = add_lead("info@new-school.com", status="verified", label="out_of_office")
     asha = team["asha"]
     assert asha.post(f"/api/crm/leads/{lead_id}/email", json={"subject": " ", "body": "Hi"}).status_code == 400
     assert lead_id in [l["id"] for l in db.awaiting_followup(1)]
 
     r = asha.post(f"/api/crm/leads/{lead_id}/email", json={"subject": "Bulk SMS pricing", "body": "Hi,\nPrices attached."})
     assert r.status_code == 200 and r.json()["to"] == "info@quiet-school.com"
-    asha.post(f"/api/crm/leads/{waiting_id}/email", json={"subject": "Hello", "body": "Hi"})
-    msg = outbox[0]
+    [msg] = outbox
     assert msg["Subject"] == "Bulk SMS pricing" and msg["In-Reply-To"] is None
     assert "wrote:" not in msg.get_body(("plain",)).get_content()  # its own conversation, nothing quoted
 
@@ -88,12 +85,38 @@ def test_a_new_email_claims_the_lead_and_stops_the_bots_emails(team, outbox):
     assert lead["claimed_by"] == team["ids"]["asha"] and lead["crm_emailed_at"] and lead["status"] == "sent"
     assert lead_id not in [l["id"] for l in db.awaiting_followup(1)]
     assert "CRM" in db.claim_send(lead_id, 1, 100)
-    assert waiting_id not in [l["id"] for l in ranking.waiting()]
-    assert "CRM" in db.claim_send(waiting_id, 0, 100)
     # someone else's lead now: other sales can't email it
     ben = signed_in(team["admin"].app, "ben@talksasa.co.ke")
     assert ben.post(f"/api/crm/leads/{lead_id}/email", json={"subject": "Hi", "body": "Hi"}).status_code == 404
-    assert len(outbox) == 2
+    assert len(outbox) == 1
+
+
+def test_an_organisation_that_has_not_replied_is_view_only_for_sales(team, outbox):
+    import ranking
+    quiet, auto_reply = add_lead("info@not-yet.com", status="sent", label="out_of_office")  # an auto-reply only
+    db.record_sent(quiet, "<first@talksasa.co.ke>", "school")
+    waiting_id, _ = add_lead("info@new-school.com", status="verified", label="out_of_office")
+    asha, admin = team["asha"], team["admin"]
+    assert asha.get(f"/api/crm/leads/{quiet}").json()["has_response"] is False
+    for path, body in [(f"/api/crm/leads/{quiet}/claim", None), (f"/api/crm/leads/{quiet}/email", {"subject": "Hi", "body": "Hi"}),
+                       (f"/api/crm/leads/{quiet}/reply", {"body": "Hi"}), (f"/api/crm/leads/{quiet}/status", {"status": "meeting"})]:
+        r = asha.post(path, json=body) if body else asha.post(path)
+        assert r.status_code == 409 and "replied yet" in r.json()["detail"], path
+    assert admin.post(f"/api/crm/leads/{quiet}/claim").status_code == 409   # nobody claims it, admins neither
+    assert outbox == [] and db.find_lead_by_email("info@not-yet.com")["status"] == "sent"
+
+    # an admin can still email it, and that stops the bot, but it stays unclaimed
+    assert admin.post(f"/api/crm/leads/{quiet}/email", json={"subject": "Hello", "body": "Hi"}).status_code == 200
+    admin.post(f"/api/crm/leads/{waiting_id}/email", json={"subject": "Hello", "body": "Hi"})
+    lead = db.find_lead_by_email("info@not-yet.com")
+    assert lead["claimed_by"] is None and lead["crm_emailed_at"] and len(outbox) == 2
+    assert quiet not in [l["id"] for l in db.awaiting_followup(1)] and "CRM" in db.claim_send(quiet, 1, 100)
+    assert waiting_id not in [l["id"] for l in ranking.waiting()] and "CRM" in db.claim_send(waiting_id, 0, 100)
+
+    # once it writes back, the first to claim it gets it
+    db.add_reply(quiet, "info@not-yet.com", "Re: Hello", "Yes, call me", "interested", "x", "uid-yes")
+    assert asha.get(f"/api/crm/leads/{quiet}").json()["has_response"] is True
+    assert asha.post(f"/api/crm/leads/{quiet}/claim").status_code == 200
 
 
 @pytest.mark.parametrize("status", ["unsubscribed", "bounced", "invalid"])

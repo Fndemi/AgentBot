@@ -211,6 +211,12 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
   .tpl-list { position: static; max-height: 240px; }
 }
 
+/* greeting for sales above the lead list, like the dashboard's */
+.hello { flex: none; padding: 18px 20px 0; background-image: var(--glow); }
+.hello .date { font-size: 12.5px; font-weight: 500; color: var(--fg-3); }
+.hello h1 { margin-top: 2px; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 30px; }
+#hello:not([hidden]) + .tiles { background-image: none; }
+
 /* summary cards above the lead list; each one is also a shortcut to that list */
 #v-leads { flex-direction: column; }
 .tiles { flex: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 14px 20px;
@@ -343,7 +349,9 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
   .tile { padding: 8px 10px; gap: 10px; }
   .tile .ic { width: 30px; height: 30px; }
   .tile b { font-size: 19px; line-height: 22px; }
-  #v-leads:has(.crm.has-sel) .tiles { display: none; }  /* a conversation is open: give it the whole screen */
+  #v-leads:has(.crm.has-sel) .tiles, #v-leads:has(.crm.has-sel) .hello { display: none; }
+  .hello { padding: 14px 12px 0; }
+  .hello h1 { font-size: 20px; line-height: 26px; }  /* a conversation is open: give it the whole screen */
 }
 @media (max-width: 860px) {
   .toast { right: 16px; left: 16px; bottom: 16px; }
@@ -442,6 +450,7 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
     <div class="drybar" id="drybar" hidden>Test mode is on (CRM_DRY_RUN=true). Replies are saved here but not emailed to anyone.</div>
 
     <div class="view" id="v-leads">
+      <header class="hello" id="hello" hidden><p class="date" id="hello-date"></p><h1 id="hello-text"></h1></header>
       <div class="tiles" id="tiles">
         <button class="tile" data-t="all"><span class="ic"><svg class="i"><use href="#i-inbox"/></svg></span><div><b id="t-open">–</b><span class="l">Open leads</span></div></button>
         <button class="tile" data-t="waiting"><span class="ic"><svg class="i"><use href="#i-send"/></svg></span><div><b id="t-waiting">–</b><span class="l">Waiting on us</span></div></button>
@@ -982,16 +991,17 @@ function renderDetail() {
   const site = lead.website ? `<a href="${esc(/^https?:/i.test(lead.website) ? lead.website : "https://" + lead.website)}" target="_blank" rel="noopener noreferrer">${esc(lead.website.replace(/^https?:\/\//, "").replace(/\/$/, ""))}</a>` : "";
   const owner = lead.claimed_by
     ? `<span class="owner"><span class="avatar sm">${esc(initials(lead.owner))}</span>${lead.mine ? "You're handling this" : esc(lead.owner) + " is handling this"}</span>`
-    : `<span class="owner muted">Nobody has claimed this lead</span>`;
+    : state.detail.has_response ? `<span class="owner muted">Nobody has claimed this lead</span>`
+    : `<span class="owner muted">Hasn't replied yet · can be claimed once it writes back</span>`;
   let buttons = "";
-  if (can_reply && can_act) buttons += `<button class="btn sm" data-a="mode" data-m="new"><svg class="i"><use href="#i-mail"/></svg>New email</button>`;
-  if (can_reply && !lead.claimed_by) buttons += `<button class="btn primary sm" data-a="claim">Claim lead</button>`;
+  if (can_reply && can_act && !viewOnly()) buttons += `<button class="btn sm" data-a="mode" data-m="new"><svg class="i"><use href="#i-mail"/></svg>New email</button>`;
+  if (can_reply && !lead.claimed_by && state.detail.has_response) buttons += `<button class="btn primary sm" data-a="claim">Claim lead</button>`;
   // a won or lost lead stays with whoever closed it; an admin can still release or reassign it
   if (can_reply && lead.claimed_by && (lead.mine || admin) && (admin || !["client", "lost"].includes(lead.status)))
     buttons += `<button class="btn ghost sm" data-a="release">Release</button>`;
   if (can_reply && admin) buttons += `<select class="select" data-a="assign" style="width:auto;height:28px;font-size:12.5px" aria-label="Assign to">
       <option value="">Assign to…</option>${state.users.filter(u => u.active).map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join("")}</select>`;
-  const stageSel = can_act && can_reply
+  const stageSel = can_act && can_reply && !viewOnly()
     ? `<select class="select" data-a="stage" style="width:auto;height:28px;font-size:12.5px" aria-label="Stage">
         ${["replied", "meeting", "client", "lost"].map(s => `<option value="${s}" ${lead.status === s ? "selected" : ""}>${STAGES[s][0]}</option>`).join("")}
         ${["replied", "meeting", "client", "lost"].includes(lead.status) ? "" : `<option selected disabled>${esc((STAGES[lead.status] || [lead.status])[0])}</option>`}
@@ -1053,7 +1063,7 @@ function msgHTML(m) {
   if (m.kind === "in") {
     const sum = m.summary ? `<div class="m-sum"><b>Summary:</b> ${esc(m.summary)}</div>` : "";
     const waiting = !m.handled && m.label !== "bounce";  // every reply but a bounce needs reading
-    const actions = state.detail.can_act ? `<div class="m-foot">${state.detail.can_reply ? `<button class="btn sm" data-a="reply-to" data-id="${m.id}">Reply to this</button>` : ""}${waiting ? `<button class="btn ghost sm" data-a="done" data-id="${m.id}"><svg class="i"><use href="#i-check"/></svg>Mark done</button>` : ""}</div>` : "";
+    const actions = state.detail.can_act ? `<div class="m-foot">${state.detail.can_reply && !viewOnly() ? `<button class="btn sm" data-a="reply-to" data-id="${m.id}">Reply to this</button>` : ""}${waiting ? `<button class="btn ghost sm" data-a="done" data-id="${m.id}"><svg class="i"><use href="#i-check"/></svg>Mark done</button>` : ""}</div>` : "";
     return `<article class="msg in"><div class="m-head"><b>${esc(m.from || m.who)}</b>${m.label ? chip(LABELS, m.label) : ""}${waiting ? '<span class="chip pri plain">Waiting</span>' : ""}${when_}</div>
       ${m.subject ? `<div class="m-subj">${esc(m.subject)}</div>` : ""}${bodyHTML(m)}${sum}${actions}</article>`;
   }
@@ -1072,7 +1082,10 @@ function pickedHTML() {
 const attachBtn = () => `<label class="btn ghost sm attach" title="PDF, Word, Excel, CSV, PNG or JPG. Up to ${MAX_FILES} files, 10 MB in total.">
   <input type="file" id="c-files" multiple accept="${FILE_EXTS.map(e => "." + e).join(",")}"><svg class="i"><use href="#i-clip"/></svg>Attach files</label>`;
 
+// Sales can only look at an unclaimed organisation until it writes back (the server refuses the rest)
+const viewOnly = () => state.me.role !== "admin" && !state.detail.lead.claimed_by && !state.detail.has_response;
 function composerHTML(lead, canReply, canAct) {
+  if (canAct && viewOnly()) return `<div class="locked">This organisation hasn't replied yet. You can read what was sent; once it writes back you can claim it and reply.</div>`;
   if (!canAct) return `<div class="locked">${esc(lead.owner)} is handling this lead, so only they or an admin can reply. You can still read the conversation.</div>`;
   if (!canReply) return `<div class="locked">${lead.status === "unsubscribed" ? "This lead unsubscribed" : "This lead's email bounced or isn't valid"}, so they can't be emailed. Read their reply, then press Mark done.</div>`;
   const ins = state.detail.thread.filter(m => m.kind === "in" && !["bounce", "out_of_office"].includes(m.label));
@@ -1339,10 +1352,17 @@ $("f-pw").addEventListener("submit", async (e) => {
 
 /* ---------------- start ---------------- */
 async function refreshAll(manual) {
+  if (state.me) greet();  // morning, afternoon, evening
   if (state.busy) return;
   const t = $("c-text"), picked = (state.files[state.sel + ":" + state.mode] || []).length;
   if (!manual && ((t && t.value.trim()) || $("c-subj")?.value.trim() || picked)) { refreshCounts(); return; } // don't disturb someone writing
   if (!$("v-leads").hidden) await loadLeads(); else { refreshCounts(); if (state.view === "team") loadTeam(); if (state.view === "report") loadReport(); }
+}
+function greet() {  // sales only: admins have it on the dashboard
+  const h = new Date().getHours(), first = (state.me.name || "").trim().split(/\s+/)[0];
+  $("hello").hidden = state.me.role === "admin";
+  $("hello-text").textContent = `${h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"}${first ? ", " + first : ""}`;
+  $("hello-date").textContent = new Date().toLocaleDateString("en-KE", { weekday: "long", day: "numeric", month: "long" }) + " · Nairobi";
 }
 async function start() {
   let me;
@@ -1353,6 +1373,7 @@ async function start() {
   $("me-role").textContent = me.user.role === "admin" ? "Admin" : "Sales";
   $("nav-team").hidden = $("nav-dash").hidden = $("nav-report").hidden = $("nav-templates").hidden = me.user.role !== "admin";
   $("drybar").hidden = !me.dry_run;
+  greet();
   await loadUsers();
   const [v, sel] = location.hash.slice(1).split("/");
   if (v === "templates" && sel) tpl.name = sel;  // #templates/sacco opens that industry's template
