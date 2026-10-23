@@ -654,6 +654,7 @@ async function refresh({ manual = false } = {}) {
   S.refreshing = true; renderChrome();
   try {
     S.data = normalise(await getJSON("api/all")); S.mode = "live"; S.lastOk = new Date(); S.refreshError = false;
+    if (!S.me) try { S.me = (await getJSON("api/auth/me")).user; } catch (e) {}  // who is signed in, for the greeting
     try { S.sentToday = (await getJSON("api/sent-today")).emails; } catch (e) { S.sentToday = null; }
     const open = [S.org.id, ...S.sentOpen].filter(x => x != null);
     S.tl = Object.fromEntries(Object.entries(S.tl).filter(([k]) => open.includes(+k)));
@@ -923,7 +924,7 @@ function renderToday() {
   return `
     <header class="hero">
       <p class="date">${new Date().toLocaleDateString("en-KE", { weekday: "long", day: "numeric", month: "long" })} · Nairobi</p>
-      <h1>${greeting()}, ${OPERATOR}</h1>
+      <h1>${greeting()}${S.me?.name ? ", " + esc(S.me.name.trim().split(/\s+/)[0]) : ""}</h1>
       <p>${n ? `<b>${n} ${n === 1 ? "reply needs" : "replies need"}</b> your attention. Interested prospects are listed first.` : "You're all caught up. New interested replies will appear here."}</p>
       <div class="cta"><a class="btn sm primary" href="#replies">Open replies ${ico("arrowR", "sm")}</a><a class="btn sm" href="#organisations">Browse organisations</a></div>
     </header>
