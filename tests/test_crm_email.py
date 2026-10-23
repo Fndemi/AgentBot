@@ -1,11 +1,34 @@
-"""Emails sent from the CRM: how they look and new emails. Nothing is sent: the CRM's mail sending is replaced by a list that keeps each email."""
+"""Emails sent from the CRM: how they look, new emails, attachments and who can download
+them. Nothing is sent: the CRM's mail sending is replaced by a list that keeps each email."""
+import base64
+import io
 import re
+import zipfile
 
 import pytest
+from fastapi.testclient import TestClient
 
 import config
 import db
 from test_crm_access import add_lead, add_user, app, handled, signed_in, team  # noqa: F401  (fixtures)
+
+PDF = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n"
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+
+
+def b64(data):
+    return base64.b64encode(data).decode()
+
+
+def office(kind, macros=False):
+    """A minimal .docx or .xlsx (or one with macros) as bytes."""
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as z:
+        z.writestr("[Content_Types].xml", '<Types><Override ContentType="application/vnd.ms-word.document.macroEnabled.main+xml"/></Types>'
+                   if macros else "<Types/>")
+        z.writestr("word/document.xml" if kind == "docx" else "xl/workbook.xml", "<x/>")
+    return out.getvalue()
+
 
 @pytest.fixture
 def outbox(app, monkeypatch):
@@ -89,6 +112,75 @@ def test_a_suppressed_address_is_never_emailed_even_at_another_status(team, outb
         db._suppress(c, "info@free-school.com", "unsubscribed")
     assert team["admin"].post(f"/api/crm/leads/{lead_id}/email", json={"subject": "Hi", "body": "Hi"}).status_code == 409
     assert outbox == []
+
+
+def send_files(client, lead_id, files):
+    return client.post(f"/api/crm/leads/{lead_id}/email", json={
+        "subject": "Files", "body": "Attached.", "attachments": [{"name": n, "data": b64(d)} for n, d in files]})
+
+
+def test_attachment_limits_and_real_file_types(team, outbox):
+    asha, (lead_id, _) = team["asha"], team["leads"]["free"]
+    refused = {
+        "6 files": [(f"f{i}.pdf", PDF) for i in range(6)],
+        "over 10 MB": [("a.pdf", PDF + b"0" * (6 * 1024 * 1024)), ("b.pdf", PDF + b"0" * (5 * 1024 * 1024))],
+        "an .exe": [("setup.exe", b"MZ\x90\x00")],
+        "no extension": [("README", b"hello")],
+        "text named .pdf": [("invoice.pdf", b"not really a pdf")],
+        "a png named .jpg": [("photo.jpg", PNG)],
+        "a program named .csv": [("data.csv", b"MZ\x90\x00\x03\x00\x00\x00")],
+        "a docx with macros": [("letter.docx", office("docx", macros=True))],
+        "an xlsx named .docx": [("letter.docx", office("xlsx"))],
+        "an empty file": [("empty.pdf", b"")],
+    }
+    for why, files in refused.items():
+        r = send_files(asha, lead_id, files)
+        assert r.status_code == 400, why
+        assert r.json()["detail"], why
+    assert outbox == []
+    assert "at most 5 files" in send_files(asha, lead_id, refused["6 files"]).json()["detail"]
+    assert "10 MB" in send_files(asha, lead_id, refused["over 10 MB"]).json()["detail"]
+    assert "isn't really a .pdf" in send_files(asha, lead_id, refused["text named .pdf"]).json()["detail"]
+    assert "Only PDF, Word" in send_files(asha, lead_id, refused["an .exe"]).json()["detail"]
+
+    ok = [("..\\..\\Price list?.PDF", PDF), ("logo.png", PNG), ("rates.csv", "name,price\nSMS,0.80\n".encode()),
+          ("Proposal.docx", office("docx")), ("sheet.xlsx", office("xlsx"))]
+    r = send_files(asha, lead_id, ok)
+    assert r.status_code == 200, r.text
+    [msg] = outbox
+    parts = {p.get_filename(): p.get_content_type() for p in msg.iter_attachments()}
+    assert parts == {"Price list.pdf": "application/pdf", "logo.png": "image/png", "rates.csv": "text/csv",
+                     "Proposal.docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                     "sheet.xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+    thread = asha.get(f"/api/crm/leads/{lead_id}").json()
+    [out] = [m for m in thread["thread"] if m["kind"] == "out"]
+    assert [(a["name"], a["size"]) for a in out["attachments"]] == [(n, len(d)) for n, d in
+                                                                    zip(parts, [d for _, d in ok])]
+    assert thread["can_download"] is True
+
+
+def test_only_the_leads_owner_and_admins_can_download_its_attachments(team, outbox):
+    lead_id, _ = team["leads"]["free"]
+    assert send_files(team["asha"], lead_id, [("quote.pdf", PDF)]).status_code == 200
+    with db.conn() as c:
+        att = c.execute("SELECT id FROM crm_attachments").fetchone()["id"]
+    url = f"/api/crm/attachments/{att}"
+
+    r = team["asha"].get(url)
+    assert r.status_code == 200 and r.content == PDF and r.headers["content-type"] == "application/pdf"
+    assert r.headers["content-disposition"].startswith('attachment; filename="quote.pdf"')
+    assert r.headers["x-content-type-options"] == "nosniff"
+    assert team["admin"].get(url).content == PDF
+
+    ben = signed_in(team["admin"].app, "ben@talksasa.co.ke")
+    r = ben.get(url)
+    assert r.status_code == 404 and PDF not in r.content     # Asha's lead: Ben can't tell it exists
+    team["admin"].post(f"/api/crm/leads/{lead_id}/release")
+    r = ben.get(url)
+    assert r.status_code == 403 and PDF not in r.content     # unclaimed: still only admins
+    detail = ben.get(f"/api/crm/leads/{lead_id}").json()
+    assert detail["can_download"] is False
+    assert TestClient(team["admin"].app).get(url).status_code == 401   # not signed in
 
 
 def test_screens_show_no_ai_wording(team):

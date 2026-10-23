@@ -197,6 +197,17 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .m-sum { margin: 0 14px 10px; padding: 8px 10px; border-radius: 8px; background: var(--muted); font-size: 12.5px; color: var(--fg-2); }
 .m-sum b { color: var(--fg); font-weight: 500; }
 .m-quote { margin: 0 14px 12px; padding: 2px 0 2px 12px; border-left: 3px solid var(--line); font-size: 13px; color: var(--fg-3); white-space: pre-wrap; overflow-wrap: anywhere; }
+.m-files, .c-files { display: flex; flex-wrap: wrap; gap: 6px; }
+.m-files { padding: 0 14px 12px; }
+.fchip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; height: 28px; padding: 0 6px 0 10px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--bg); font-size: 12.5px; color: var(--fg); }
+.fchip .truncate { max-width: 220px; }
+.fchip .sz { color: var(--fg-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+a.fchip:hover { background: var(--hover); }
+.fchip.locked-file { color: var(--fg-2); cursor: default; }
+.fchip button { width: 22px; height: 22px; border: 0; border-radius: 5px; background: none; color: var(--fg-3); display: grid; place-items: center; }
+.fchip button:hover { background: var(--hover); color: var(--fg); }
+.attach input { display: none; }
 .m-foot { display: flex; gap: 6px; padding: 0 10px 10px; flex-wrap: wrap; }
 .missing { color: var(--fg-3); font-style: italic; }
 
@@ -303,6 +314,8 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
   <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></symbol>
   <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
   <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.5 0 10 8 10 8a17.6 17.6 0 0 1-2.16 3.19"/><path d="M6.61 6.61A17.4 17.4 0 0 0 2 12s3.5 8 10 8a9.7 9.7 0 0 0 5.39-1.61"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="m2 2 20 20"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
   <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></symbol>
   <symbol id="i-archive" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="5" rx="1"/><path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/></symbol>
 </svg>
@@ -447,7 +460,10 @@ const scoreHTML = (v) => v == null || v === "" ? "" : `<span class="score ${+v >
 const chip = (map, k) => { const [t, c] = map[k] || [k || "—", ""]; return `<span class="chip ${c}">${esc(t)}</span>`; };
 
 const state = { me: null, dryRun: false, fromEmail: "", view: "open", filter: "waiting", leads: [], counts: {}, users: [],
-  sel: null, detail: null, mode: "reply", replyTo: null, drafts: {}, busy: 0, loadedAt: null };
+  sel: null, detail: null, mode: "reply", replyTo: null, drafts: {}, files: {}, busy: 0, loadedAt: null };
+// What can be attached (the server checks all of this again, and each file's real type)
+const FILE_EXTS = ["pdf", "doc", "docx", "xls", "xlsx", "csv", "png", "jpg", "jpeg"], MAX_FILES = 5, MAX_BYTES = 10 * 1024 * 1024;
+const fsize = (n) => n < 1024 ? n + " B" : n < 1048576 ? Math.round(n / 1024) + " KB" : (n / 1048576).toFixed(1) + " MB";
 
 function toast(msg, err) {
   const t = $("toast"); t.textContent = msg; t.className = "toast" + (err ? " err" : ""); t.hidden = false;
@@ -670,6 +686,13 @@ function bodyHTML(m) {
     + (rest ? `<button class="btn ghost sm" data-a="quoted" aria-expanded="false">Show quoted text</button>` : "");
   return `<div class="m-text ${long ? "clamp" : ""}">${esc(main)}</div>${foot ? `<div class="m-foot">${foot}</div>` : ""}${rest ? `<div class="m-quote" hidden>${esc(rest)}</div>` : ""}`;
 }
+function filesHTML(list) {
+  if (!list?.length) return "";
+  const can = state.detail.can_download;
+  return `<div class="m-files">${list.map(a => can
+    ? `<a class="fchip" href="/api/crm/attachments/${a.id}" download="${esc(a.name)}" title="Download ${esc(a.name)}"><svg class="i"><use href="#i-clip"/></svg><span class="truncate">${esc(a.name)}</span><span class="sz">${fsize(a.size)}</span></a>`
+    : `<span class="fchip locked-file" title="Only the person handling this lead or an admin can download it"><svg class="i"><use href="#i-clip"/></svg><span class="truncate">${esc(a.name)}</span><span class="sz">${fsize(a.size)}</span></span>`).join("")}</div>`;
+}
 
 function msgHTML(m) {
   const when_ = `<span class="when" title="${esc(fullWhen(m.at))}">${esc(when(m.at))}</span>`;
@@ -684,8 +707,17 @@ function msgHTML(m) {
   const who = m.kind === "bot" ? `LeadBot <span class="muted">· ${m.step > 1 ? "follow-up " + (m.step - 1) : "first email"}</span>` : esc(m.who) + (m.to ? ` <span class="muted">to ${esc(m.to)}</span>` : "");
   const st = m.status === "dry_run" ? '<span class="chip warn plain">Test only, not sent</span>' : m.status === "failed" ? '<span class="chip neg plain">Failed to send</span>' : "";
   return `<article class="msg ${m.status === "failed" ? "failed" : ""}"><div class="m-head"><b>${who}</b>${st}${when_}</div>
-    ${m.subject ? `<div class="m-subj">${esc(m.subject)}</div>` : ""}${bodyHTML(m)}${m.error ? `<div class="m-sum" style="color:var(--neg)">${esc(m.error)}</div>` : ""}</article>`;
+    ${m.subject ? `<div class="m-subj">${esc(m.subject)}</div>` : ""}${bodyHTML(m)}${filesHTML(m.attachments)}${m.error ? `<div class="m-sum" style="color:var(--neg)">${esc(m.error)}</div>` : ""}</article>`;
 }
+
+function pickedHTML() {
+  const files = state.files[state.sel + ":" + state.mode] || [];
+  const total = files.reduce((n, f) => n + f.size, 0);
+  return `<div class="c-files">${files.map((f, i) => `<span class="fchip"><svg class="i"><use href="#i-clip"/></svg><span class="truncate">${esc(f.name)}</span><span class="sz">${fsize(f.size)}</span><button type="button" data-a="unattach" data-i="${i}" aria-label="Remove ${esc(f.name)}" title="Remove"><svg class="i"><use href="#i-x"/></svg></button></span>`).join("")}
+    ${files.length ? `<span class="hint" style="align-self:center;font-size:12px;color:var(--fg-3)">${files.length} of ${MAX_FILES} files · ${fsize(total)} of 10 MB</span>` : ""}</div>`;
+}
+const attachBtn = () => `<label class="btn ghost sm attach" title="PDF, Word, Excel, CSV, PNG or JPG. Up to ${MAX_FILES} files, 10 MB in total.">
+  <input type="file" id="c-files" multiple accept="${FILE_EXTS.map(e => "." + e).join(",")}"><svg class="i"><use href="#i-clip"/></svg>Attach files</label>`;
 
 function composerHTML(lead, canReply, canAct) {
   if (!canAct) return `<div class="locked">${esc(lead.owner)} is handling this lead, so only they or an admin can reply. You can still read the conversation.</div>`;
@@ -706,7 +738,8 @@ function composerHTML(lead, canReply, canAct) {
       <div class="c-meta"><span><b>To</b> ${esc(lead.email || "")}</span>${from}<span>A new conversation. LeadBot stops its automatic emails to this lead once you send.</span></div>
       <input class="input" id="c-subj" maxlength="200" placeholder="Subject" aria-label="Subject">
       <textarea class="textarea" id="c-text" rows="5" placeholder="Write your email. Your name, TalkSasa and your phone are added at the bottom."></textarea>
-      <div class="c-foot"><span class="hint">${sendHint}</span>
+      ${pickedHTML()}
+      <div class="c-foot"><span class="hint">${sendHint}</span>${attachBtn()}
         <button class="btn primary" data-a="send-new"><svg class="i"><use href="#i-send"/></svg>${sendLabel}</button></div></div>`;
   }
   const target = ins.find(m => m.id === state.replyTo) || ins[ins.length - 1];
@@ -716,9 +749,31 @@ function composerHTML(lead, canReply, canAct) {
     <div class="c-meta"><span><b>To</b> ${esc(to)}</span>${from}<span><b>Subject</b> ${esc(subj)}</span>
       ${target && ins.length > 1 ? `<span>Answering their message from ${esc(when(target.at))}</span>` : ""}</div>
     <textarea class="textarea" id="c-text" rows="5" placeholder="Write your reply. Your name, TalkSasa and your phone are added at the bottom, and their message is quoted below it."></textarea>
-    <div class="c-foot"><span class="hint">${sendHint}</span>
+    ${pickedHTML()}
+    <div class="c-foot"><span class="hint">${sendHint}</span>${attachBtn()}
       <button class="btn primary" data-a="send" data-reply="${target ? target.id : ""}"><svg class="i"><use href="#i-send"/></svg>${state.dryRun ? "Save test reply" : "Send reply"}</button></div></div>`;
 }
+
+function addFiles(list) {
+  const key = state.sel + ":" + state.mode, files = state.files[key] || [];
+  for (const f of list) {
+    const ext = (f.name.split(".").pop() || "").toLowerCase();
+    if (!f.name.includes(".") || !FILE_EXTS.includes(ext)) { toast(`${f.name} can't be attached. Only PDF, Word, Excel, CSV, PNG and JPG files can be sent.`, true); continue; }
+    if (!f.size) { toast(`${f.name} is empty.`, true); continue; }
+    if (files.length >= MAX_FILES) { toast(`You can attach at most ${MAX_FILES} files to one email.`, true); break; }
+    if (files.reduce((n, x) => n + x.size, 0) + f.size > MAX_BYTES) { toast(`${f.name} doesn't fit: attachments can be 10 MB in total at most.`, true); continue; }
+    files.push(f);
+  }
+  state.files[key] = files;
+  saveDraft(); renderDetail();
+}
+const toBase64 = (file) => new Promise((ok, fail) => {
+  const r = new FileReader();
+  r.onload = () => ok(String(r.result).split(",")[1] || "");
+  r.onerror = () => fail(new Error(`${file.name} couldn't be read. Try attaching it again.`));
+  r.readAsDataURL(file);
+});
+const attachments = (key) => Promise.all((state.files[key] || []).map(async f => ({ name: f.name, data: await toBase64(f) })));
 
 $("detail").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-a]"); if (!b || b.tagName === "SELECT") return;
@@ -729,6 +784,7 @@ $("detail").addEventListener("click", async (e) => {
     const q = b.closest(".msg").querySelector(".m-quote"), open = q.hidden;
     q.hidden = !open; b.setAttribute("aria-expanded", open); b.textContent = open ? "Hide quoted text" : "Show quoted text"; return;
   }
+  if (a === "unattach") { const k = state.sel + ":" + state.mode; saveDraft(); (state.files[k] || []).splice(+b.dataset.i, 1); renderDetail(); return; }
   if (a === "mode") { saveDraft(); state.mode = b.dataset.m; renderDetail(); (b.dataset.m === "new" ? $("c-subj") : $("c-text"))?.focus(); return; }
   if (a === "reply-to") { saveDraft(); state.mode = "reply"; state.replyTo = +b.dataset.id; renderDetail(); $("c-text")?.focus(); return; }
   b.disabled = true;
@@ -743,23 +799,26 @@ $("detail").addEventListener("click", async (e) => {
     }
     if (a === "send") {
       const text = $("c-text").value.trim(); if (!text) { toast("Write your reply first.", true); return; }
-      const r = await act(() => api(`/api/crm/leads/${id}/reply`, { method: "POST", body: { body: text, reply_id: b.dataset.reply ? +b.dataset.reply : null } }));
+      const r = await act(async () => api(`/api/crm/leads/${id}/reply`, { method: "POST",
+        body: { body: text, reply_id: b.dataset.reply ? +b.dataset.reply : null, attachments: await attachments(id + ":reply") } }));
       toast(r.status === "dry_run" ? "Saved as a test reply. Nothing was emailed." : "Reply sent to " + r.to + ".");
-      state.drafts[id + ":reply"] = ""; $("c-text").value = ""; state.replyTo = null;
+      state.drafts[id + ":reply"] = ""; state.files[id + ":reply"] = []; $("c-text").value = ""; state.replyTo = null;
     }
     if (a === "send-new") {
       const subject = $("c-subj").value.trim(), text = $("c-text").value.trim();
       if (!subject) { toast("Add a subject first.", true); return; }
       if (!text) { toast("Write your email first.", true); return; }
-      const r = await act(() => api(`/api/crm/leads/${id}/email`, { method: "POST", body: { subject, body: text } }));
+      const r = await act(async () => api(`/api/crm/leads/${id}/email`, { method: "POST",
+        body: { subject, body: text, attachments: await attachments(id + ":new") } }));
       toast(r.status === "dry_run" ? "Saved as a test email. Nothing was emailed." : "Email sent to " + r.to + ".");
-      state.drafts[id + ":new"] = state.drafts[id + ":subject"] = ""; state.mode = "reply";
+      state.drafts[id + ":new"] = state.drafts[id + ":subject"] = ""; state.files[id + ":new"] = []; state.mode = "reply";
     }
     await Promise.all([loadDetail(id), reloadListOnly()]);
   } catch (err) { /* toast already shown */ }
   finally { b.disabled = false; }
 });
 $("detail").addEventListener("change", async (e) => {
+  if (e.target.id === "c-files") { addFiles([...e.target.files]); return; }
   const s = e.target.closest("select[data-a]"); if (!s) return;
   const id = state.sel;
   try {
@@ -922,8 +981,8 @@ $("f-pw").addEventListener("submit", async (e) => {
 /* ---------------- start ---------------- */
 async function refreshAll(manual) {
   if (state.busy) return;
-  const t = $("c-text");
-  if (!manual && ((t && t.value.trim()) || $("c-subj")?.value.trim())) { refreshCounts(); return; } // don't disturb someone writing
+  const t = $("c-text"), picked = (state.files[state.sel + ":" + state.mode] || []).length;
+  if (!manual && ((t && t.value.trim()) || $("c-subj")?.value.trim() || picked)) { refreshCounts(); return; } // don't disturb someone writing
   if (!$("v-leads").hidden) await loadLeads(); else { refreshCounts(); if (state.view === "team") loadTeam(); if (state.view === "report") loadReport(); }
 }
 async function start() {

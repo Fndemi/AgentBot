@@ -19,11 +19,13 @@ Settings (.env, all optional):
     SESSION_HOURS    how long a sign-in lasts (default 12)
     COOKIE_SECURE    true once the dashboard is served over HTTPS
 """
+import base64
 import getpass
 import hashlib
 import hmac
 import html
 import imaplib
+import io
 import json
 import os
 import re
@@ -32,16 +34,18 @@ import smtplib
 import ssl
 import sys
 import time
+import unicodedata
+import zipfile
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from email.utils import formataddr, formatdate, make_msgid
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 from urllib.parse import quote, urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel
 
 import config
@@ -149,6 +153,18 @@ def ensure_schema():
         CREATE INDEX IF NOT EXISTS idx_crm_messages_lead ON crm_messages(lead_id);
         CREATE INDEX IF NOT EXISTS idx_crm_notes_lead ON crm_notes(lead_id);
         CREATE INDEX IF NOT EXISTS idx_crm_events_lead ON crm_events(lead_id);
+        -- files sent with a CRM email (only ones that went out, or were saved in test mode)
+        CREATE TABLE IF NOT EXISTS crm_attachments (
+            id INTEGER PRIMARY KEY,
+            message_id INTEGER NOT NULL REFERENCES crm_messages(id),
+            lead_id INTEGER NOT NULL REFERENCES leads(id),
+            filename TEXT NOT NULL,
+            content_type TEXT NOT NULL,
+            size INTEGER NOT NULL,
+            data BLOB NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_crm_attachments_lead ON crm_attachments(lead_id);
         -- one-time data changes, so each runs once and never undoes what people did since
         CREATE TABLE IF NOT EXISTS crm_migrations (
             name TEXT PRIMARY KEY,
@@ -571,10 +587,15 @@ def lead_detail(lead_id: int, user=Depends(current_user)):
             items.append({"kind": "in", "id": r["id"], "at": iso(r["received_at"]), "subject": r["subject"],
                           "body": r["body"], "label": r["label"], "summary": screen_text(r["summary"]),
                           "from": r["from_email"], "handled": bool(r["handled"]), "who": lead["company"]})
+        files = defaultdict(list)
+        for a in c.execute("SELECT id, message_id, filename, content_type, size FROM crm_attachments "
+                           "WHERE lead_id = ? ORDER BY id", (lead_id,)):
+            files[a["message_id"]].append({"id": a["id"], "name": a["filename"], "type": a["content_type"],
+                                           "size": a["size"]})
         for r in c.execute("SELECT * FROM crm_messages WHERE lead_id = ? ORDER BY id", (lead_id,)):
             items.append({"kind": "out", "id": r["id"], "at": iso(r["sent_at"]), "subject": r["subject"],
                           "body": r["body"], "to": r["to_email"], "status": r["status"], "error": r["error"],
-                          "who": names.get(r["user_id"], "Someone")})
+                          "who": names.get(r["user_id"], "Someone"), "attachments": files.get(r["id"], [])})
         for r in c.execute("SELECT * FROM crm_notes WHERE lead_id = ? ORDER BY id", (lead_id,)):
             items.append({"kind": "note", "id": r["id"], "at": iso(r["created_at"]), "body": r["body"],
                           "who": names.get(r["user_id"], "Someone")})
@@ -590,7 +611,8 @@ def lead_detail(lead_id: int, user=Depends(current_user)):
     lead["claimed_at"] = iso(lead.get("claimed_at"))
     lead["created_at"] = iso(lead.get("created_at"))
     return {"lead": lead, "thread": items, "events": events, "can_reply": can_reply,
-            "can_act": user["role"] == "admin" or not lead.get("claimed_by") or lead["mine"]}
+            "can_act": user["role"] == "admin" or not lead.get("claimed_by") or lead["mine"],
+            "can_download": user["role"] == "admin" or lead["mine"]}
 
 
 def _require_owner_or_free(lead, user):
@@ -699,15 +721,126 @@ def reply_done(reply_id: int, user=Depends(current_user)):
 
 # ---------------------------------------------------------------- replying
 
+class AttachmentIn(BaseModel):
+    name: str
+    data: str            # the file's bytes, base64
+
+
 class ReplyIn(BaseModel):
     body: str
     subject: Optional[str] = None
     reply_id: Optional[int] = None   # the incoming message being answered
+    attachments: List[AttachmentIn] = []
 
 
 class NewEmailIn(BaseModel):
     subject: str
     body: str
+    attachments: List[AttachmentIn] = []
+
+
+# ---------------------------------------------------------------- attachments
+
+MAX_FILES = 5
+MAX_TOTAL = 10 * 1024 * 1024   # all files of one email together
+FILE_TYPES = {
+    "pdf": "application/pdf",
+    "doc": "application/msword",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "xls": "application/vnd.ms-excel",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "csv": "text/csv",
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+}
+ALLOWED_TEXT = "PDF, Word (doc, docx), Excel (xls, xlsx), CSV, PNG and JPG"
+OLE = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"   # old Word and Excel files
+
+
+def clean_filename(name):
+    """Just the file's own name, in plain letters, digits, spaces and . _ - ( ), with the
+    extension in lower case: no folders, no control characters, at most 80 characters before it."""
+    name = unicodedata.normalize("NFKC", name or "")
+    name = re.split(r"[\\/]", name)[-1]
+    name = re.sub(r"[^A-Za-z0-9 ._()\-]", "_", name)
+    name = re.sub(r"\s+", " ", name).strip(" .")
+    stem, dot, ext = name.rpartition(".")
+    if not dot:
+        stem, ext = name, ""
+    stem = stem.strip(" ._")[:80].strip(" ._") or "attachment"
+    return f"{stem}.{ext.lower()}" if ext else stem
+
+
+def file_kinds(data):
+    """The extensions a file's bytes really are, read from its contents, not its name."""
+    if data.startswith(b"%PDF-"):
+        return {"pdf"}
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return {"png"}
+    if data.startswith(b"\xff\xd8\xff"):
+        return {"jpg", "jpeg"}
+    if data.startswith(OLE):
+        if "WordDocument".encode("utf-16-le") in data:
+            return {"doc"}
+        if "Workbook".encode("utf-16-le") in data or "Book".encode("utf-16-le") in data:
+            return {"xls"}
+        return set()
+    if data.startswith(b"PK\x03\x04"):
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as z:
+                names = set(z.namelist())
+                info = z.getinfo("[Content_Types].xml")
+                types = z.read(info) if info.file_size < 1_000_000 else b""
+        except (zipfile.BadZipFile, KeyError, RuntimeError, ValueError, OSError):
+            return set()
+        if not types or b"macroEnabled" in types or any(n.lower().endswith("vbaproject.bin") for n in names):
+            return set()   # files with macros are never sent
+        if "word/document.xml" in names:
+            return {"docx"}
+        if "xl/workbook.xml" in names:
+            return {"xlsx"}
+        return set()
+    # CSV is plain text: readable as UTF-8 (or Windows' own encoding), no binary bytes
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        try:
+            text = data.decode("cp1252")
+        except UnicodeDecodeError:
+            return set()
+    if any(ord(ch) < 32 and ch not in "\t\r\n" for ch in text):
+        return set()
+    return {"csv"}
+
+
+def read_attachments(items):
+    """The files to send, checked: at most MAX_FILES, MAX_TOTAL bytes together, only the
+    allowed types, each one really the type its name says. Any problem stops the email."""
+    if len(items) > MAX_FILES:
+        raise HTTPException(400, f"You can attach at most {MAX_FILES} files to one email.")
+    files, total = [], 0
+    for item in items:
+        name = clean_filename(item.name)
+        ext = name.rpartition(".")[2] if "." in name else ""
+        if ext not in FILE_TYPES:
+            raise HTTPException(400, f"{name} can't be attached. Only {ALLOWED_TEXT} files can be sent.")
+        if len(item.data) > MAX_TOTAL * 4 // 3 + 8:
+            raise HTTPException(400, "Attachments can be 10 MB in total at most.")
+        try:
+            data = base64.b64decode(item.data, validate=True)
+        except ValueError:
+            raise HTTPException(400, f"{name} couldn't be read. Try attaching it again.")
+        if not data:
+            raise HTTPException(400, f"{name} is empty.")
+        total += len(data)
+        if total > MAX_TOTAL:
+            raise HTTPException(400, "Attachments can be 10 MB in total at most.")
+        if ext not in file_kinds(data):
+            raise HTTPException(400, f"{name} isn't really a .{ext} file, so it can't be attached. "
+                                     f"Only {ALLOWED_TEXT} files can be sent.")
+        files.append({"filename": name, "content_type": FILE_TYPES[ext], "size": len(data), "data": data})
+    return files
 
 
 # ---------------------------------------------------------------- the email itself
@@ -767,8 +900,8 @@ def _html_signature(user):
             + "<br>".join(html.escape(line) for line in rest) + "</div>")
 
 
-def build_email(user, to, subject, text, orig=None, who="", refs=()):
-    """The email as it goes out: plain text and HTML versions.
+def build_email(user, to, subject, text, orig=None, who="", refs=(), files=()):
+    """The email as it goes out: plain text and HTML versions, then any attachments.
     Returns it with its plain text, which is what the conversation keeps."""
     when = _when_text(orig["received_at"]) if orig is not None else ""
     plain = text + "\n\n" + signature(user)
@@ -791,6 +924,9 @@ def build_email(user, to, subject, text, orig=None, who="", refs=()):
     msg.set_content(plain)
     msg.add_alternative(f"<!doctype html><html><body style=\"margin:0;padding:16px 0\">{page}</body></html>",
                         subtype="html")
+    for f in files:
+        maintype, subtype = f["content_type"].split("/")
+        msg.add_attachment(f["data"], maintype=maintype, subtype=subtype, filename=f["filename"])
     return msg, plain
 
 
@@ -840,8 +976,8 @@ def _open_for_email(c, lead_id, user):
     return lead
 
 
-def _send(c, lead, user, to, subject, msg, plain, in_reply_to, event):
-    """Send one CRM email and record it. The lead becomes the
+def _send(c, lead, user, to, subject, msg, plain, files, in_reply_to, event):
+    """Send one CRM email and record it (with its attachments). The lead becomes the
     sender's if nobody had it, and the bot sends it nothing more."""
     lead_id = lead["id"]
     status, error = ("dry_run" if CRM_DRY_RUN else "sent"), None
@@ -849,13 +985,17 @@ def _send(c, lead, user, to, subject, msg, plain, in_reply_to, event):
         _deliver(msg)
     except Exception as e:  # keep a record of what failed
         status, error = "failed", str(e)[:300]
-    c.execute("""INSERT INTO crm_messages (lead_id, user_id, to_email, subject, body, message_id,
-                 in_reply_to, status, error) VALUES (?,?,?,?,?,?,?,?,?)""",
-              (lead_id, user["id"], to, subject, plain, msg["Message-ID"], in_reply_to, status, error))
+    message_id = c.execute("""INSERT INTO crm_messages (lead_id, user_id, to_email, subject, body, message_id,
+                 in_reply_to, status, error) VALUES (?,?,?,?,?,?,?,?,?) RETURNING id""",
+                           (lead_id, user["id"], to, subject, plain, msg["Message-ID"], in_reply_to,
+                            status, error)).fetchone()[0]
     if status == "failed":
         log_event(c, lead_id, user["id"], "reply_failed", error)
         c.commit()
         raise HTTPException(502, f"The email didn't send: {error}")
+    for f in files:
+        c.execute("""INSERT INTO crm_attachments (message_id, lead_id, filename, content_type, size, data)
+                     VALUES (?,?,?,?,?,?)""", (message_id, lead_id, f["filename"], f["content_type"], f["size"], f["data"]))
     if not lead["claimed_by"]:
         c.execute("UPDATE leads SET claimed_by = ?, claimed_at = ? WHERE id = ?", (user["id"], now_utc(), lead_id))
         log_event(c, lead_id, user["id"], "claimed", "by emailing")
@@ -868,6 +1008,7 @@ def _send(c, lead, user, to, subject, msg, plain, in_reply_to, event):
 def send_reply(lead_id: int, body: ReplyIn, user=Depends(current_user)):
     text = body.body.strip()
     _check_sendable(text)
+    files = read_attachments(body.attachments)
     with conn() as c:
         lead = _open_for_email(c, lead_id, user)
         orig = None
@@ -904,8 +1045,8 @@ def send_reply(lead_id: int, body: ReplyIn, user=Depends(current_user)):
                 refs.append(r["message_id"])
 
         msg, plain = build_email(user, to, subject, text, orig, (orig["from_email"] if orig is not None else "")
-                                 or lead["company"], refs)
-        status = _send(c, lead, user, to, subject, msg, plain, refs[0] if refs else None, "replied")
+                                 or lead["company"], refs, files)
+        status = _send(c, lead, user, to, subject, msg, plain, files, refs[0] if refs else None, "replied")
         c.execute("UPDATE replies SET handled = 1 WHERE lead_id = ? AND COALESCE(handled,0) = 0", (lead_id,))
         if lead["status"] in ("sent", "verified", "new"):
             c.execute("UPDATE leads SET status = 'replied' WHERE id = ?", (lead_id,))
@@ -921,15 +1062,31 @@ def send_new_email(lead_id: int, body: NewEmailIn, user=Depends(current_user)):
     if not subject:
         raise HTTPException(400, "Add a subject.")
     _check_sendable(text)
+    files = read_attachments(body.attachments)
     with conn() as c:
         lead = _open_for_email(c, lead_id, user)
         to = (lead["email"] or "").strip()
         if not EMAIL_RE.match(to):
             raise HTTPException(400, f"The lead's email address doesn't look valid: {to or 'missing'}.")
-        msg, plain = build_email(user, to, subject, text)
-        status = _send(c, lead, user, to, subject, msg, plain, None, "emailed")
+        msg, plain = build_email(user, to, subject, text, files=files)
+        status = _send(c, lead, user, to, subject, msg, plain, files, None, "emailed")
     _file_in_sent(msg)
     return {"ok": True, "status": status, "to": to}
+
+
+@router.get("/api/crm/attachments/{attachment_id}")
+def download_attachment(attachment_id: int, user=Depends(current_user)):
+    """Only the person handling the lead, or an admin, can download what was sent to it."""
+    with conn() as c:
+        a = c.execute("""SELECT a.filename, a.content_type, a.data, l.claimed_by FROM crm_attachments a
+                         JOIN leads l ON l.id = a.lead_id WHERE a.id = ?""", (attachment_id,)).fetchone()
+    if not a or not _sees(user, a):
+        raise HTTPException(404, "Attachment not found.")
+    if user["role"] != "admin" and a["claimed_by"] != user["id"]:
+        raise HTTPException(403, "Only the person handling this lead or an admin can download its attachments.")
+    return Response(bytes(a["data"]), media_type=a["content_type"], headers={
+        "Content-Disposition": f"attachment; filename=\"{a['filename']}\"; filename*=UTF-8''{quote(a['filename'])}",
+        "X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store"})
 
 
 # ---------------------------------------------------------------- what's working
