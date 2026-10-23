@@ -71,8 +71,10 @@ def no_need_scores(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def same_mailbox_and_sender(monkeypatch):
-    """Tests don't depend on .env: one mailbox (mail keys without an account) and the
+    """Tests don't depend on .env: one mailbox (mail keys without an account), the address
+    emails go out from (replies to our emails are recognised by its domain) and the
     sender name the expected emails are written with."""
+    monkeypatch.setattr(config, "FROM_EMAIL", "florence@talksasa.co.ke")
     monkeypatch.setattr(config, "IMAP_USER", "florence@talksasa.co.ke")
     monkeypatch.setattr(config, "FIRST_IMAP_USER", "florence@talksasa.co.ke")
     monkeypatch.setattr(config, "SENDER_NAME", "Florence")
