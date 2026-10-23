@@ -13,3 +13,4 @@ TalkSasa Communications Ltd
 +254 762 000 008
 +254 712 295 880
 {website}
+{profile_line}

@@ -24,6 +24,7 @@ import targeting
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 MAX_PDF_BYTES = 1024 * 1024
 ATTACHMENT_LINE = "I've attached a one-page overview of TalkSasa."
+PROFILE_LABEL = "Company profile"  # the words before the profile link, unless an admin changed them
 # Tried in this order when the server doesn't flag a folder as \Sent
 SENT_NAMES = ("Sent", "Sent Items", "Sent Messages", "Sent Mail", "INBOX.Sent",
               "INBOX.Sent Items", "INBOX.Sent Messages", "INBOX/Sent", "[Gmail]/Sent Mail")
@@ -39,11 +40,29 @@ def _warn(text):
         print(f"WARNING: {text}")
 
 
+def setting(key, default):
+    """A setting an admin saved in the CRM, read for every email so a change needs no restart;
+    `default` (from .env) when it was never set there. An empty string is a real value: "none"."""
+    value = db.get_setting(key)
+    return default if value is None else value
+
+
+def profile_url():
+    return setting("profile_url", config.PROFILE_URL)
+
+
+def profile_line():
+    """The signature's profile line, e.g. "Company profile: https://...", or "" with no link."""
+    url = profile_url()
+    return f"{setting('profile_label', PROFILE_LABEL)}: {url}" if url else ""
+
+
 def attachment():
     """The PDF to attach, or None. Warns if it is missing or over 1MB."""
-    if not config.ATTACH_PDF:
+    name = setting("attach_pdf", config.ATTACH_PDF)
+    if not name:
         return None
-    path = Path(config.ATTACH_PDF)
+    path = Path(name)
     if not path.is_absolute():
         path = Path(__file__).parent / path
     if not path.is_file():
@@ -81,11 +100,11 @@ def fill(text, lead, attached=False, for_html=False, extra=None):
         phone=config.SENDER_PHONE,
         # plain text shows the name only; the HTML version turns the address into a link
         website=config.WEBSITE if for_html else WEBSITE_LABEL,
-        profile_url=config.PROFILE_URL,
+        profile_url=profile_url(),
         # own paragraph before the sign-off; empty when nothing is attached
         attachment_line=ATTACHMENT_LINE if attached else "",
-        # whole signature line; empty when PROFILE_URL is not set
-        profile_line=f"Company profile: {config.PROFILE_URL}" if config.PROFILE_URL else "",
+        # whole signature line; empty when there is no profile link
+        profile_line=profile_line(),
     )
     values.update(extra or {})
     return text.format(**values)

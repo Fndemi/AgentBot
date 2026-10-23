@@ -138,6 +138,14 @@ CREATE TABLE IF NOT EXISTS send_claims (
     owner TEXT,
     PRIMARY KEY (lead_id, step)
 );
+-- settings an admin changed in the CRM (profile_url, profile_label, attach_pdf); each one takes
+-- the place of the same setting in .env. A setting with no row here still comes from .env.
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    updated_by INTEGER,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 -- one row per lock held: only one send run at a time, across processes
 CREATE TABLE IF NOT EXISTS locks (
     name TEXT PRIMARY KEY,
@@ -594,6 +602,23 @@ def send_claims():
     with conn() as c:
         return c.execute("SELECT sc.*, l.email FROM send_claims sc LEFT JOIN leads l ON l.id = sc.lead_id"
                          " ORDER BY claimed_at").fetchall()
+
+def get_setting(key):
+    """A setting an admin saved in the CRM, or None if it was never set there (.env decides)."""
+    try:
+        with conn() as c:
+            row = c.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    except Error as e:  # SQLite says "no such table", PostgreSQL "does not exist"
+        if "no such table" in str(e) or "does not exist" in str(e):  # from before settings existed: nothing was set
+            return None
+        raise
+    return row["value"] if row else None
+
+def set_setting(key, value, by=None):
+    with conn() as c:
+        c.execute("INSERT INTO settings (key, value, updated_by, updated_at) VALUES (?,?,?,CURRENT_TIMESTAMP)"
+                  " ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_by=excluded.updated_by,"
+                  " updated_at=excluded.updated_at", (key, value, by))
 
 def reply_seen(uid):
     with conn() as c:

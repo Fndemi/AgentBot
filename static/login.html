@@ -69,53 +69,113 @@ body { margin: 0; background: var(--app); color: var(--fg); font-family: var(--f
   -webkit-font-smoothing: antialiased; }
 button, input { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
-h1, p { margin: 0; }
-.wrap { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: var(--glow), var(--app); }
-.card { width: 100%; max-width: 380px; background: var(--card); border: 1px solid var(--line); border-radius: 12px;
-  box-shadow: var(--shadow-pop); padding: 28px; display: grid; gap: 20px; }
-.brand { display: flex; align-items: center; gap: 10px; }
-.brand img { width: 30px; height: 30px; object-fit: contain; border-radius: 7px; background: #FFFFFF; padding: 2px; border: 1px solid var(--line); }
-.brand b { display: block; font-size: 14px; font-weight: 600; line-height: 17px; }
-.brand span { display: block; font-size: 12px; color: var(--fg-3); line-height: 15px; }
-h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.015em; }
-.sub { color: var(--fg-2); font-size: 13px; margin-top: 4px; }
-form { display: grid; gap: 14px; }
-label { display: grid; gap: 6px; font-size: 13px; font-weight: 500; }
-input { height: 38px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--input); background: var(--bg); }
-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+h1, h2, p, ul { margin: 0; }
+
+/* two columns on a wide screen: the brand panel on the left, the form on the right */
+.wrap { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr); background: var(--app); }
+@media (min-width: 920px) { .wrap { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); } }
+
+.side { display: none; position: relative; overflow: hidden; padding: 44px 56px; color: #FFFFFF;
+  background:
+    radial-gradient(70% 55% at 100% 0%, rgba(22, 200, 232, .38), transparent 62%),
+    radial-gradient(60% 60% at 0% 100%, rgba(255, 255, 255, .10), transparent 60%),
+    linear-gradient(155deg, #5443D6 0%, #3A2CA3 55%, #261C73 100%); }
+@media (min-width: 920px) { .side { display: flex; flex-direction: column; justify-content: space-between; gap: 40px; } }
+.side::after { content: ""; position: absolute; right: -120px; bottom: -120px; width: 380px; height: 380px; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .12); box-shadow: 0 0 0 60px rgba(255, 255, 255, .03), 0 0 0 120px rgba(255, 255, 255, .02); }
+.side .brand b { color: #FFFFFF; }
+.side .brand span { color: rgba(255, 255, 255, .7); }
+.side .brand img { border-color: transparent; }
+.pitch { position: relative; z-index: 1; max-width: 460px; }
+.eyebrow { display: inline-block; font-size: 12px; font-weight: 500; letter-spacing: .02em; padding: 4px 10px; border-radius: 999px;
+  background: rgba(255, 255, 255, .14); color: rgba(255, 255, 255, .92); margin-bottom: 18px; }
+.pitch h2 { font-size: 38px; line-height: 1.12; font-weight: 600; letter-spacing: -0.025em; }
+.pitch > p { margin-top: 14px; font-size: 15.5px; line-height: 1.6; color: rgba(255, 255, 255, .78); }
+.points { list-style: none; padding: 0; margin-top: 32px; display: grid; gap: 16px; }
+.points li { display: flex; gap: 14px; align-items: flex-start; }
+.points .tick { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+  background: rgba(255, 255, 255, .14); }
+.points .tick svg { width: 16px; height: 16px; fill: none; stroke: #FFFFFF; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.points b { display: block; font-size: 14.5px; font-weight: 600; }
+.points span { display: block; font-size: 13.5px; color: rgba(255, 255, 255, .72); }
+.side small { position: relative; z-index: 1; font-size: 12px; color: rgba(255, 255, 255, .6); }
+
+.main { display: grid; place-items: center; padding: 32px 16px; background: var(--glow), var(--app); }
+.card { width: 100%; max-width: 400px; background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+  box-shadow: var(--shadow-pop); padding: 32px; display: grid; gap: 24px; }
+@media (min-width: 920px) {
+  .main { background: var(--app); }
+  .card { border: 0; box-shadow: none; background: transparent; padding: 0; }
+  .card > .brand { display: none; }  /* the brand panel already shows it */
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand img { width: 40px; height: 40px; object-fit: contain; border-radius: 10px; background: #FFFFFF; padding: 3px; border: 1px solid var(--line); }
+.brand b { display: block; font-size: 16px; font-weight: 600; line-height: 19px; }
+.brand span { display: block; font-size: 12.5px; color: var(--fg-3); line-height: 16px; }
+h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; }
+.sub { color: var(--fg-2); font-size: 14px; margin-top: 6px; }
+form { display: grid; gap: 16px; }
+label { display: grid; gap: 7px; font-size: 13px; font-weight: 500; }
+input { width: 100%; height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--input); background: var(--bg);
+  transition: border-color .15s, box-shadow .15s; }
+input:hover { border-color: var(--fg-3); }
+input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-soft); }
 .hint { font-size: 12px; color: var(--fg-3); font-weight: 400; }
-.btn { height: 38px; border-radius: 8px; border: 0; background: var(--primary); color: var(--on-primary); font-weight: 500; cursor: pointer; }
+.btn { height: 44px; margin-top: 4px; border-radius: 10px; border: 0; background: var(--primary); color: var(--on-primary);
+  font-weight: 600; font-size: 14.5px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+  box-shadow: 0 1px 2px rgba(20, 20, 30, .12), inset 0 1px 0 rgba(255, 255, 255, .12); transition: background .15s, transform .05s; }
 .btn:hover { background: var(--primary-hover); }
+.btn:active { transform: translateY(1px); }
+.btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .btn[disabled] { opacity: .6; cursor: default; }
-.err { background: var(--neg-bg); color: var(--neg); border-radius: 8px; padding: 9px 12px; font-size: 13px; }
+.err { background: var(--neg-bg); color: var(--neg); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
 .pwfield { position: relative; display: block; }
 .pwfield input { width: 100%; padding-right: 42px; }
 .eye { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; display: grid; place-items: center;
   border: 0; border-radius: 6px; background: transparent; color: var(--fg-3); cursor: pointer; }
 .eye:hover { background: var(--hover); color: var(--fg); }
 .eye svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.foot { font-size: 12px; color: var(--fg-3); text-align: center; }
+.foot { font-size: 12.5px; color: var(--fg-3); text-align: center; padding-top: 18px; border-top: 1px solid var(--line); }
 </style>
 
 <div class="wrap">
+  <aside class="side">
+    <div class="brand"><img id="side-logo" alt=""><div><b>LeadBot</b><span>TalkSasa outreach</span></div></div>
+    <div class="pitch">
+      <span class="eyebrow">TalkSasa sales team</span>
+      <h2>Every reply, in one place.</h2>
+      <p>LeadBot emails new organisations and reads their answers, so your team can spend its time on the ones who said yes.</p>
+      <ul class="points">
+        <li><span class="tick"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+          <div><b>See replies as they arrive</b><span>Interested and questions first, each with a short summary.</span></div></li>
+        <li><span class="tick"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+          <div><b>Claim a lead and it's yours</b><span>First come, first served. Nobody answers the same lead twice.</span></div></li>
+        <li><span class="tick"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+          <div><b>Reply and keep the whole thread</b><span>Emails, replies and team notes stay together.</span></div></li>
+      </ul>
+    </div>
+    <small>TalkSasa Communications Ltd · Nairobi</small>
+  </aside>
+
+  <div class="main">
   <main class="card">
     <div class="brand"><img src="data:image/png;base64,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" alt=""><div><b>LeadBot</b><span>TalkSasa outreach</span></div></div>
 
     <section id="signin">
-      <h1>Sign in</h1>
-      <p class="sub">Use the account your admin set up for you.</p>
-      <form id="f-signin" style="margin-top:18px" novalidate>
-        <label>Email <input id="email" type="email" autocomplete="username" required autofocus></label>
+      <h1>Welcome back</h1>
+      <p class="sub">Sign in with the account your admin set up for you.</p>
+      <form id="f-signin" style="margin-top:24px" novalidate>
+        <label>Email <input id="email" type="email" autocomplete="username" placeholder="you@talksasa.co.ke" required autofocus></label>
         <label>Password <input id="password" type="password" autocomplete="current-password" required></label>
         <p class="err" id="e-signin" role="alert" hidden></p>
-        <button class="btn" type="submit">Sign in</button>
+        <button class="btn" type="submit">Sign in <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
       </form>
     </section>
 
     <section id="change" hidden>
       <h1>Set your password</h1>
       <p class="sub" id="change-sub">Choose a password only you know before you continue.</p>
-      <form id="f-change" style="margin-top:18px" novalidate>
+      <form id="f-change" style="margin-top:24px" novalidate>
         <label>Current or temporary password <input id="cur" type="password" autocomplete="current-password" required></label>
         <label>New password <span class="hint">At least 10 characters.</span>
           <input id="new1" type="password" autocomplete="new-password" minlength="10" required></label>
@@ -127,6 +187,7 @@ input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px
 
     <p class="foot">Forgot your password? Ask an admin to reset it.</p>
   </main>
+  </div>
 </div>
 
 <script>
@@ -167,6 +228,7 @@ input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px
   });
 
   function showErr(el, msg) { el.textContent = msg; el.hidden = !msg; }
+  $("side-logo").src = document.querySelector(".card .brand img").src;  // one copy of the logo in the page
   function showChange() { $("signin").hidden = true; $("change").hidden = false; $("cur").focus(); }
 
   // Already signed in? Go straight on, or finish setting the password.
@@ -178,7 +240,7 @@ input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px
 
   $("f-signin").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const btn = e.submitter || e.target.querySelector("button");
+    const btn = e.submitter || e.target.querySelector("button[type=submit]");
     showErr($("e-signin"), "");
     const email = $("email").value.trim(), password = $("password").value;
     if (!email || !password) return showErr($("e-signin"), "Enter your email and password.");
@@ -194,7 +256,7 @@ input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px
 
   $("f-change").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const btn = e.submitter || e.target.querySelector("button");
+    const btn = e.submitter || e.target.querySelector("button[type=submit]");
     showErr($("e-change"), "");
     if ($("new1").value.length < 10) return showErr($("e-change"), "Use at least 10 characters.");
     if ($("new1").value !== $("new2").value) return showErr($("e-change"), "The two new passwords don't match.");

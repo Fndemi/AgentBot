@@ -20,6 +20,7 @@ Settings (.env, all optional):
     COOKIE_SECURE    true once the dashboard is served over HTTPS
 """
 import base64
+import binascii
 import getpass
 import hashlib
 import hmac
@@ -32,6 +33,7 @@ import re
 import secrets
 import smtplib
 import ssl
+import string
 import sys
 import time
 import unicodedata
@@ -45,7 +47,7 @@ from typing import List, Optional
 from urllib.parse import quote, urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel
 
 import config
@@ -149,6 +151,16 @@ def ensure_schema():
             action TEXT NOT NULL,
             detail TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        -- an email template as it was before an admin saved over it, so it can be restored
+        CREATE TABLE IF NOT EXISTS template_history (
+            id INTEGER PRIMARY KEY,
+            kind TEXT NOT NULL,     -- first / followup / followup2
+            name TEXT NOT NULL,     -- the industry, e.g. sacco
+            subject TEXT,
+            body TEXT NOT NULL,
+            user_id INTEGER REFERENCES users(id),   -- who replaced it
+            saved_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
         CREATE INDEX IF NOT EXISTS idx_crm_messages_lead ON crm_messages(lead_id);
         CREATE INDEX IF NOT EXISTS idx_crm_notes_lead ON crm_notes(lead_id);
@@ -557,7 +569,8 @@ def open_leads(scope: str = "open", user=Depends(current_user)):
     # Waiting on us first, newest reply first
     rows.sort(key=lambda r: r["last_received"] or "", reverse=True)
     rows.sort(key=lambda r: r["waiting"] == 0)
-    counts = {"waiting": sum(1 for r in rows if r["waiting"]),
+    counts = {"open": len(rows),
+              "waiting": sum(1 for r in rows if r["waiting"]),
               "unclaimed": sum(1 for r in rows if not r["claimed_by"]),
               "mine": sum(1 for r in rows if r["mine"])}
     return {"leads": rows, "counts": counts, "me": user["id"]}
@@ -1309,6 +1322,278 @@ def edit_user(user_id: int, body: EditUserIn, admin=Depends(admin_only)):
             c.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
         log_event(c, None, admin["id"], "user_updated", target["email"])
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- email templates (admin)
+# The bot reads templates/<industry>.txt (first email: a "Subject:" line, then the text),
+# templates/followup/ and templates/followup2/ (text only) every time it builds an email,
+# so a template saved here is used from the next email that goes out.
+
+TEMPLATE_DIR = HERE / "templates"
+TEMPLATE_KINDS = {"first": TEMPLATE_DIR, "followup": TEMPLATE_DIR / "followup", "followup2": TEMPLATE_DIR / "followup2"}
+TEMPLATE_NAME = re.compile(r"^[a-z0-9_]+$")
+# The gaps sender.fill can fill; a follow-up also gets {offer} (sender.FOLLOWUP_OFFERS)
+TEMPLATE_FIELDS = ("company", "uses", "opener", "attachment_line", "sender", "our_company", "phone", "website",
+                   "profile_line", "profile_url", "industry")
+MAX_TEMPLATE_CHARS = 6000
+
+
+def _fields(kind):
+    return set(TEMPLATE_FIELDS) | ({"offer"} if kind != "first" else set())
+
+
+def _template_path(kind, name):
+    """The template's file. Only files that already exist: templates are edited here, never created."""
+    if kind not in TEMPLATE_KINDS or not TEMPLATE_NAME.match(name or ""):
+        raise HTTPException(404, "No such template.")
+    path = TEMPLATE_KINDS[kind] / f"{name}.txt"
+    if not path.is_file():
+        raise HTTPException(404, "No such template.")
+    return path
+
+
+def _read_template(kind, path):
+    """(subject, body) the way sender.load_template reads them; subject is None for a follow-up."""
+    text = path.read_text(encoding="utf-8")
+    if kind != "first":
+        return None, text.strip()
+    subject, _, body = text.partition("\n")
+    return subject.replace("Subject:", "", 1).strip(), body.strip()
+
+
+def _write_template(kind, path, subject, body):
+    text = (f"Subject: {subject}\n" if kind == "first" else "") + body.strip() + "\n"
+    tmp = path.with_suffix(".tmp")
+    with open(tmp, "w", encoding="utf-8", newline="\n") as f:  # "\n" so the file doesn't change to CRLF on Windows
+        f.write(text)
+    os.replace(tmp, path)  # all at once: the bot never reads half a template
+
+
+def _sample_lead(name):
+    return {"id": None, "company": "Example Company", "industry": "" if name == "default" else name,
+            "email": "info@example.co.ke", "opener": None, "uses": None, "confidence": None}
+
+
+def _render(kind, name, subject, body):
+    """The email an example company would get from this template: built the way the bot builds it."""
+    import sender
+    lead = _sample_lead(name)
+    if kind == "first":
+        msg = sender.compose(lead, sender.fill(subject, lead), body, sender.attachment())
+    else:
+        first = sender.fill(sender.load_template(lead["industry"])[1], lead)
+        msg = sender.compose(lead, first if first.lower().startswith("re:") else "Re: " + first, body,
+                             extra=sender.followup_values(lead))
+    return {"subject": str(msg["Subject"]), "text": sender.plain_of(msg),
+            "attachments": [p.get_filename() for p in msg.iter_attachments()]}
+
+
+def _template_problem(kind, name, subject, body):
+    """Why this template can't be saved (it would break or change sending in a way nobody meant), or None."""
+    import sender
+    if kind == "first":
+        if not subject:
+            return "The subject can't be empty."
+        if "\n" in subject or "\r" in subject:
+            return "The subject must be one line."
+        if len(subject) > 150:
+            return "Keep the subject under 150 characters."
+    if not body.strip():
+        return "The email text can't be empty."
+    if len(body) > MAX_TEMPLATE_CHARS:
+        return f"Keep the email text under {MAX_TEMPLATE_CHARS:,} characters."
+    allowed = _fields(kind)
+    for text in (subject or "", body):
+        try:
+            parts = list(string.Formatter().parse(text))
+        except ValueError:
+            return "There is a { or } without its partner. Gaps look like {company}; to show a brace itself, write {{ or }}."
+        for _, field, spec, conv in parts:
+            if field is not None and (field not in allowed or spec or conv):
+                return (f"{{{field}}} isn't a gap LeadBot can fill. Use one of: "
+                        + ", ".join("{" + f + "}" for f in sorted(allowed)) + ".")
+    if kind == "followup" and sender.FOLLOWUP1_LINE not in body:
+        # sender.build_followup swaps this line for leads whose first email had older wording
+        return f'Keep this line exactly as it is, LeadBot changes it for leads emailed with older wording: "{sender.FOLLOWUP1_LINE}"'
+    try:
+        _render(kind, name, subject, body)
+    except Exception as e:  # anything the bot itself would trip over when sending
+        return f"LeadBot couldn't build an email from this ({type(e).__name__}: {e})."
+    return None
+
+
+class TemplateIn(BaseModel):
+    subject: Optional[str] = None
+    body: str
+
+
+@router.get("/api/crm/templates")
+def list_templates(admin=Depends(admin_only)):
+    import personalise
+    out = []
+    for path in sorted(TEMPLATE_DIR.glob("*.txt")):
+        name = path.stem
+        if not TEMPLATE_NAME.match(name):
+            continue
+        out.append({"name": name, "approved": bool(personalise.approved({"industry": name})),
+                    "kinds": [k for k, d in TEMPLATE_KINDS.items() if (d / f"{name}.txt").is_file()]})
+    return {"templates": out}
+
+
+@router.get("/api/crm/templates/{kind}/{name}")
+def get_template(kind: str, name: str, admin=Depends(admin_only)):
+    subject, body = _read_template(kind, _template_path(kind, name))
+    with conn() as c:
+        names = _user_names(c)
+        history = [{"id": r["id"], "at": iso(r["saved_at"]), "who": names.get(r["user_id"], "Someone")}
+                   for r in c.execute("SELECT id, user_id, saved_at FROM template_history WHERE kind = ? AND name = ?"
+                                      " ORDER BY id DESC LIMIT 10", (kind, name))]
+    return {"kind": kind, "name": name, "subject": subject, "body": body, "fields": sorted(_fields(kind)),
+            "history": history}
+
+
+@router.post("/api/crm/templates/{kind}/{name}/preview")
+def preview_template(kind: str, name: str, body: TemplateIn, admin=Depends(admin_only)):
+    _template_path(kind, name)
+    subject = (body.subject or "").strip() if kind == "first" else None
+    problem = _template_problem(kind, name, subject, body.body)
+    if problem:
+        return {"problem": problem}
+    return {"problem": None, **_render(kind, name, subject, body.body)}
+
+
+def _save_template(kind, name, subject, body, user):
+    path = _template_path(kind, name)
+    problem = _template_problem(kind, name, subject, body)
+    if problem:
+        raise HTTPException(400, problem)
+    old_subject, old_body = _read_template(kind, path)
+    if (old_subject, old_body) == (subject, body.strip()):
+        return
+    with conn() as c:
+        c.execute("INSERT INTO template_history (kind, name, subject, body, user_id) VALUES (?,?,?,?,?)",
+                  (kind, name, old_subject, old_body, user["id"]))
+        _write_template(kind, path, subject, body)
+        log_event(c, None, user["id"], "template_saved", f"{kind}/{name}")
+
+
+@router.post("/api/crm/templates/{kind}/{name}")
+def save_template(kind: str, name: str, body: TemplateIn, admin=Depends(admin_only)):
+    _save_template(kind, name, (body.subject or "").strip() if kind == "first" else None, body.body, admin)
+    return {"ok": True}
+
+
+@router.post("/api/crm/templates/{kind}/{name}/restore/{history_id}")
+def restore_template(kind: str, name: str, history_id: int, admin=Depends(admin_only)):
+    with conn() as c:
+        row = c.execute("SELECT subject, body FROM template_history WHERE id = ? AND kind = ? AND name = ?",
+                        (history_id, kind, name)).fetchone()
+    if not row:
+        raise HTTPException(404, "That version wasn't found.")
+    _save_template(kind, name, row["subject"], row["body"], admin)  # the current text is kept in history too
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- sent with every email (admin)
+# The profile link and the attached PDF. Saved in the settings table (db.set_setting), which the
+# bot reads for every email it builds; until an admin saves one here, .env decides.
+
+ATTACH_DIR = HERE / "attachments"   # PDFs uploaded here
+MAX_PDF_UPLOAD = 5 * 1024 * 1024
+SAFE_FILENAME = re.compile(r"[^A-Za-z0-9._ -]+")
+
+
+def _settings_out():
+    import db
+    import sender
+    url, label = sender.profile_url(), sender.setting("profile_label", sender.PROFILE_LABEL)
+    pdf = sender.attachment()
+    return {
+        "profile_url": url, "profile_label": label, "profile_line": sender.profile_line(),
+        # where each value comes from, so it is clear whether .env still decides
+        "profile_from": "crm" if db.get_setting("profile_url") is not None else ".env",
+        "attachment": {"name": pdf.name, "size": pdf.stat().st_size} if pdf else None,
+        "attachment_from": "crm" if db.get_setting("attach_pdf") is not None else ".env",
+        "max_upload": MAX_PDF_UPLOAD,
+    }
+
+
+class ProfileIn(BaseModel):
+    profile_url: str = ""
+    profile_label: str = ""
+
+
+class PdfIn(BaseModel):
+    filename: str
+    data: str   # the file, base64
+
+
+@router.get("/api/crm/settings")
+def get_settings(admin=Depends(admin_only)):
+    return _settings_out()
+
+
+@router.post("/api/crm/settings/profile")
+def save_profile(body: ProfileIn, admin=Depends(admin_only)):
+    import db
+    url, label = body.profile_url.strip(), body.profile_label.strip() or "Company profile"
+    if url and (not re.match(r"^https?://[^\s<>\"']+$", url) or len(url) > 300):
+        raise HTTPException(400, "The link must start with http:// or https:// and have no spaces.")
+    if len(label) > 40 or "\n" in label or "{" in label or "}" in label:
+        raise HTTPException(400, "Keep the words before the link short (under 40 characters), on one line.")
+    db.set_setting("profile_url", url, admin["id"])  # empty means: no link, whatever .env says
+    db.set_setting("profile_label", label, admin["id"])
+    with conn() as c:
+        log_event(c, None, admin["id"], "profile_link_saved", url or "(none)")
+    return _settings_out()
+
+
+@router.post("/api/crm/settings/attachment")
+def upload_pdf(body: PdfIn, admin=Depends(admin_only)):
+    import db
+    try:
+        data = base64.b64decode(body.data, validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(400, "The file didn't arrive in one piece. Try again.")
+    if not data.startswith(b"%PDF-"):
+        raise HTTPException(400, "That isn't a PDF. Choose a .pdf file.")
+    if len(data) > MAX_PDF_UPLOAD:
+        raise HTTPException(400, f"Keep the PDF under {MAX_PDF_UPLOAD // (1024 * 1024)} MB (under 1 MB is best, "
+                                 "large attachments land in spam more often).")
+    # the name people see on the attachment; never a path, so it can't be written anywhere else
+    name = SAFE_FILENAME.sub("", Path(body.filename.replace("\\", "/")).name).strip(" .")[:80]
+    name = (name[:-4] if name.lower().endswith(".pdf") else name).strip(" .") or "TalkSasa_profile"
+    path = ATTACH_DIR / f"{name}.pdf"
+    ATTACH_DIR.mkdir(exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_bytes(data)
+    os.replace(tmp, path)
+    try:  # inside the project folder it is saved relative to it, like ATTACH_PDF in .env
+        stored = path.relative_to(HERE).as_posix()
+    except ValueError:
+        stored = str(path)
+    db.set_setting("attach_pdf", stored, admin["id"])
+    with conn() as c:
+        log_event(c, None, admin["id"], "attachment_uploaded", f"{path.name} ({len(data):,} bytes)")
+    return _settings_out()
+
+
+@router.post("/api/crm/settings/attachment/remove")
+def remove_pdf(admin=Depends(admin_only)):
+    import db
+    db.set_setting("attach_pdf", "", admin["id"])  # empty means: attach nothing, whatever .env says
+    with conn() as c:
+        log_event(c, None, admin["id"], "attachment_removed")
+    return _settings_out()
+
+
+@router.get("/api/crm/settings/attachment")
+def view_pdf(admin=Depends(admin_only)):
+    import sender
+    pdf = sender.attachment()
+    if not pdf:
+        raise HTTPException(404, "No PDF is attached to the emails.")
+    return FileResponse(pdf, media_type="application/pdf", filename=pdf.name, content_disposition_type="inline")
 
 
 # ---------------------------------------------------------------- command line

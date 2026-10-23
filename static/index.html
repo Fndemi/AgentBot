@@ -33,7 +33,7 @@
   --neu: #63626C;  --neu-bg: #EEEEF1;
   --chart-sent: #C6C5CD;
   --chart-reply: #4A3AC2;
-  --shadow-panel: 0 1px 2px rgba(20, 20, 30, .06), 0 0 0 1px rgba(20, 20, 30, .03);
+  --shadow-panel: 0 1px 2px rgba(20, 20, 30, .05), 0 8px 20px -14px rgba(20, 20, 30, .18);
   --shadow-pop: 0 12px 32px -12px rgba(20, 20, 30, .25), 0 2px 6px rgba(20, 20, 30, .06);
   --glow: radial-gradient(60% 120% at 0% 0%, rgba(74, 58, 194, .07), transparent 60%), radial-gradient(50% 120% at 100% 0%, rgba(22, 200, 232, .07), transparent 60%);
   --font: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -84,13 +84,13 @@ svg.i.sm { width: 14px; height: 14px; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 4px;
   border: 1px solid var(--line); background: var(--card); font-family: var(--mono); font-size: 10.5px; color: var(--fg-2); }
-.panel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-panel); min-width: 0; }
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-panel); min-width: 0; }
 
 /* ---------- sidebar ---------- */
 .side { position: fixed; inset: 0 auto 0 0; width: 240px; padding: 16px 12px; display: flex; flex-direction: column; gap: 20px; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px; }
-.brand img { width: 26px; height: 26px; object-fit: contain; border-radius: 6px; background: #FFFFFF; padding: 2px; }
-.brand b { display: block; font-size: 13px; font-weight: 600; line-height: 16px; }
+.brand img { width: 32px; height: 32px; object-fit: contain; border-radius: 8px; background: #FFFFFF; padding: 2px; border: 1px solid var(--line); }
+.brand b { display: block; font-size: 14px; font-weight: 600; line-height: 17px; }
 .brand span { display: block; font-size: 11px; color: var(--fg-3); line-height: 14px; }
 .searchbtn { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line);
   background: var(--card); color: var(--fg-3); font-size: 13px; box-shadow: var(--shadow-panel); width: 100%; text-align: left; }
@@ -109,8 +109,32 @@ svg.i.sm { width: 14px; height: 14px; }
 @media (min-width: 1280px) { .navlink .keys { display: inline-flex; } }
 .badge { border-radius: 999px; background: var(--primary); color: var(--on-primary); font-size: 11px; font-weight: 600; line-height: 18px; padding: 0 6px; }
 .side-foot { margin-top: auto; display: grid; gap: 10px; }
+.me { display: flex; align-items: center; gap: 10px; padding: 10px 8px 2px; border-top: 1px solid var(--line); }
+.me .av { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 600;
+  background: var(--primary-soft); color: var(--primary); border: 1px solid var(--primary-line); }
+.me b { display: block; font-size: 13px; font-weight: 600; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.me span { display: block; font-size: 11.5px; color: var(--fg-3); line-height: 15px; }
+.me > div { min-width: 0; }
 .eyebrow { padding: 0 8px; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-3); }
 .botcard { padding: 12px; display: grid; gap: 12px; }
+/* the bot's status card at the foot of the sidebar: brand purple, like the sign-in page's panel */
+.botcard.brandcard { position: relative; overflow: hidden; padding: 14px; gap: 8px; border: 0; border-radius: 12px; color: #FFFFFF;
+  background: radial-gradient(80% 60% at 100% 0%, rgba(22, 200, 232, .35), transparent 62%), linear-gradient(155deg, #5443D6 0%, #3A2CA3 60%, #261C73 100%);
+  box-shadow: 0 12px 24px -16px rgba(58, 44, 163, .9); }
+.brandcard::after { content: ""; position: absolute; right: -40px; bottom: -40px; width: 120px; height: 120px; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 0 0 18px rgba(255, 255, 255, .04); pointer-events: none; }
+.bc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bc-name { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: rgba(255, 255, 255, .72); }
+.bc-pill { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; border-radius: 999px; min-width: 0;
+  background: rgba(255, 255, 255, .15); font-size: 11.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bc-when { font-size: 11.5px; color: rgba(255, 255, 255, .72); }
+.bc-sent { position: relative; z-index: 1; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 6px;
+  font-size: 12px; color: rgba(255, 255, 255, .82); }
+.bc-sent b { font-size: 22px; font-weight: 600; line-height: 26px; letter-spacing: -.02em; color: #FFFFFF; }
+.bc-sent small { font-size: 12px; font-weight: 500; color: rgba(255, 255, 255, .72); letter-spacing: 0; }
+.bc-bar { position: relative; z-index: 1; height: 6px; border-radius: 999px; background: rgba(255, 255, 255, .2); overflow: hidden; }
+.bc-bar span { display: block; height: 100%; border-radius: 999px; background: #FFFFFF; }
+.bc-left { position: relative; z-index: 1; font-size: 11.5px; color: rgba(255, 255, 255, .72); }
 .botrow { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .botrow b { font-weight: 500; }
 .botrow .when { margin-left: auto; color: var(--fg-3); }
@@ -178,9 +202,9 @@ main.page { width: 100%; max-width: 1280px; margin: 0 auto; padding: 32px; }
 .pagehead h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; line-height: 32px; }
 .pagehead p { margin-top: 4px; color: var(--fg-2); }
 .shead { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
-.shead h2 { font-size: 16px; font-weight: 600; line-height: 22px; }
+.shead h2 { font-size: 18px; font-weight: 600; line-height: 24px; letter-spacing: -0.01em; }
 .shead p { font-size: 13px; color: var(--fg-2); }
-.stack { display: grid; gap: 40px; }
+.stack { display: grid; gap: 48px; }
 .stack > *, .split > *, section { min-width: 0; }
 .notice { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; border-radius: 8px; padding: 12px 16px; border: 1px solid; }
 .notice.warn { background: var(--warn-bg); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
@@ -201,7 +225,7 @@ main.page { width: 100%; max-width: 1280px; margin: 0 auto; padding: 32px; }
 /* hero */
 .hero { margin: -32px -32px 0; padding: 40px 32px 32px; border-bottom: 1px solid var(--line); background-image: var(--glow); }
 .hero .date { font-size: 13px; font-weight: 500; color: var(--fg-3); }
-.hero h1 { margin-top: 4px; font-size: 28px; font-weight: 600; letter-spacing: -0.02em; line-height: 34px; }
+.hero h1 { margin-top: 4px; font-size: 32px; font-weight: 600; letter-spacing: -0.025em; line-height: 38px; }
 .hero p { margin-top: 6px; max-width: 600px; color: var(--fg-2); }
 .hero p b { color: var(--fg); font-weight: 600; }
 .hero .cta { margin-top: 20px; display: flex; gap: 8px; flex-wrap: wrap; }
@@ -231,6 +255,23 @@ main.page { width: 100%; max-width: 1280px; margin: 0 auto; padding: 32px; }
 .kpi .spark svg { display: block; width: 100%; height: 28px; }
 .kpi .spark small { display: block; font-size: 11px; color: var(--fg-3); margin-top: 2px; }
 .kpi .meter { margin-top: auto; padding-top: 14px; }
+
+/* summary cards under the greeting: one headline number each */
+.tiles { margin-top: 28px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tile { display: flex; flex-direction: column; gap: 4px; padding: 18px 20px; color: inherit; text-decoration: none;
+  transition: border-color .15s, box-shadow .15s, transform .15s; }
+a.tile:hover { border-color: var(--primary-line); box-shadow: var(--shadow-pop); transform: translateY(-1px); }
+.tile .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tile .lbl { font-size: 13px; font-weight: 500; color: var(--fg-2); }
+.tile .ic { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex: none;
+  background: var(--primary-soft); color: var(--primary); }
+.tile .val { margin-top: 6px; font-size: 32px; font-weight: 600; line-height: 38px; letter-spacing: -0.025em; color: var(--fg); }
+.tile .val small { font-size: 16px; font-weight: 500; color: var(--fg-3); letter-spacing: 0; }
+.tile .hint { font-size: 12.5px; line-height: 1.4; color: var(--fg-3); }
+.tile .track { margin-top: 8px; height: 6px; border-radius: 999px; background: var(--primary-soft); overflow: hidden; }
+.tile .track span { display: block; height: 100%; border-radius: 999px; background: var(--primary); }
+@media (max-width: 1180px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 400px) { .tile { padding: 14px 16px; } .tile .val { font-size: 26px; line-height: 32px; } }
 
 /* activity + pipeline */
 .split { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 40px; align-items: start; }
@@ -408,7 +449,8 @@ tr.orgrow:focus-visible { outline-offset: -2px; }
 .stoday button { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto auto 16px; gap: 16px; align-items: center; padding: 12px 20px; border: 0; background: transparent; text-align: left; transition: background .15s; }
 .stoday button:hover { background: var(--hover); }
 .stoday b { font-weight: 500; }
-.stoday .step { font-size: 13px; color: var(--fg-2); white-space: nowrap; }
+.stoday .step { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 12px;
+  font-weight: 500; white-space: nowrap; background: var(--primary-soft); color: var(--primary); }
 .stoday .ind { font-size: 13px; color: var(--fg-3); white-space: nowrap; }
 .stoday svg { color: var(--fg-3); }
 
@@ -481,7 +523,7 @@ tr.orgrow:focus-visible { outline-offset: -2px; }
     <a class="navlink" href="/crm"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="lbl">CRM</span></a>
     <button class="navlink signout" data-act="logout"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span class="lbl">Sign out</span></button>
   </div>
-  <div class="side-foot"><p class="eyebrow">Bot</p><div id="botcard"></div></div>
+  <div class="side-foot"><div id="botcard"></div><div class="me" id="me" hidden></div></div>
 </aside>
 
 <div class="shell">
@@ -528,7 +570,7 @@ const ICON = {
 const ico = (n, cls = "") => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICON[n]}</svg>`;
 
 /* ======================= vocabulary ======================= */
-const OPERATOR = "Mary";
+let OPERATOR = "";  // first name of whoever is signed in, from api/auth/me
 const LABEL = {
   interested:     { text: "Interested",     tone: "pos"  },
   question:       { text: "Question",       tone: "info" },
@@ -654,7 +696,6 @@ async function refresh({ manual = false } = {}) {
   S.refreshing = true; renderChrome();
   try {
     S.data = normalise(await getJSON("api/all")); S.mode = "live"; S.lastOk = new Date(); S.refreshError = false;
-    if (!S.me) try { S.me = (await getJSON("api/auth/me")).user; } catch (e) {}  // who is signed in, for the greeting
     try { S.sentToday = (await getJSON("api/sent-today")).emails; } catch (e) { S.sentToday = null; }
     const open = [S.org.id, ...S.sentOpen].filter(x => x != null);
     S.tl = Object.fromEntries(Object.entries(S.tl).filter(([k]) => open.includes(+k)));
@@ -867,10 +908,16 @@ function navHTML(compact) {
 function botCardHTML() {
   if (!S.data) return `<div class="panel botcard"><div class="sk" style="height:12px;width:70%"></div><div class="sk" style="height:12px;width:90%"></div></div>`;
   const f = inboxState(), b = S.data.bot, p = Math.min(100, (b.sent_today / Math.max(1, b.daily_limit)) * 100);
-  return `<div class="panel botcard" title="Shows when replies were last checked, not whether sending works.">
-    <div class="botrow"><span class="pulse ${f.live ? "live" : ""}" style="--c:${f.c}"><i></i><i></i></span><b>${f.text}</b><span class="when tnum">${f.when}</span></div>
-    <div><div class="botrow" style="margin-bottom:6px"><span style="color:var(--fg-2)">Sent today</span><b class="tnum" style="margin-left:auto">${fmtNum(b.sent_today)} / ${fmtNum(b.daily_limit)}</b></div>
-    <div class="bar" role="meter" aria-label="Emails sent today" aria-valuemin="0" aria-valuemax="${b.daily_limit}" aria-valuenow="${b.sent_today}"><span style="width:${p}%"></span></div></div></div>`;
+  const left = Math.max(0, b.daily_limit - b.sent_today);
+  // the status dot sits on purple here, so it uses brighter steps of the same three colours
+  const dot = { "var(--pos)": "#4ADE80", "var(--warn)": "#FCD34D", "var(--neg)": "#FCA5A5" }[f.c] || "#FFFFFF";
+  return `<div class="botcard brandcard" title="The status shows when replies were last checked, not whether sending works.">
+    <div class="bc-top"><span class="bc-name">LeadBot</span>
+      <span class="bc-pill"><span class="pulse ${f.live ? "live" : ""}" style="--c:${dot}"><i></i><i></i></span>${f.text}</span></div>
+    <p class="bc-when">${f.when ? `Last inbox check ${f.when}` : "No inbox check yet"}</p>
+    <div class="bc-sent"><span>Sent today</span><b class="tnum">${fmtNum(b.sent_today)} <small>/ ${fmtNum(b.daily_limit)}</small></b></div>
+    <div class="bc-bar" role="meter" aria-label="Emails sent today" aria-valuemin="0" aria-valuemax="${b.daily_limit}" aria-valuenow="${b.sent_today}"><span style="width:${p}%"></span></div>
+    <p class="bc-left">${left ? `${fmtNum(left)} more can go out today` : "Today's limit is reached"}</p></div>`;
 }
 function renderChrome() {
   $("#sidenav").innerHTML = navHTML(false);
@@ -924,9 +971,21 @@ function renderToday() {
   return `
     <header class="hero">
       <p class="date">${new Date().toLocaleDateString("en-KE", { weekday: "long", day: "numeric", month: "long" })} · Nairobi</p>
-      <h1>${greeting()}${S.me?.name ? ", " + esc(S.me.name.trim().split(/\s+/)[0]) : ""}</h1>
+      <h1>${greeting()}${OPERATOR ? `, ${esc(OPERATOR)}` : ""}</h1>
       <p>${n ? `<b>${n} ${n === 1 ? "reply needs" : "replies need"}</b> your attention. Interested prospects are listed first.` : "You're all caught up. New interested replies will appear here."}</p>
       <div class="cta"><a class="btn sm primary" href="#replies">Open replies ${ico("arrowR", "sm")}</a><a class="btn sm" href="#organisations">Browse organisations</a></div>
+      <div class="tiles">
+        <a class="panel tile" href="#replies"><div class="top"><span class="lbl">Waiting for a reply</span><span class="ic">${ico("inbox", "sm")}</span></div>
+          <p class="val tnum">${fmtNum(n)}</p><p class="hint">${n ? "Interested, questions and replies to check" : "You're all caught up"}</p></a>
+        <div class="panel tile"><div class="top"><span class="lbl">Sent today</span><span class="ic">${ico("send", "sm")}</span></div>
+          <p class="val tnum">${fmtNum(b.sent_today || 0)} <small>/ ${fmtNum(b.daily_limit || 0)}</small></p>
+          <div class="track" role="meter" aria-label="Emails sent today" aria-valuemin="0" aria-valuemax="${b.daily_limit || 0}" aria-valuenow="${b.sent_today || 0}">
+            <span style="width:${b.daily_limit ? Math.min(100, Math.round(100 * (b.sent_today || 0) / b.daily_limit)) : 0}%"></span></div></div>
+        <a class="panel tile" href="#replies"><div class="top"><span class="lbl">Replies, last 30 days</span><span class="ic">${ico("inbox", "sm")}</span></div>
+          <p class="val tnum">${fmtNum(reply30)}</p><p class="hint">Not counting bounces and auto-replies</p></a>
+        <a class="panel tile" href="#organisations"><div class="top"><span class="lbl">Clients won</span><span class="ic">${ico("check", "sm")}</span></div>
+          <p class="val tnum">${fmtNum(t.clients)}</p><p class="hint">${t.meetings ? `${fmtNum(t.meetings)} more at the meeting stage` : "None at the meeting stage yet"}</p></a>
+      </div>
     </header>
     <div class="stack" style="margin-top:32px">
       ${notice()}
@@ -1319,6 +1378,16 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => { 
 
 applyStoredTheme();
 route();
+getJSON("api/auth/me").then(m => {
+  const name = (m.user?.name || "").trim();
+  OPERATOR = name.split(/\s+/)[0];
+  if (name) {
+    $("#me").innerHTML = `<span class="av" aria-hidden="true">${esc(name[0].toUpperCase())}</span>
+      <div><b>${esc(name)}</b><span>${m.user.role === "admin" ? "Admin" : "Sales"} · signed in</span></div>`;
+    $("#me").hidden = false;
+  }
+  if (S.data) render();
+}).catch(() => {});
 refresh().then(route);
 setInterval(poll, POLL_MS);
 setInterval(() => { if (S.data && !busy()) renderChrome(); }, 30000);

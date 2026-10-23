@@ -80,8 +80,8 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 /* sidebar */
 .side { position: fixed; inset: 0 auto 0 0; width: 240px; padding: 16px 12px; display: flex; flex-direction: column; gap: 20px; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px; }
-.brand img { width: 26px; height: 26px; object-fit: contain; border-radius: 6px; background: #FFFFFF; padding: 2px; }
-.brand b { display: block; font-size: 13px; font-weight: 600; line-height: 16px; }
+.brand img { width: 32px; height: 32px; object-fit: contain; border-radius: 8px; background: #FFFFFF; padding: 2px; border: 1px solid var(--line); }
+.brand b { display: block; font-size: 14px; font-weight: 600; line-height: 17px; }
 .brand span { display: block; font-size: 11px; color: var(--fg-3); line-height: 14px; }
 .nav { display: grid; gap: 2px; }
 .eyebrow { padding: 0 8px 4px; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-3); }
@@ -158,6 +158,73 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .filters .input { flex: 1; min-width: 0; }
 .filters .select { width: auto; }
 .list { overflow-y: auto; flex: 1; min-height: 0; }
+
+/* sent with every email: profile link and attached PDF (admin) */
+.settings-panel { padding: 16px; display: grid; gap: 14px; }
+.settings-panel h3 { font-size: 14px; }
+.settings-panel .hint { font-size: 12.5px; color: var(--fg-3); }
+.set-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.set-block { border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; align-content: start; background: var(--bg); min-width: 0; }
+.set-title { font-weight: 600; font-size: 13.5px; }
+.set-fields { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 10px; }
+.set-fields label { display: grid; gap: 5px; font-size: 12.5px; font-weight: 500; }
+.set-line { font-size: 13px; color: var(--fg-2); overflow-wrap: anywhere; }
+.set-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.set-foot label.btn { cursor: pointer; }
+.pdf-card { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; background: var(--card); border: 1px solid var(--line); min-width: 0; }
+.pdf-card .ic { width: 36px; height: 40px; border-radius: 6px; display: grid; place-items: center; flex: none;
+  background: var(--primary-soft); color: var(--primary); font-size: 10px; font-weight: 700; letter-spacing: .04em; }
+.pdf-card > div { min-width: 0; flex: 1; }
+.pdf-card b { display: block; font-size: 13px; font-weight: 500; }
+.pdf-card span.muted { display: block; font-size: 12px; }
+@media (max-width: 860px) { .set-grid, .set-fields { grid-template-columns: minmax(0, 1fr); } }
+
+/* email templates (admin) */
+.tpl { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 16px; align-items: start; }
+.tpl-list { display: flex; flex-direction: column; max-height: calc(100dvh - 190px); overflow: hidden; position: sticky; top: 0; }
+.tpl-list .input { margin: 12px; width: auto; flex: none; }
+#tpl-items { overflow-y: auto; padding: 0 6px 8px; }
+.tpl-item { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 0;
+  border-radius: 7px; background: transparent; font-size: 13px; text-align: left; color: var(--fg); cursor: pointer; }
+.tpl-item:hover { background: var(--hover); }
+.tpl-item[aria-current="true"] { background: var(--nav-sel); font-weight: 500; }
+.tpl-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 16px 0; flex-wrap: wrap; }
+.tpl-head h3 { font-size: 16px; }
+.tpl-head p { font-size: 12.5px; margin-top: 2px; }
+.tpl-head .tab { flex: none; padding: 0 12px; }
+.tab[disabled] { opacity: .4; cursor: default; }
+.textarea.mono { font-family: var(--mono); font-size: 12.5px; line-height: 1.65; min-height: 200px; }
+.gaps { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.gap { height: 24px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--primary-line); background: var(--primary-soft);
+  color: var(--primary); font-family: var(--mono); font-size: 11.5px; cursor: pointer; }
+.gap:hover { background: var(--card); }
+.note { font-size: 12.5px; color: var(--warn); background: var(--warn-bg); padding: 8px 10px; border-radius: 7px; }
+.tpl-prev, .tpl-hist { border-top: 1px solid var(--line); padding: 16px; display: grid; gap: 10px; }
+.tpl-prev .eyebrow, .tpl-hist .eyebrow { padding: 0; }
+.tpl-mail { border: 1px solid var(--line); border-radius: 8px; background: var(--bg); padding: 14px 16px; font-size: 13px; display: grid; gap: 4px; }
+.tpl-mail pre { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font); font-size: 13.5px; line-height: 1.6; }
+.tpl-problem { border-radius: 8px; padding: 10px 12px; background: var(--neg-bg); color: var(--neg); font-size: 13px; }
+.tpl-hist ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.tpl-hist li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--fg-2); }
+@media (max-width: 860px) {
+  .tpl { grid-template-columns: minmax(0, 1fr); }
+  .tpl-list { position: static; max-height: 240px; }
+}
+
+/* summary cards above the lead list; each one is also a shortcut to that list */
+#v-leads { flex-direction: column; }
+.tiles { flex: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 14px 20px;
+  border-bottom: 1px solid var(--line); background-image: var(--glow); }
+.tile { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--card); box-shadow: var(--shadow-panel); text-align: left; cursor: pointer; min-width: 0;
+  transition: border-color .15s, box-shadow .15s; }
+.tile:hover { border-color: var(--primary-line); }
+.tile[aria-pressed="true"] { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.tile .ic { width: 36px; height: 36px; border-radius: 9px; display: grid; place-items: center; flex: none;
+  background: var(--primary-soft); color: var(--primary); }
+.tile > div { min-width: 0; }
+.tile b { display: block; font-size: 24px; font-weight: 600; line-height: 28px; letter-spacing: -0.02em; color: var(--fg); }
+.tile .l { display: block; font-size: 12.5px; color: var(--fg-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row { display: grid; gap: 4px; padding: 12px 14px; border-bottom: 1px solid var(--line); cursor: pointer; position: relative; background: none;
   border-left: 0; border-right: 0; border-top: 0; width: 100%; text-align: left; }
 .row:hover { background: var(--hover); }
@@ -270,6 +337,14 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
 .overlay { position: fixed; inset: 0; background: rgba(10, 10, 15, .35); z-index: 40; }
 
 @media (max-width: 1100px) { .crm { grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); } }
+@media (max-width: 1000px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 860px) {
+  .tiles { padding: 10px 12px; gap: 8px; }
+  .tile { padding: 8px 10px; gap: 10px; }
+  .tile .ic { width: 30px; height: 30px; }
+  .tile b { font-size: 19px; line-height: 22px; }
+  #v-leads:has(.crm.has-sel) .tiles { display: none; }  /* a conversation is open: give it the whole screen */
+}
 @media (max-width: 860px) {
   .toast { right: 16px; left: 16px; bottom: 16px; }
   .side { transform: translateX(-100%); transition: transform .2s; z-index: 50; background: var(--app); box-shadow: var(--shadow-pop); }
@@ -310,6 +385,7 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
   <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></symbol>
   <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></symbol>
   <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></symbol>
   <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
@@ -338,6 +414,7 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
       <a class="navlink" href="/" id="nav-dash" hidden><svg class="i"><use href="#i-grid"/></svg>Dashboard</a>
       <button class="navlink" data-go="report" id="nav-report" hidden><svg class="i"><use href="#i-chart"/></svg>What's working</button>
       <button class="navlink" data-go="team" id="nav-team" hidden><svg class="i"><use href="#i-users"/></svg>Team</button>
+      <button class="navlink" data-go="templates" id="nav-templates" hidden><svg class="i"><use href="#i-mail"/></svg>Email templates</button>
       <button class="navlink" data-go="account"><svg class="i"><use href="#i-user"/></svg>My account</button>
     </nav>
   </div>
@@ -365,6 +442,12 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
     <div class="drybar" id="drybar" hidden>Test mode is on (CRM_DRY_RUN=true). Replies are saved here but not emailed to anyone.</div>
 
     <div class="view" id="v-leads">
+      <div class="tiles" id="tiles">
+        <button class="tile" data-t="all"><span class="ic"><svg class="i"><use href="#i-inbox"/></svg></span><div><b id="t-open">–</b><span class="l">Open leads</span></div></button>
+        <button class="tile" data-t="waiting"><span class="ic"><svg class="i"><use href="#i-send"/></svg></span><div><b id="t-waiting">–</b><span class="l">Waiting on us</span></div></button>
+        <button class="tile" data-t="unclaimed"><span class="ic"><svg class="i"><use href="#i-users"/></svg></span><div><b id="t-unclaimed">–</b><span class="l">Unclaimed</span></div></button>
+        <button class="tile" data-t="mine"><span class="ic"><svg class="i"><use href="#i-user"/></svg></span><div><b id="t-mine">–</b><span class="l">My leads</span></div></button>
+      </div>
       <div class="crm" id="crm">
         <section class="list-pane" aria-label="Leads">
           <div class="list-head">
@@ -415,6 +498,42 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
             <thead><tr><th>Person</th><th>Role</th><th>Open leads</th><th>Replies sent</th><th>Last sign-in</th><th></th></tr></thead>
             <tbody id="people"></tbody>
           </table></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="view" id="v-templates" hidden>
+      <div class="page" style="max-width:1240px">
+        <div><h1>Email templates</h1>
+          <p class="lead">The emails LeadBot sends to each industry. A change you save is used from the next email that goes out. Only admins see this page.</p></div>
+        <div class="panel settings-panel">
+          <h3>Sent with every email</h3>
+          <div class="set-grid">
+            <div class="set-block">
+              <p class="set-title">Profile link</p>
+              <p class="hint">Shown in the signature wherever a template has {profile_line}. Leave the link empty for no profile line.</p>
+              <div class="set-fields">
+                <label>Words before the link <input class="input" id="set-label" maxlength="40" placeholder="Company profile"></label>
+                <label>Link <input class="input" id="set-url" type="url" placeholder="https://…"></label>
+              </div>
+              <p class="set-line" id="set-line"></p>
+              <div class="set-foot"><button class="btn primary sm" id="set-save">Save link</button><span class="muted" id="set-from"></span></div>
+            </div>
+            <div class="set-block">
+              <p class="set-title">Attached PDF</p>
+              <p class="hint">Attached to every first email. Follow-ups never carry it.</p>
+              <div id="set-pdf"><p class="muted">Loading…</p></div>
+              <div class="set-foot"><label class="btn sm">Upload a new PDF<input type="file" id="set-file" accept="application/pdf,.pdf" hidden></label>
+                <button class="btn ghost sm" id="set-remove" hidden>Don't attach a PDF</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="tpl">
+          <div class="panel tpl-list">
+            <input class="input" id="tpl-q" type="search" placeholder="Find an industry" aria-label="Find an industry">
+            <div id="tpl-items"><p class="muted" style="padding:12px">Loading…</p></div>
+          </div>
+          <div class="panel" id="tpl-edit"><div class="empty"><b>Pick an industry</b>Its first email and follow-ups open here.</div></div>
         </div>
       </div>
     </div>
@@ -511,20 +630,26 @@ $("theme").onclick = () => {
 };
 
 /* ---------------- navigation ---------------- */
-const TITLES = { open: "Open leads", mine: "My leads", closed: "Won and lost", orgs: "Organisations", report: "What's working", team: "Team", account: "My account" };
+const TITLES = { open: "Open leads", mine: "My leads", closed: "Won and lost", orgs: "Organisations", report: "What's working",
+                 team: "Team", templates: "Email templates", account: "My account" };
 function go(view, opts = {}) {
-  if ((view === "team" || view === "report") && state.me?.role !== "admin") view = "open";
+  if (["team", "report", "templates"].includes(view) && state.me?.role !== "admin") view = "open";
+  if (state.view === "templates" && view !== "templates" && tplDirty() && !confirm("Your template changes aren't saved. Leave them?")) return;
   state.view = view;
+  if (opts.filter) state.filter = opts.filter;  // a summary card picks the list it shows
   $("v-leads").hidden = !LIST_VIEWS.includes(view);
   $("v-team").hidden = view !== "team"; $("v-account").hidden = view !== "account"; $("v-report").hidden = view !== "report";
+  $("v-templates").hidden = view !== "templates";
   document.querySelectorAll("[data-go]").forEach(b => b.dataset.go === view ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
   $("crumb").textContent = TITLES[view];
   $("subtabs").hidden = view === "closed" || view === "orgs";
   $("org-filters").hidden = view !== "orgs";
+  $("tiles").hidden = view === "closed" || view === "orgs";  // the cards count open leads
   closeMenu();
   if (!opts.keepHash) setHash();
   if (view === "team") loadTeam();
   if (view === "report") loadReport();
+  if (view === "templates") loadTemplates();
   if (view === "account") $("acct-lead").textContent = `${state.me.name} · ${state.me.email} · ${state.me.role === "admin" ? "Admin" : "Sales"}`;
   if (!$("v-leads").hidden) { if (!opts.keepSel) { state.sel = null; state.detail = null; } loadLeads(); }
 }
@@ -538,6 +663,170 @@ $("menu").onclick = () => { $("side").classList.add("open"); $("overlay").hidden
 $("overlay").onclick = closeMenu;
 $("logout").onclick = async () => { try { await api("/api/auth/logout", { method: "POST" }); } catch (e) {} location.replace("/login"); };
 $("refresh").onclick = () => refreshAll(true);
+
+/* ---------------- email templates (admin) ---------------- */
+const KIND_NAMES = { first: "First email", followup: "Follow-up 1", followup2: "Follow-up 2" };
+const GAP_HELP = {
+  company: "The organisation's name", uses: "SMS uses for the industry, from uses.yaml",
+  opener: "A first sentence written about them (empty unless switched on in .env)",
+  attachment_line: "\"I've attached a one-page overview of TalkSasa.\" when the PDF is attached",
+  sender: "Sender name (SENDER_NAME in .env)", our_company: "Our company name (COMPANY in .env)",
+  phone: "Phone (SENDER_PHONE in .env)", website: "Our website, as a link", profile_line: "\"Company profile: <link>\" when PROFILE_URL is set",
+  profile_url: "PROFILE_URL from .env", industry: "The lead's industry", offer: "The visit/call or rates offer for this industry",
+};
+const tpl = { list: [], name: null, kind: "first", data: null, problem: null, field: null, timer: null };
+const IND_NAMES = { default: "Default (other industries)", sacco: "SACCO", ngo: "NGO", saas: "SaaS", hr_payroll: "HR & payroll",
+                    ecommerce: "E-commerce", proptech: "PropTech", insurtech: "InsurTech", edtech: "EdTech", healthtech: "HealthTech", agritech: "AgriTech" };
+const indName = (n) => IND_NAMES[n] || n.replace(/_/g, " ").replace(/^./, c => c.toUpperCase());
+
+function tplDirty() {
+  if (!tpl.data || !$("tpl-body")) return false;
+  const s = $("tpl-subject");
+  return $("tpl-body").value.trim() !== tpl.data.body || (!!s && s.value.trim() !== tpl.data.subject);
+}
+/* sent with every email */
+async function loadEmailSettings() {
+  try { renderEmailSettings(await api("/api/crm/settings")); }
+  catch (e) { $("set-pdf").innerHTML = `<p class="tpl-problem">${esc(e.message)}</p>`; }
+}
+function renderEmailSettings(s) {
+  $("set-label").value = s.profile_label; $("set-url").value = s.profile_url;
+  $("set-line").innerHTML = s.profile_line ? `In emails: <b>${esc(s.profile_line)}</b>` : "No profile line in emails right now.";
+  $("set-from").textContent = s.profile_from === ".env" ? "Now coming from .env (PROFILE_URL)" : "";
+  const size = (n) => n < 1048576 ? Math.max(1, Math.round(n / 1024)) + " KB" : (n / 1048576).toFixed(1) + " MB";
+  const a = s.attachment;
+  $("set-pdf").innerHTML = a ? `<div class="pdf-card"><span class="ic">PDF</span><div><b class="truncate">${esc(a.name)}</b>
+      <span class="muted">${size(a.size)}${a.size > 1048576 ? " · over 1 MB, more likely to land in spam" : ""}${s.attachment_from === ".env" ? " · from .env (ATTACH_PDF)" : ""}</span></div>
+      <a class="btn ghost sm" href="/api/crm/settings/attachment" target="_blank" rel="noopener">Open</a></div>`
+    : `<p class="muted">No PDF is attached to emails.</p>`;
+  $("set-remove").hidden = !a;
+  state.maxUpload = s.max_upload;
+}
+async function saveEmailSetting(call, okMsg) {
+  try { renderEmailSettings(await act(call, okMsg)); tplPreview(); } catch (e) { /* toast already shown */ }
+}
+$("set-save").onclick = () => saveEmailSetting(() => api("/api/crm/settings/profile", { method: "POST",
+  body: { profile_url: $("set-url").value, profile_label: $("set-label").value } }), "Profile link saved. The next emails use it.");
+$("set-remove").onclick = () => { if (confirm("Stop attaching a PDF to emails?"))
+  saveEmailSetting(() => api("/api/crm/settings/attachment/remove", { method: "POST" }), "Emails will go out without a PDF."); };
+$("set-file").onchange = async (e) => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  if (f.size > (state.maxUpload || 5242880)) return toast("Keep the PDF under 5 MB.", true);
+  const data = await new Promise((ok, bad) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(",")[1] || ""); r.onerror = bad; r.readAsDataURL(f); });
+  saveEmailSetting(() => api("/api/crm/settings/attachment", { method: "POST", body: { filename: f.name, data } }), "PDF uploaded. The next emails attach it.");
+};
+
+async function loadTemplates() {
+  loadEmailSettings();
+  try {  // industries being emailed first, then the rest A to Z
+    tpl.list = (await api("/api/crm/templates")).templates
+      .sort((a, b) => (b.approved - a.approved) || indName(a.name).localeCompare(indName(b.name)));
+  }
+  catch (e) { $("tpl-items").innerHTML = `<div class="empty"><b>Couldn't load templates</b>${esc(e.message)}</div>`; return; }
+  renderTplList();
+  if (tpl.name && !tplDirty()) openTemplate(tpl.name, tpl.kind, true);
+}
+function renderTplList() {
+  const q = $("tpl-q").value.trim().toLowerCase();
+  const rows = tpl.list.filter(t => !q || indName(t.name).toLowerCase().includes(q));
+  $("tpl-items").innerHTML = rows.map(t => `<button class="tpl-item" data-name="${esc(t.name)}" aria-current="${t.name === tpl.name}">
+      <span class="truncate">${esc(indName(t.name))}</span>${t.approved ? '<span class="chip pos">Sending</span>' : '<span class="chip plain">Off</span>'}</button>`).join("")
+    || `<p class="muted" style="padding:12px">No industry matches.</p>`;
+}
+async function openTemplate(name, kind, force) {
+  if (!force && tplDirty() && !confirm("Your changes to this template aren't saved. Leave them?")) return;
+  const t = tpl.list.find(x => x.name === name); if (!t) return;
+  if (!t.kinds.includes(kind)) kind = "first";
+  tpl.name = name; tpl.kind = kind; tpl.field = null; renderTplList();
+  if (state.view === "templates") history.replaceState(null, "", "#templates/" + name);
+  $("tpl-edit").innerHTML = `<div class="empty">Loading…</div>`;
+  try { tpl.data = await api(`/api/crm/templates/${kind}/${name}`); }
+  catch (e) { $("tpl-edit").innerHTML = `<div class="empty"><b>Couldn't open it</b>${esc(e.message)}</div>`; return; }
+  if (tpl.name !== name || tpl.kind !== kind) return;  // another one was picked meanwhile
+  renderTplEditor(t);
+  tplPreview();
+}
+function renderTplEditor(t) {
+  const d = tpl.data;
+  $("tpl-edit").innerHTML = `
+    <div class="tpl-head"><div><h3>${esc(indName(d.name))}</h3>
+        <p class="muted">${t.approved ? "Leads in this industry are being emailed." : "Not approved in uses.yaml, so nobody in this industry is emailed yet."}</p></div>
+      <div class="tabs" role="tablist">${Object.keys(KIND_NAMES).map(k => `<button class="tab" role="tab" data-kind="${k}" aria-selected="${k === d.kind}"
+        ${t.kinds.includes(k) ? "" : `disabled title="This industry has no ${KIND_NAMES[k].toLowerCase()}"`}>${KIND_NAMES[k]}</button>`).join("")}</div></div>
+    <div class="formgrid">
+      ${d.kind === "first" ? `<label class="full">Subject <input class="input" id="tpl-subject" value="${esc(d.subject)}" maxlength="150"></label>`
+        : `<p class="full hint">Follow-ups go out as a reply in the same thread: the subject is "Re: " and the first email's subject, and no PDF is attached.</p>`}
+      <label class="full">Email text <textarea class="textarea mono" id="tpl-body" rows="${Math.min(30, d.body.split("\n").length + 2)}">${esc(d.body)}</textarea></label>
+      <div class="full gaps"><span class="hint">Gaps LeadBot fills in. Click one to add it where the cursor is:</span>
+        ${d.fields.map(f => `<button type="button" class="gap" data-gap="${f}" title="${esc(GAP_HELP[f] || "")}">{${f}}</button>`).join("")}</div>
+      ${d.kind === "followup" ? `<p class="full note">Keep the line <b>"Just following up on my email about sending {uses} by SMS."</b> exactly as it is.
+        For leads whose first email had older wording, LeadBot swaps it for a general line.</p>` : ""}
+    </div>
+    <div class="formfoot"><button class="btn primary" id="tpl-save">Save</button><button class="btn ghost" id="tpl-reset" hidden>Discard changes</button>
+      <span class="muted" id="tpl-state"></span></div>
+    <div class="tpl-prev"><p class="eyebrow">Preview: what Example Company would get</p><div id="tpl-prev"></div></div>
+    ${d.history.length ? `<div class="tpl-hist"><p class="eyebrow">Earlier versions</p><ul>${d.history.map(h => `<li>
+        <span>${esc(fullWhen(h.at))} · replaced by ${esc(h.who)}</span><button class="btn ghost sm" data-restore="${h.id}">Restore</button></li>`).join("")}</ul></div>` : ""}`;
+  tplState();
+}
+function tplState() {
+  const dirty = tplDirty();
+  $("tpl-state").textContent = tpl.problem ? "Fix the problem below to save" : dirty ? "Unsaved changes" : "Saved · in use";
+  $("tpl-reset").hidden = !dirty;
+  $("tpl-save").disabled = !dirty || !!tpl.problem;
+}
+async function tplPreview() {
+  const b = $("tpl-body"); if (!b) return;
+  const s = $("tpl-subject"), name = tpl.name, kind = tpl.kind;
+  let out;
+  try {
+    const r = await api(`/api/crm/templates/${kind}/${name}/preview`, { method: "POST", body: { subject: s ? s.value : null, body: b.value } });
+    if (tpl.name !== name || tpl.kind !== kind) return;
+    tpl.problem = r.problem;
+    out = r.problem ? `<div class="tpl-problem">${esc(r.problem)}</div>`
+      : `<div class="tpl-mail"><p><b>Subject:</b> ${esc(r.subject)}</p>${r.attachments.length ? `<p><b>Attached:</b> ${r.attachments.map(esc).join(", ")}</p>` : ""}<pre>${esc(r.text)}</pre></div>`;
+  } catch (e) { tpl.problem = e.message; out = `<div class="tpl-problem">${esc(e.message)}</div>`; }
+  $("tpl-prev").innerHTML = out;
+  tplState();
+}
+$("tpl-q").addEventListener("input", renderTplList);
+$("tpl-items").addEventListener("click", (e) => { const b = e.target.closest(".tpl-item"); if (b) openTemplate(b.dataset.name, tpl.kind); });
+$("tpl-edit").addEventListener("focusin", (e) => { if (e.target.id === "tpl-body" || e.target.id === "tpl-subject") tpl.field = e.target; });
+$("tpl-edit").addEventListener("input", (e) => {
+  if (e.target.id !== "tpl-body" && e.target.id !== "tpl-subject") return;
+  tplState(); clearTimeout(tpl.timer); tpl.timer = setTimeout(tplPreview, 400);
+});
+$("tpl-edit").addEventListener("click", async (e) => {
+  const tab = e.target.closest(".tab[data-kind]");
+  if (tab && !tab.disabled) return openTemplate(tpl.name, tab.dataset.kind);
+  const gap = e.target.closest(".gap");
+  if (gap) {  // put {gap} where the cursor was, in the subject or the text
+    const f = tpl.field || $("tpl-body"), text = "{" + gap.dataset.gap + "}";
+    const at = f.selectionStart ?? f.value.length, end = f.selectionEnd ?? at;
+    f.value = f.value.slice(0, at) + text + f.value.slice(end);
+    f.focus(); f.selectionStart = f.selectionEnd = at + text.length;
+    f.dispatchEvent(new Event("input", { bubbles: true }));
+    return;
+  }
+  const b = e.target.closest("button"); if (!b) return;
+  const name = tpl.name, kind = tpl.kind;
+  try {
+    if (b.id === "tpl-reset") return openTemplate(name, kind, true);
+    if (b.id === "tpl-save") {
+      b.disabled = true;
+      const s = $("tpl-subject");
+      await act(() => api(`/api/crm/templates/${kind}/${name}`, { method: "POST", body: { subject: s ? s.value : null, body: $("tpl-body").value } }),
+                "Saved. The next emails use it.");
+      return openTemplate(name, kind, true);
+    }
+    if (b.dataset.restore) {
+      if (!confirm("Put this earlier version back? The text now in use is kept in the list, so you can undo this.")) return;
+      await act(() => api(`/api/crm/templates/${kind}/${name}/restore/${b.dataset.restore}`, { method: "POST" }), "Earlier version restored.");
+      return openTemplate(name, kind, true);
+    }
+  } catch (err) { if (b.id === "tpl-save") tplState(); }
+});
+window.addEventListener("beforeunload", (e) => { if (state.view === "templates" && tplDirty()) e.preventDefault(); });
 
 /* ---------------- lead list ---------------- */
 const LIST_VIEWS = ["open", "mine", "closed", "orgs"];
@@ -553,7 +842,7 @@ async function loadLeads() {
     if (scope !== scopeOf()) return;
     state.leads = d.leads;
     if (scope === "orgs") fillOrgFilters(); state.loadedAt = new Date();
-    if (scope === "open") state.counts = d.counts;
+    if (scope === "open") state.counts = d.counts; else refreshCounts();  // the cards always count all open leads
     updateBadges(); renderList();
     if (state.sel && !state.leads.some(l => l.id === state.sel) && !state.detail) state.sel = null;
     if (state.sel) loadDetail(state.sel, { quiet: true });
@@ -571,8 +860,21 @@ function updateBadges() {
   const c = state.counts;
   $("nb-open").textContent = c.waiting || ""; $("nb-open").hidden = !c.waiting;
   $("nb-mine").textContent = c.mine || ""; $("nb-mine").hidden = !c.mine;
-  $("n-waiting").textContent = c.waiting ?? ""; $("n-unclaimed").textContent = c.unclaimed ?? "";
+  // the tabs count the list they filter: on My leads, only yours
+  $("n-waiting").textContent = state.view === "mine" ? state.leads.filter(l => l.waiting).length : c.waiting ?? "";
+  $("n-unclaimed").textContent = c.unclaimed ?? "";
+  for (const k of ["open", "waiting", "unclaimed", "mine"]) $("t-" + k).textContent = c[k] ?? "–";
 }
+function markTile() {  // the card that matches what the list is showing
+  const on = state.view === "mine" ? "mine" : state.view === "open" ? state.filter : null;
+  document.querySelectorAll("#tiles .tile").forEach(t => t.setAttribute("aria-pressed", t.dataset.t === on));
+}
+$("tiles").addEventListener("click", (e) => {
+  const t = e.target.closest(".tile"); if (!t) return;
+  if (t.dataset.t === "mine") { if (state.view !== "mine") go("mine"); return; }
+  if (state.view !== "open") go("open", { filter: t.dataset.t });
+  else { state.filter = t.dataset.t; renderList(); }
+});
 function visibleLeads() {
   const q = $("q").value.trim().toLowerCase(), owner = $("owner-f").value;
   return state.leads.filter(l => {
@@ -593,6 +895,7 @@ function visibleLeads() {
 }
 function renderList() {
   document.querySelectorAll("#subtabs .tab").forEach(t => t.setAttribute("aria-selected", t.dataset.f === state.filter));
+  markTile();
   const rows = visibleLeads();
   if (!rows.length) {
     const msg = state.view === "orgs" ? (state.leads.length ? ["No organisations match", "Try another search, stage or industry."]
@@ -1040,10 +1343,12 @@ async function start() {
   state.me = me.user; state.dryRun = me.dry_run; state.fromEmail = me.from_email || "";
   $("me-name").textContent = me.user.name; $("me-av").textContent = initials(me.user.name);
   $("me-role").textContent = me.user.role === "admin" ? "Admin" : "Sales";
-  $("nav-team").hidden = $("nav-dash").hidden = $("nav-report").hidden = me.user.role !== "admin"; $("drybar").hidden = !me.dry_run;
+  $("nav-team").hidden = $("nav-dash").hidden = $("nav-report").hidden = $("nav-templates").hidden = me.user.role !== "admin";
+  $("drybar").hidden = !me.dry_run;
   await loadUsers();
   const [v, sel] = location.hash.slice(1).split("/");
-  if (sel) state.sel = +sel;
+  if (v === "templates" && sel) tpl.name = sel;  // #templates/sacco opens that industry's template
+  else if (sel) state.sel = +sel;
   go(TITLES[v] ? v : "open", { keepSel: true, keepHash: true });
   if (!sel) setHash();
   setInterval(() => { if (document.visibilityState === "visible") refreshAll(false); }, 60000);

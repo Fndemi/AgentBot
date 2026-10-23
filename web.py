@@ -11,7 +11,7 @@ import os
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
@@ -19,7 +19,7 @@ import config
 import db
 
 app = FastAPI(title="LeadBot")
-from crm import install as install_crm, screen_text
+from crm import install as install_crm, current_user, _require_owner_or_free, screen_text
 install_crm(app)
 from web_extra import router as extra_router
 app.include_router(extra_router)
@@ -161,18 +161,28 @@ class Status(BaseModel):
 
 
 @app.post("/api/replies/{reply_id}/handled")
-def set_handled(reply_id: int, body: Handled):
+def set_handled(reply_id: int, body: Handled, user=Depends(current_user)):
     with conn() as c:
-        cur = c.execute("UPDATE replies SET handled = ? WHERE id = ?", (int(body.handled), reply_id))
-        if cur.rowcount == 0:
+        reply = c.execute("SELECT lead_id FROM replies WHERE id = ?", (reply_id,)).fetchone()
+        if not reply:
             raise HTTPException(404, "Reply not found")
+        # same rule as the CRM: a claimed lead is only changed by its owner or an admin
+        lead = c.execute("SELECT claimed_by FROM leads WHERE id = ?", (reply["lead_id"],)).fetchone()
+        if lead:
+            _require_owner_or_free(lead, user)
+        c.execute("UPDATE replies SET handled = ? WHERE id = ?", (int(body.handled), reply_id))
     return {"ok": True}
 
 
 @app.post("/api/leads/{lead_id}/status")
-def set_status(lead_id: int, body: Status):
+def set_status(lead_id: int, body: Status, user=Depends(current_user)):
     if body.status not in ALLOWED_STATUSES:
         raise HTTPException(400, f"Unknown status: {body.status}")
+    with conn() as c:
+        lead = c.execute("SELECT claimed_by FROM leads WHERE id = ?", (lead_id,)).fetchone()
+    if not lead:
+        raise HTTPException(404, "Lead not found")
+    _require_owner_or_free(lead, user)
     # db.set_status also logs the change and stamps meeting_at / client_at
     if not db.set_status(lead_id, body.status, "dashboard"):
         raise HTTPException(404, "Lead not found")
