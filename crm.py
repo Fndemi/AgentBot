@@ -563,6 +563,42 @@ def open_leads(scope: str = "open", user=Depends(current_user)):
     return {"leads": rows, "counts": counts, "me": user["id"]}
 
 
+@router.get("/api/crm/organisations")
+def organisations(user=Depends(current_user)):
+    """Every organisation that has been emailed, by the bot or from the CRM, whether or not
+    it has written back. Sales see the ones nobody has claimed and their own."""
+    no_email = ",".join("'%s'" % s for s in NO_EMAIL)
+    where = ("(EXISTS (SELECT 1 FROM sent s WHERE s.lead_id = l.id) OR EXISTS "
+             "(SELECT 1 FROM crm_messages m WHERE m.lead_id = l.id AND m.status != 'failed'))")
+    if user["role"] != "admin":
+        where += " AND (l.claimed_by IS NULL OR l.claimed_by = %d)" % int(user["id"])
+    suppressed = db.suppressed_emails()
+    with conn() as c:
+        names = _user_names(c)
+        sc = _score_cols(c)
+        rows = [dict(r) for r in c.execute(f"""
+            SELECT l.id, l.company, l.email, l.phone, l.industry, l.website, l.status, l.claimed_by,
+                   {('l.' + sc['score']) if sc['score'] else 'NULL'} AS score,
+                   CASE WHEN l.status IN ({no_email}) THEN 0 ELSE 1 END AS can_email,
+                   (SELECT COUNT(*) FROM sent s WHERE s.lead_id = l.id) AS bot_emails,
+                   (SELECT COUNT(*) FROM crm_messages m WHERE m.lead_id = l.id AND m.status != 'failed') AS team_emails,
+                   (SELECT MAX(s.sent_on) FROM sent s WHERE s.lead_id = l.id) AS last_bot,
+                   (SELECT MAX(m.sent_at) FROM crm_messages m WHERE m.lead_id = l.id AND m.status != 'failed') AS last_team,
+                   (SELECT COUNT(*) FROM replies r WHERE r.lead_id = l.id
+                        AND COALESCE(r.label,'') NOT IN ('bounce','out_of_office')) AS replies,
+                   (SELECT COUNT(*) FROM replies r WHERE r.lead_id = l.id AND COALESCE(r.handled,0) = 0
+                        AND COALESCE(r.label,'') != 'bounce') AS waiting
+            FROM leads l WHERE {where}""")]
+    for r in rows:
+        r["emails"] = r.pop("bot_emails") + r.pop("team_emails")
+        r["last_emailed"] = max(filter(None, (r.pop("last_bot"), (r.pop("last_team") or "")[:10])), default=None)
+        r["can_email"] = bool(r["can_email"]) and (r["email"] or "").lower().strip() not in suppressed
+        r["owner"] = names.get(r["claimed_by"])
+        r["mine"] = r["claimed_by"] == user["id"]
+    rows.sort(key=lambda r: (r["last_emailed"] or "", r["id"]), reverse=True)  # most recently emailed first
+    return {"organisations": rows}
+
+
 @router.get("/api/crm/leads/{lead_id}")
 def lead_detail(lead_id: int, user=Depends(current_user)):
     with conn() as c:

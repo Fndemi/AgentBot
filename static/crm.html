@@ -317,6 +317,7 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
   <symbol id="i-clip" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
   <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></symbol>
+  <symbol id="i-building" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></symbol>
   <symbol id="i-archive" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="5" rx="1"/><path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/></symbol>
 </svg>
 
@@ -328,6 +329,7 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
       <button class="navlink" data-go="open"><svg class="i"><use href="#i-inbox"/></svg>Open leads<span class="badge" id="nb-open" hidden></span></button>
       <button class="navlink" data-go="mine"><svg class="i"><use href="#i-user"/></svg>My leads<span class="badge soft" id="nb-mine" hidden></span></button>
       <button class="navlink" data-go="closed"><svg class="i"><use href="#i-archive"/></svg>Won and lost</button>
+      <button class="navlink" data-go="orgs"><svg class="i"><use href="#i-building"/></svg>Organisations</button>
     </nav>
   </div>
   <div>
@@ -374,6 +376,10 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
             <div class="filters">
               <input class="input" id="q" type="search" placeholder="Search company, email, message" aria-label="Search leads">
               <select class="select" id="owner-f" aria-label="Filter by person"><option value="">Anyone</option></select>
+            </div>
+            <div class="filters" id="org-filters" hidden>
+              <select class="select" id="stage-f" aria-label="Filter by stage"><option value="">Every stage</option></select>
+              <select class="select" id="ind-f" aria-label="Filter by industry"><option value="">Every industry</option></select>
             </div>
           </div>
           <div class="list" id="list"></div>
@@ -505,15 +511,16 @@ $("theme").onclick = () => {
 };
 
 /* ---------------- navigation ---------------- */
-const TITLES = { open: "Open leads", mine: "My leads", closed: "Won and lost", report: "What's working", team: "Team", account: "My account" };
+const TITLES = { open: "Open leads", mine: "My leads", closed: "Won and lost", orgs: "Organisations", report: "What's working", team: "Team", account: "My account" };
 function go(view, opts = {}) {
   if ((view === "team" || view === "report") && state.me?.role !== "admin") view = "open";
   state.view = view;
-  $("v-leads").hidden = !["open", "mine", "closed"].includes(view);
+  $("v-leads").hidden = !LIST_VIEWS.includes(view);
   $("v-team").hidden = view !== "team"; $("v-account").hidden = view !== "account"; $("v-report").hidden = view !== "report";
   document.querySelectorAll("[data-go]").forEach(b => b.dataset.go === view ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
   $("crumb").textContent = TITLES[view];
-  $("subtabs").hidden = view === "closed";
+  $("subtabs").hidden = view === "closed" || view === "orgs";
+  $("org-filters").hidden = view !== "orgs";
   closeMenu();
   if (!opts.keepHash) setHash();
   if (view === "team") loadTeam();
@@ -533,12 +540,19 @@ $("logout").onclick = async () => { try { await api("/api/auth/logout", { method
 $("refresh").onclick = () => refreshAll(true);
 
 /* ---------------- lead list ---------------- */
+const LIST_VIEWS = ["open", "mine", "closed", "orgs"];
+const scopeOf = () => LIST_VIEWS.includes(state.view) ? state.view : "open";
+// Organisations: every organisation emailed, whether or not it has written back
+const fetchList = (scope) => scope === "orgs"
+  ? api("/api/crm/organisations").then(d => ({ leads: d.organisations }))
+  : api("/api/crm/leads?scope=" + scope);
 async function loadLeads() {
-  const scope = state.view === "closed" ? "closed" : state.view === "mine" ? "mine" : "open";
+  const scope = scopeOf();
   try {
-    const d = await api("/api/crm/leads?scope=" + scope);
-    if (scope !== (state.view === "closed" ? "closed" : state.view === "mine" ? "mine" : "open")) return;
-    state.leads = d.leads; state.loadedAt = new Date();
+    const d = await fetchList(scope);
+    if (scope !== scopeOf()) return;
+    state.leads = d.leads;
+    if (scope === "orgs") fillOrgFilters(); state.loadedAt = new Date();
     if (scope === "open") state.counts = d.counts;
     updateBadges(); renderList();
     if (state.sel && !state.leads.some(l => l.id === state.sel) && !state.detail) state.sel = null;
@@ -563,13 +577,17 @@ function visibleLeads() {
   const q = $("q").value.trim().toLowerCase(), owner = $("owner-f").value;
   return state.leads.filter(l => {
     if (l.id === state.sel) return true; // keep the open lead in view after you answer it
-    if (state.view !== "closed") {
+    if (state.view === "open" || state.view === "mine") {
       if (state.filter === "waiting" && !l.waiting) return false;
       if (state.filter === "unclaimed" && l.claimed_by) return false;
     }
     if (owner === "none" && l.claimed_by) return false;
     if (owner && owner !== "none" && String(l.claimed_by) !== owner) return false;
-    if (q && ![l.company, l.email, l.industry, l.last_summary, l.owner].some(v => (v || "").toLowerCase().includes(q))) return false;
+    if (state.view === "orgs") {
+      if ($("stage-f").value && l.status !== $("stage-f").value) return false;
+      if ($("ind-f").value && (l.industry || "") !== $("ind-f").value) return false;
+    }
+    if (q && ![l.company, l.email, l.phone, l.industry, l.last_summary, l.owner].some(v => (v || "").toLowerCase().includes(q))) return false;
     return true;
   });
 }
@@ -577,12 +595,15 @@ function renderList() {
   document.querySelectorAll("#subtabs .tab").forEach(t => t.setAttribute("aria-selected", t.dataset.f === state.filter));
   const rows = visibleLeads();
   if (!rows.length) {
-    const msg = state.view === "closed" ? ["Nothing closed yet", "Leads you mark Client or Lost show up here."]
+    const msg = state.view === "orgs" ? (state.leads.length ? ["No organisations match", "Try another search, stage or industry."]
+        : ["No organisations emailed yet", "Every organisation the bot or your team has emailed shows up here."])
+      : state.view === "closed" ? ["Nothing closed yet", "Leads you mark Client or Lost show up here."]
       : state.view === "mine" ? ["No leads claimed by you", "Open a lead and press Claim to make it yours."]
       : state.filter === "waiting" ? ["All caught up", "No one is waiting for an answer. Check the All tab for older conversations."]
       : ["No leads here", "When a lead replies, the bot puts them in this list."];
     $("list").innerHTML = `<div class="empty"><b>${msg[0]}</b>${msg[1]}</div>`; return;
   }
+  if (state.view === "orgs") { $("list").innerHTML = rows.map(orgRow).join(""); return; }
   $("list").innerHTML = rows.map(l => `
     <button class="row" data-id="${l.id}" ${l.id === state.sel ? 'aria-current="true"' : ""}>
       <span class="l1">${l.waiting ? '<span class="dot" title="Waiting for an answer"></span>' : ""}<b class="truncate">${esc(l.company || l.email)}</b>
@@ -596,6 +617,33 @@ $("list").addEventListener("click", (e) => { const r = e.target.closest(".row");
 $("subtabs").addEventListener("click", (e) => { const t = e.target.closest(".tab"); if (t) { state.filter = t.dataset.f; renderList(); } });
 $("q").addEventListener("input", renderList);
 $("owner-f").addEventListener("change", renderList);
+$("stage-f").addEventListener("change", renderList);
+$("ind-f").addEventListener("change", renderList);
+const ownerText = (l) => l.owner ? (l.mine ? "You" : esc(l.owner)) : "Unclaimed";
+function orgRow(l) {
+  const sent = `${l.emails} ${l.emails === 1 ? "email" : "emails"} sent${l.last_emailed ? ", last " + esc(when(l.last_emailed)) : ""}`;
+  return `
+    <button class="row" data-id="${l.id}" ${l.id === state.sel ? 'aria-current="true"' : ""}>
+      <span class="l1">${l.waiting ? '<span class="dot" title="Waiting for an answer"></span>' : ""}<b class="truncate">${esc(l.company || l.email)}</b>
+        <span class="when">${esc(when(l.last_emailed))}</span></span>
+      <span class="l2">${esc([l.email, l.phone, (l.industry || "").replace(/_/g, " ")].filter(Boolean).join(" · "))}</span>
+      <span class="l3">${scoreHTML(l.score)}${chip(STAGES, l.status)}${l.can_email ? "" : '<span class="chip neg plain">Can\'t be emailed</span>'}
+        <span class="truncate">${sent}${l.replies ? ` · ${l.replies} ${l.replies === 1 ? "reply" : "replies"}` : ""}</span>
+        <span class="truncate" style="margin-left:auto">${ownerText(l)}</span></span>
+    </button>`;
+}
+// Stage and industry choices: the ones among the organisations loaded, keeping what was picked
+function fillOrgFilters() {
+  const fill = (sel, values, label) => {
+    const cur = sel.value;
+    sel.innerHTML = `<option value="">${label}</option>` + values.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
+    sel.value = values.some(([v]) => v === cur) ? cur : "";
+  };
+  const stages = [...new Set(state.leads.map(l => l.status))].sort((a, b) => Object.keys(STAGES).indexOf(a) - Object.keys(STAGES).indexOf(b));
+  fill($("stage-f"), stages.map(s => [s, (STAGES[s] || [s])[0]]), "Every stage");
+  const inds = [...new Set(state.leads.map(l => l.industry || ""))].filter(Boolean).sort();
+  fill($("ind-f"), inds.map(i => [i, i.replace(/_/g, " ")]), "Every industry");
+}
 
 /* ---------------- lead detail ---------------- */
 function openLead(id) {
@@ -836,8 +884,8 @@ $("detail").addEventListener("keydown", (e) => {
   }
 });
 async function reloadListOnly() {
-  const scope = state.view === "closed" ? "closed" : state.view === "mine" ? "mine" : "open";
-  try { const d = await api("/api/crm/leads?scope=" + scope); state.leads = d.leads; if (scope === "open") state.counts = d.counts; updateBadges(); renderList(); } catch (e) {}
+  const scope = scopeOf();
+  try { const d = await fetchList(scope); if (scope !== scopeOf()) return; state.leads = d.leads; if (scope === "orgs") fillOrgFilters(); if (scope === "open") state.counts = d.counts; updateBadges(); renderList(); } catch (e) {}
   refreshCounts();
 }
 

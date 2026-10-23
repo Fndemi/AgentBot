@@ -173,3 +173,32 @@ def test_replies_marked_handled_by_the_old_rule_wait_again_once(team):
     team["admin"].post(f"/api/crm/replies/{unanswered}/done")
     crm.ensure_schema()  # starting again doesn't undo what someone marked done
     assert handled(unanswered) == 1
+
+
+def test_organisations_lists_everyone_emailed_with_the_same_limits_for_sales(team):
+    L, ids = team["leads"], team["ids"]
+    for name in ("asha", "ben", "free"):
+        db.record_sent(L[name][0], f"<{name}@talksasa.co.ke>", "school")
+    quiet, _ = add_lead("info@quiet.com", status="sent", label="out_of_office")
+    db.record_sent(quiet, "<quiet@talksasa.co.ke>", "school")
+    db.record_sent(quiet, "<quiet-2@talksasa.co.ke>", "school")
+    by_team, _ = add_lead("info@phoned.com", status="verified", label="out_of_office")
+    with db.conn() as c:
+        c.execute("INSERT INTO crm_messages (lead_id, user_id, status) VALUES (?, ?, 'sent')", (by_team, ids["admin"]))
+        c.execute("UPDATE leads SET score_reasons = '[\"+40 lender\"]', source = 'CBK DCP directory', "
+                  "source_email = 'old@cbk-listed.com'")
+    never, _ = add_lead("info@never-emailed.com", status="verified", label="out_of_office")
+
+    def orgs(client):
+        return {o["id"]: o for o in client.get("/api/crm/organisations").json()["organisations"]}
+
+    sales = orgs(team["asha"])
+    assert set(sales) == {L["asha"][0], L["free"][0], quiet, by_team}  # not Ben's, not one never emailed
+    assert sales[quiet]["emails"] == 2 and sales[quiet]["replies"] == 0 and sales[quiet]["owner"] is None
+    assert sales[by_team]["emails"] == 1 and sales[L["asha"][0]]["mine"] is True
+    for o in sales.values():
+        for hidden in ("score_reasons", "source", "source_email", "source_url"):
+            assert hidden not in o
+    assert "Ben" not in str(sales)
+    assert set(orgs(team["admin"])) == {L["asha"][0], L["ben"][0], L["free"][0], quiet, by_team}
+    assert never not in orgs(team["admin"])
