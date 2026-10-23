@@ -66,7 +66,10 @@ CREATE TABLE IF NOT EXISTS leads (
     score INTEGER,
     score_reasons TEXT,
     score_version INTEGER,
-    scored_at TEXT
+    scored_at TEXT,
+    -- when someone first emailed this lead from the CRM: the bot sends it nothing more
+    -- (no first email, no follow-ups) from then on
+    crm_emailed_at TEXT
 );
 CREATE TABLE IF NOT EXISTS sent (
     id INTEGER PRIMARY KEY,
@@ -309,7 +312,7 @@ def init():
                                  ("leads", "phone", "TEXT"), ("leads", "physical_address", "TEXT"),
                                  ("leads", "date_licensed", "TEXT"), ("leads", "imported_at", "TEXT"),
                                  ("leads", "scored_at", "TEXT"), ("leads", "source_email", "TEXT"),
-                                 ("replies", "message_id", "TEXT")):
+                                 ("leads", "crm_emailed_at", "TEXT"), ("replies", "message_id", "TEXT")):
             if col not in columns(c, table):
                 c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {kind}")
         # Leads from before these existed
@@ -499,7 +502,8 @@ def awaiting_followup(n=1):
             FROM leads l
             JOIN sent s ON s.id = (SELECT MIN(id) FROM sent WHERE lead_id = l.id)
             JOIN sent last ON last.id = (SELECT MAX(id) FROM sent WHERE lead_id = l.id)
-            WHERE l.status = 'sent' AND (SELECT COUNT(*) FROM sent s2 WHERE s2.lead_id = l.id) = ?
+            WHERE l.status = 'sent' AND l.crm_emailed_at IS NULL
+              AND (SELECT COUNT(*) FROM sent s2 WHERE s2.lead_id = l.id) = ?
             ORDER BY s.id""", (n,)).fetchall()
 
 def sent_thread(lead_id):
@@ -557,9 +561,11 @@ def claim_send(lead_id, followup, daily_limit, owner=None):
     step = int(followup) + 1
     today = date.today().isoformat()  # the same day sent_today counts
     with immediate() as c:
-        lead = c.execute("SELECT email, status FROM leads WHERE id=?", (lead_id,)).fetchone()
+        lead = c.execute("SELECT email, status, crm_emailed_at FROM leads WHERE id=?", (lead_id,)).fetchone()
         if not lead:
             return "no such lead"
+        if lead["crm_emailed_at"]:
+            return "someone at TalkSasa has emailed this lead from the CRM"
         wanted = "sent" if followup else "verified"
         if lead["status"] != wanted:
             return f"status is now {lead['status']}, not {wanted}"

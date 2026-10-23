@@ -196,6 +196,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .m-text.clamp { max-height: 9.5em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
 .m-sum { margin: 0 14px 10px; padding: 8px 10px; border-radius: 8px; background: var(--muted); font-size: 12.5px; color: var(--fg-2); }
 .m-sum b { color: var(--fg); font-weight: 500; }
+.m-quote { margin: 0 14px 12px; padding: 2px 0 2px 12px; border-left: 3px solid var(--line); font-size: 13px; color: var(--fg-3); white-space: pre-wrap; overflow-wrap: anywhere; }
 .m-foot { display: flex; gap: 6px; padding: 0 10px 10px; flex-wrap: wrap; }
 .missing { color: var(--fg-3); font-style: italic; }
 
@@ -302,6 +303,7 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
   <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></symbol>
   <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
   <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.5 0 10 8 10 8a17.6 17.6 0 0 1-2.16 3.19"/><path d="M6.61 6.61A17.4 17.4 0 0 0 2 12s3.5 8 10 8a9.7 9.7 0 0 0 5.39-1.61"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="m2 2 20 20"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></symbol>
   <symbol id="i-archive" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="5" rx="1"/><path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/></symbol>
 </svg>
 
@@ -598,7 +600,11 @@ async function loadDetail(id, { quiet } = {}) {
     if (!quiet) $("detail").innerHTML = `<div class="empty"><b>Couldn't open this lead</b>${esc(e.message)}</div>`;
   }
 }
-function saveDraft() { const t = $("c-text"); if (t && state.sel) state.drafts[state.sel + ":" + state.mode] = t.value; }
+function saveDraft() {
+  const t = $("c-text"), subj = $("c-subj");
+  if (t && state.sel) state.drafts[state.sel + ":" + state.mode] = t.value;
+  if (subj && state.sel) state.drafts[state.sel + ":subject"] = subj.value;
+}
 
 function renderDetail() {
   $("crm").classList.toggle("has-sel", !!state.sel);
@@ -611,6 +617,7 @@ function renderDetail() {
     ? `<span class="owner"><span class="avatar sm">${esc(initials(lead.owner))}</span>${lead.mine ? "You're handling this" : esc(lead.owner) + " is handling this"}</span>`
     : `<span class="owner muted">Nobody has claimed this lead</span>`;
   let buttons = "";
+  if (can_reply && can_act) buttons += `<button class="btn sm" data-a="mode" data-m="new"><svg class="i"><use href="#i-mail"/></svg>New email</button>`;
   if (can_reply && !lead.claimed_by) buttons += `<button class="btn primary sm" data-a="claim">Claim lead</button>`;
   if (can_reply && lead.claimed_by && (lead.mine || admin)) buttons += `<button class="btn ghost sm" data-a="release">Release</button>`;
   if (can_reply && admin) buttons += `<select class="select" data-a="assign" style="width:auto;height:28px;font-size:12.5px" aria-label="Assign to">
@@ -635,45 +642,81 @@ function renderDetail() {
     ${composerHTML(lead, can_reply, can_act)}`;
   const body = el.querySelector(".d-body"); body.scrollTop = body.scrollHeight;
   const ta = $("c-text"); if (ta) ta.value = state.drafts[state.sel + ":" + state.mode] || "";
+  const subj = $("c-subj"); if (subj) subj.value = state.drafts[state.sel + ":subject"] || "";
+}
+
+// Where an email's older, quoted text (or a long signature) starts: the line index, or -1
+function quoteStart(lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i].trim();
+    if (/^On\s/i.test(l) && lines.slice(i, i + 3).some(x => /wrote:\s*$/i.test(x))) return i;
+    if (/^-{2,}\s*(Original|Forwarded) Message\s*-{2,}$/i.test(l) || /^_{8,}$/.test(l)) return i;
+    if (/^From:\s/i.test(l) && lines.slice(i + 1, i + 5).some(x => /^(Sent|Date|To|Subject):\s/i.test(x.trim()))) return i;
+    if (/^>/.test(l)) return i;
+    if (/^--\s?$/.test(lines[i]) && lines.slice(i + 1).filter(x => x.trim()).length > 3) return i;
+  }
+  return -1;
+}
+function splitQuoted(body) {
+  const lines = String(body).replace(/\r\n?/g, "\n").split("\n"), at = quoteStart(lines);
+  const main = (at < 0 ? lines : lines.slice(0, at)).join("\n").replace(/\s+$/, "");
+  if (at < 0 || !main.trim()) return { main: String(body).replace(/\s+$/, ""), rest: "" };
+  return { main, rest: lines.slice(at).join("\n").replace(/^\s+|\s+$/g, "") };
+}
+function bodyHTML(m) {
+  if (!m.body) return `<div class="m-text"><span class="missing">The text of this email wasn't saved.</span></div>`;
+  const { main, rest } = splitQuoted(m.body), long = main.length > 600;
+  const foot = (long ? `<button class="btn ghost sm" data-a="expand">Show full email</button>` : "")
+    + (rest ? `<button class="btn ghost sm" data-a="quoted" aria-expanded="false">Show quoted text</button>` : "");
+  return `<div class="m-text ${long ? "clamp" : ""}">${esc(main)}</div>${foot ? `<div class="m-foot">${foot}</div>` : ""}${rest ? `<div class="m-quote" hidden>${esc(rest)}</div>` : ""}`;
 }
 
 function msgHTML(m) {
-  const text = m.body ? esc(m.body) : `<span class="missing">The text of this email wasn't saved.</span>`;
-  const long = (m.body || "").length > 600;
-  if (m.kind === "note") return `<article class="msg note"><div class="m-head"><span class="avatar sm">${esc(initials(m.who))}</span><b>${esc(m.who)}</b><span class="muted">added a note</span><span class="when" title="${esc(fullWhen(m.at))}">${esc(when(m.at))}</span></div><div class="m-text">${text}</div></article>`;
+  const when_ = `<span class="when" title="${esc(fullWhen(m.at))}">${esc(when(m.at))}</span>`;
+  if (m.kind === "note") return `<article class="msg note"><div class="m-head"><span class="avatar sm">${esc(initials(m.who))}</span><b>${esc(m.who)}</b><span class="muted">added a note</span>${when_}</div><div class="m-text">${m.body ? esc(m.body) : ""}</div></article>`;
   if (m.kind === "in") {
-    const ai = m.summary ? `<div class="m-sum"><b>Summary:</b> ${esc(m.summary)}</div>` : "";
+    const sum = m.summary ? `<div class="m-sum"><b>Summary:</b> ${esc(m.summary)}</div>` : "";
     const waiting = !m.handled && m.label !== "bounce";  // every reply but a bounce needs reading
     const actions = state.detail.can_act ? `<div class="m-foot">${state.detail.can_reply ? `<button class="btn sm" data-a="reply-to" data-id="${m.id}">Reply to this</button>` : ""}${waiting ? `<button class="btn ghost sm" data-a="done" data-id="${m.id}"><svg class="i"><use href="#i-check"/></svg>Mark done</button>` : ""}</div>` : "";
-    return `<article class="msg in"><div class="m-head"><b>${esc(m.from || m.who)}</b>${m.label ? chip(LABELS, m.label) : ""}${waiting ? '<span class="chip pri plain">Waiting</span>' : ""}<span class="when" title="${esc(fullWhen(m.at))}">${esc(when(m.at))}</span></div>
-      ${m.subject ? `<div class="m-subj">${esc(m.subject)}</div>` : ""}<div class="m-text ${long ? "clamp" : ""}">${text}</div>${long ? `<div class="m-foot"><button class="btn ghost sm" data-a="expand">Show full email</button></div>` : ""}${ai}${actions}</article>`;
+    return `<article class="msg in"><div class="m-head"><b>${esc(m.from || m.who)}</b>${m.label ? chip(LABELS, m.label) : ""}${waiting ? '<span class="chip pri plain">Waiting</span>' : ""}${when_}</div>
+      ${m.subject ? `<div class="m-subj">${esc(m.subject)}</div>` : ""}${bodyHTML(m)}${sum}${actions}</article>`;
   }
   const who = m.kind === "bot" ? `LeadBot <span class="muted">· ${m.step > 1 ? "follow-up " + (m.step - 1) : "first email"}</span>` : esc(m.who) + (m.to ? ` <span class="muted">to ${esc(m.to)}</span>` : "");
   const st = m.status === "dry_run" ? '<span class="chip warn plain">Test only, not sent</span>' : m.status === "failed" ? '<span class="chip neg plain">Failed to send</span>' : "";
-  return `<article class="msg ${m.status === "failed" ? "failed" : ""}"><div class="m-head"><b>${who}</b>${st}<span class="when" title="${esc(fullWhen(m.at))}">${esc(when(m.at))}</span></div>
-    ${m.subject ? `<div class="m-subj">${esc(m.subject)}</div>` : ""}<div class="m-text ${long ? "clamp" : ""}">${text}</div>${long ? `<div class="m-foot"><button class="btn ghost sm" data-a="expand">Show full email</button></div>` : ""}${m.error ? `<div class="m-sum" style="color:var(--neg)">${esc(m.error)}</div>` : ""}</article>`;
+  return `<article class="msg ${m.status === "failed" ? "failed" : ""}"><div class="m-head"><b>${who}</b>${st}${when_}</div>
+    ${m.subject ? `<div class="m-subj">${esc(m.subject)}</div>` : ""}${bodyHTML(m)}${m.error ? `<div class="m-sum" style="color:var(--neg)">${esc(m.error)}</div>` : ""}</article>`;
 }
 
 function composerHTML(lead, canReply, canAct) {
   if (!canAct) return `<div class="locked">${esc(lead.owner)} is handling this lead, so only they or an admin can reply. You can still read the conversation.</div>`;
   if (!canReply) return `<div class="locked">${lead.status === "unsubscribed" ? "This lead unsubscribed" : "This lead's email bounced or isn't valid"}, so they can't be emailed. Read their reply, then press Mark done.</div>`;
   const ins = state.detail.thread.filter(m => m.kind === "in" && !["bounce", "out_of_office"].includes(m.label));
-  const target = ins.find(m => m.id === state.replyTo) || ins[ins.length - 1];
-  const to = (target?.from || lead.email || "").replace(/.*<([^>]+)>.*/, "$1");
   const tabs = `<div class="c-tabs tabs" role="tablist" style="display:inline-flex;justify-self:start">
-      ${canReply ? `<button class="tab" role="tab" data-a="mode" data-m="reply" aria-selected="${state.mode === "reply"}">Reply</button>` : ""}
-      <button class="tab" role="tab" data-a="mode" data-m="note" aria-selected="${state.mode === "note" || !canReply}">Internal note</button></div>`;
-  if (state.mode === "note" || !canReply) {
-    return `<div class="composer">${tabs}${canReply ? "" : `<p class="c-meta">This lead unsubscribed or their email bounced, so you can't email them. Notes still work.</p>`}
+      ${["reply", "new", "note"].map(k => `<button class="tab" role="tab" data-a="mode" data-m="${k}" aria-selected="${state.mode === k}">${{ reply: "Reply", new: "New email", note: "Internal note" }[k]}</button>`).join("")}</div>`;
+  const from = `<span><b>From</b> ${esc(state.me.name)} from TalkSasa &lt;${esc(state.fromEmail)}&gt;</span>`;
+  const sendHint = `Ctrl + Enter to send${state.dryRun ? " · test mode, nothing is emailed" : ""}`;
+  const sendLabel = state.dryRun ? "Save test email" : "Send";
+  if (state.mode === "note") {
+    return `<div class="composer">${tabs}
       <textarea class="textarea" id="c-text" rows="3" placeholder="Only your team sees notes, e.g. called them, wants a quote for 50,000 SMS"></textarea>
       <div class="c-foot"><span class="hint">Ctrl + Enter to save</span><button class="btn primary" data-a="save-note">Save note</button></div></div>`;
   }
+  if (state.mode === "new") {
+    return `<div class="composer">${tabs}
+      <div class="c-meta"><span><b>To</b> ${esc(lead.email || "")}</span>${from}<span>A new conversation. LeadBot stops its automatic emails to this lead once you send.</span></div>
+      <input class="input" id="c-subj" maxlength="200" placeholder="Subject" aria-label="Subject">
+      <textarea class="textarea" id="c-text" rows="5" placeholder="Write your email. Your name, TalkSasa and your phone are added at the bottom."></textarea>
+      <div class="c-foot"><span class="hint">${sendHint}</span>
+        <button class="btn primary" data-a="send-new"><svg class="i"><use href="#i-send"/></svg>${sendLabel}</button></div></div>`;
+  }
+  const target = ins.find(m => m.id === state.replyTo) || ins[ins.length - 1];
+  const to = (target?.from || lead.email || "").replace(/.*<([^>]+)>.*/, "$1");
   const subj = target?.subject ? (/^re:/i.test(target.subject) ? target.subject : "Re: " + target.subject) : "Re: TalkSasa";
   return `<div class="composer">${tabs}
-    <div class="c-meta"><span><b>To</b> ${esc(to)}</span><span><b>From</b> ${esc(state.me.name)} from TalkSasa &lt;${esc(state.fromEmail)}&gt;</span><span><b>Subject</b> ${esc(subj)}</span>
+    <div class="c-meta"><span><b>To</b> ${esc(to)}</span>${from}<span><b>Subject</b> ${esc(subj)}</span>
       ${target && ins.length > 1 ? `<span>Answering their message from ${esc(when(target.at))}</span>` : ""}</div>
     <textarea class="textarea" id="c-text" rows="5" placeholder="Write your reply. Your name, TalkSasa and your phone are added at the bottom, and their message is quoted below it."></textarea>
-    <div class="c-foot"><span class="hint">Ctrl + Enter to send${state.dryRun ? " · test mode, nothing is emailed" : ""}</span>
+    <div class="c-foot"><span class="hint">${sendHint}</span>
       <button class="btn primary" data-a="send" data-reply="${target ? target.id : ""}"><svg class="i"><use href="#i-send"/></svg>${state.dryRun ? "Save test reply" : "Send reply"}</button></div></div>`;
 }
 
@@ -681,8 +724,12 @@ $("detail").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-a]"); if (!b || b.tagName === "SELECT") return;
   const id = state.sel, a = b.dataset.a;
   if (a === "back") { saveDraft(); state.sel = null; state.detail = null; setHash(); renderList(); renderDetail(); return; }
-  if (a === "expand") { const t = b.closest(".msg").querySelector(".m-text"); t.classList.remove("clamp"); b.parentElement.remove(); return; }
-  if (a === "mode") { saveDraft(); state.mode = b.dataset.m; renderDetail(); $("c-text")?.focus(); return; }
+  if (a === "expand") { const t = b.closest(".msg").querySelector(".m-text"); t.classList.remove("clamp"); const f = b.parentElement; b.remove(); if (!f.children.length) f.remove(); return; }
+  if (a === "quoted") {
+    const q = b.closest(".msg").querySelector(".m-quote"), open = q.hidden;
+    q.hidden = !open; b.setAttribute("aria-expanded", open); b.textContent = open ? "Hide quoted text" : "Show quoted text"; return;
+  }
+  if (a === "mode") { saveDraft(); state.mode = b.dataset.m; renderDetail(); (b.dataset.m === "new" ? $("c-subj") : $("c-text"))?.focus(); return; }
   if (a === "reply-to") { saveDraft(); state.mode = "reply"; state.replyTo = +b.dataset.id; renderDetail(); $("c-text")?.focus(); return; }
   b.disabled = true;
   try {
@@ -699,6 +746,14 @@ $("detail").addEventListener("click", async (e) => {
       const r = await act(() => api(`/api/crm/leads/${id}/reply`, { method: "POST", body: { body: text, reply_id: b.dataset.reply ? +b.dataset.reply : null } }));
       toast(r.status === "dry_run" ? "Saved as a test reply. Nothing was emailed." : "Reply sent to " + r.to + ".");
       state.drafts[id + ":reply"] = ""; $("c-text").value = ""; state.replyTo = null;
+    }
+    if (a === "send-new") {
+      const subject = $("c-subj").value.trim(), text = $("c-text").value.trim();
+      if (!subject) { toast("Add a subject first.", true); return; }
+      if (!text) { toast("Write your email first.", true); return; }
+      const r = await act(() => api(`/api/crm/leads/${id}/email`, { method: "POST", body: { subject, body: text } }));
+      toast(r.status === "dry_run" ? "Saved as a test email. Nothing was emailed." : "Email sent to " + r.to + ".");
+      state.drafts[id + ":new"] = state.drafts[id + ":subject"] = ""; state.mode = "reply";
     }
     await Promise.all([loadDetail(id), reloadListOnly()]);
   } catch (err) { /* toast already shown */ }
@@ -718,7 +773,7 @@ $("detail").addEventListener("change", async (e) => {
 });
 $("detail").addEventListener("keydown", (e) => {
   if (e.target.id === "c-text" && e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-    e.preventDefault(); $("detail").querySelector('[data-a="send"],[data-a="save-note"]')?.click();
+    e.preventDefault(); $("detail").querySelector('[data-a="send"],[data-a="send-new"],[data-a="save-note"]')?.click();
   }
 });
 async function reloadListOnly() {
@@ -867,7 +922,8 @@ $("f-pw").addEventListener("submit", async (e) => {
 /* ---------------- start ---------------- */
 async function refreshAll(manual) {
   if (state.busy) return;
-  const t = $("c-text"); if (!manual && t && t.value.trim()) { refreshCounts(); return; } // don't disturb someone typing
+  const t = $("c-text");
+  if (!manual && ((t && t.value.trim()) || $("c-subj")?.value.trim())) { refreshCounts(); return; } // don't disturb someone writing
   if (!$("v-leads").hidden) await loadLeads(); else { refreshCounts(); if (state.view === "team") loadTeam(); if (state.view === "report") loadReport(); }
 }
 async function start() {

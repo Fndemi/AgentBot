@@ -133,11 +133,12 @@ def waiting():
     """Verified leads in the order they will be emailed: highest need score first (see
     targeting.py; not scored yet comes last), then the points above, then oldest-found first. An address on the suppression list is never waiting,
     whatever its score, and neither is a lead that has already been emailed, even if
-    its status was set back to verified: a first email is never sent twice."""
+    its status was set back to verified: a first email is never sent twice. A lead someone
+    has emailed from the CRM is left to them."""
     suppressed = db.suppressed_emails()
     emailed = db.emailed_lead_ids()
     leads = [l for l in db.leads_by_status("verified")
-             if l["email"] not in suppressed and l["id"] not in emailed]
+             if l["email"] not in suppressed and l["id"] not in emailed and not l["crm_emailed_at"]]
     return sorted(leads, key=lambda l: (-(need_score(l) if need_score(l) is not None else -1),
                                         -score(l), l["id"]))
 

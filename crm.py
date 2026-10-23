@@ -22,6 +22,7 @@ Settings (.env, all optional):
 import getpass
 import hashlib
 import hmac
+import html
 import imaplib
 import json
 import os
@@ -704,6 +705,16 @@ class ReplyIn(BaseModel):
     reply_id: Optional[int] = None   # the incoming message being answered
 
 
+class NewEmailIn(BaseModel):
+    subject: str
+    body: str
+
+
+# ---------------------------------------------------------------- the email itself
+
+FONT = "font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#222222"
+
+
 def signature(user):
     lines = [user["name"], config.COMPANY]
     phone = (user.get("phone") or "").strip() or (config.SENDER_PHONE or "").strip()
@@ -712,12 +723,75 @@ def signature(user):
     return "\n".join(lines)
 
 
+def _when_text(ts):
+    """A stored UTC time as the reader's "Mon, 20 Oct 2026 at 14:05" (this server's time zone)."""
+    try:
+        d = datetime.strptime((ts or "")[:19].replace("T", " "), "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return (ts or "")[:16]
+    d = d.replace(tzinfo=timezone.utc).astimezone()
+    return f"{d:%a}, {d.day} {d:%b %Y} at {d:%H:%M}"
+
+
 def _quote(text, who, when):
     text = (text or "").strip()
     if not text:
         return ""
     quoted = "\n".join("> " + line for line in text.splitlines()[:60])
     return f"\n\nOn {when}, {who} wrote:\n{quoted}"
+
+
+def _html_text(text):
+    return "<br>\n".join(html.escape(line, quote=False) for line in text.splitlines())
+
+
+def _html_quote(text, who, when):
+    """Their message in a light grey block, without the "> " marks of older quoting."""
+    lines = []
+    for line in (text or "").strip().splitlines()[:60]:
+        line = re.sub(r"^\s*(>\s?)+", "", line)
+        line = re.sub(r"<([^<>\s@]+@[^<>\s]+)>", r"\1", line)   # Name <a@b.com> -> Name a@b.com
+        lines.append(line.replace(">", "›"))
+    if not any(l.strip() for l in lines):
+        return ""
+    return (f'<div style="margin-top:28px;font-size:13px;color:#666666">On {html.escape(when)}, '
+            f'{html.escape(who.replace(">", "›"))} wrote:</div>'
+            f'<div style="margin-top:6px;padding:10px 14px;background:#f5f5f5;border-left:3px solid #d6d6d6;'
+            f'border-radius:4px;font-size:13px;line-height:1.5;color:#666666">{_html_text(chr(10).join(lines))}</div>')
+
+
+def _html_signature(user):
+    name, *rest = signature(user).splitlines()
+    return (f'<div style="margin-top:22px;padding-top:10px;border-top:1px solid #e6e6e6;font-size:13px;'
+            f'line-height:1.5;color:#555555"><strong style="color:#222222">{html.escape(name)}</strong><br>'
+            + "<br>".join(html.escape(line) for line in rest) + "</div>")
+
+
+def build_email(user, to, subject, text, orig=None, who="", refs=()):
+    """The email as it goes out: plain text and HTML versions.
+    Returns it with its plain text, which is what the conversation keeps."""
+    when = _when_text(orig["received_at"]) if orig is not None else ""
+    plain = text + "\n\n" + signature(user)
+    page = f'<div style="{FONT}">{_html_text(text)}{_html_signature(user)}'
+    if orig is not None:
+        plain += _quote(orig["body"], who, when)
+        page += _html_quote(orig["body"], who, when)
+    page += "</div>"
+
+    msg = EmailMessage()
+    msg["From"] = formataddr((f"{user['name']} from TalkSasa", CRM_FROM_EMAIL))
+    msg["To"] = to
+    msg["Reply-To"] = CRM_FROM_EMAIL
+    msg["Subject"] = subject
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=(CRM_FROM_EMAIL or "talksasa.co.ke").split("@")[-1])
+    if refs:
+        msg["In-Reply-To"] = refs[0]
+        msg["References"] = " ".join(reversed(refs))
+    msg.set_content(plain)
+    msg.add_alternative(f"<!doctype html><html><body style=\"margin:0;padding:16px 0\">{page}</body></html>",
+                        subtype="html")
+    return msg, plain
 
 
 def _deliver(msg):
@@ -749,20 +823,53 @@ def _file_in_sent(msg):
         pass
 
 
-@router.post("/api/crm/leads/{lead_id}/reply")
-def send_reply(lead_id: int, body: ReplyIn, user=Depends(current_user)):
-    text = body.body.strip()
+def _check_sendable(text):
     if not text:
         raise HTTPException(400, "Write a message first.")
     if not CRM_FROM_EMAIL or not EMAIL_RE.match(CRM_FROM_EMAIL):
         raise HTTPException(503, "Replies aren't set up yet: add FROM_EMAIL (or CRM_FROM_EMAIL) to .env and restart.")
     if len(text) > 20000:
         raise HTTPException(400, "That message is too long.")
+
+
+def _open_for_email(c, lead_id, user):
+    lead = _lead_or_404(c, lead_id, user)
+    _require_owner_or_free(lead, user)
+    if not _can_email(c, lead):
+        raise HTTPException(409, "This lead unsubscribed or their address bounced. Don't email them.")
+    return lead
+
+
+def _send(c, lead, user, to, subject, msg, plain, in_reply_to, event):
+    """Send one CRM email and record it. The lead becomes the
+    sender's if nobody had it, and the bot sends it nothing more."""
+    lead_id = lead["id"]
+    status, error = ("dry_run" if CRM_DRY_RUN else "sent"), None
+    try:
+        _deliver(msg)
+    except Exception as e:  # keep a record of what failed
+        status, error = "failed", str(e)[:300]
+    c.execute("""INSERT INTO crm_messages (lead_id, user_id, to_email, subject, body, message_id,
+                 in_reply_to, status, error) VALUES (?,?,?,?,?,?,?,?,?)""",
+              (lead_id, user["id"], to, subject, plain, msg["Message-ID"], in_reply_to, status, error))
+    if status == "failed":
+        log_event(c, lead_id, user["id"], "reply_failed", error)
+        c.commit()
+        raise HTTPException(502, f"The email didn't send: {error}")
+    if not lead["claimed_by"]:
+        c.execute("UPDATE leads SET claimed_by = ?, claimed_at = ? WHERE id = ?", (user["id"], now_utc(), lead_id))
+        log_event(c, lead_id, user["id"], "claimed", "by emailing")
+    c.execute("UPDATE leads SET crm_emailed_at = ? WHERE id = ? AND crm_emailed_at IS NULL", (now_utc(), lead_id))
+    log_event(c, lead_id, user["id"], event, to)
+    return status
+
+
+@router.post("/api/crm/leads/{lead_id}/reply")
+def send_reply(lead_id: int, body: ReplyIn, user=Depends(current_user)):
+    text = body.body.strip()
+    _check_sendable(text)
     with conn() as c:
-        lead = _lead_or_404(c, lead_id, user)
-        _require_owner_or_free(lead, user)
-        if not _can_email(c, lead):
-            raise HTTPException(409, "This lead unsubscribed or their address bounced. Don't email them.")
+        lead = _open_for_email(c, lead_id, user)
         orig = None
         if body.reply_id:
             orig = c.execute("SELECT * FROM replies WHERE id = ? AND lead_id = ?", (body.reply_id, lead_id)).fetchone()
@@ -796,43 +903,31 @@ def send_reply(lead_id: int, body: ReplyIn, user=Depends(current_user)):
             if r and r["message_id"] and r["message_id"] not in refs:
                 refs.append(r["message_id"])
 
-        full = text + "\n\n" + signature(user)
-        if orig is not None:
-            full += _quote(orig["body"], orig["from_email"] or lead["company"], (orig["received_at"] or "")[:16])
-
-        msg = EmailMessage()
-        msg["From"] = formataddr((f"{user['name']} from TalkSasa", CRM_FROM_EMAIL))
-        msg["To"] = to
-        msg["Reply-To"] = CRM_FROM_EMAIL
-        msg["Subject"] = subject
-        msg["Date"] = formatdate(localtime=True)
-        domain = (CRM_FROM_EMAIL or "talksasa.co.ke").split("@")[-1]
-        msg_id = make_msgid(domain=domain)
-        msg["Message-ID"] = msg_id
-        if refs:
-            msg["In-Reply-To"] = refs[0]
-            msg["References"] = " ".join(reversed(refs))
-        msg.set_content(full)
-
-        status, error = ("dry_run" if CRM_DRY_RUN else "sent"), None
-        try:
-            _deliver(msg)
-        except Exception as e:  # keep a record of what failed
-            status, error = "failed", str(e)[:300]
-        c.execute("""INSERT INTO crm_messages (lead_id, user_id, to_email, subject, body, message_id, in_reply_to,
-                     status, error) VALUES (?,?,?,?,?,?,?,?,?)""",
-                  (lead_id, user["id"], to, subject, full, msg_id, refs[0] if refs else None, status, error))
-        if status == "failed":
-            log_event(c, lead_id, user["id"], "reply_failed", error)
-            c.commit()
-            raise HTTPException(502, f"The email didn't send: {error}")
-        if not lead["claimed_by"]:
-            c.execute("UPDATE leads SET claimed_by = ?, claimed_at = ? WHERE id = ?", (user["id"], now_utc(), lead_id))
-            log_event(c, lead_id, user["id"], "claimed", "by replying")
+        msg, plain = build_email(user, to, subject, text, orig, (orig["from_email"] if orig is not None else "")
+                                 or lead["company"], refs)
+        status = _send(c, lead, user, to, subject, msg, plain, refs[0] if refs else None, "replied")
         c.execute("UPDATE replies SET handled = 1 WHERE lead_id = ? AND COALESCE(handled,0) = 0", (lead_id,))
         if lead["status"] in ("sent", "verified", "new"):
             c.execute("UPDATE leads SET status = 'replied' WHERE id = ?", (lead_id,))
-        log_event(c, lead_id, user["id"], "replied", to)
+    _file_in_sent(msg)
+    return {"ok": True, "status": status, "to": to}
+
+
+@router.post("/api/crm/leads/{lead_id}/email")
+def send_new_email(lead_id: int, body: NewEmailIn, user=Depends(current_user)):
+    """A fresh email to the lead (its own thread), whenever the person handling it wants."""
+    text = body.body.strip()
+    subject = body.subject.replace("\r", " ").replace("\n", " ").strip()[:200]
+    if not subject:
+        raise HTTPException(400, "Add a subject.")
+    _check_sendable(text)
+    with conn() as c:
+        lead = _open_for_email(c, lead_id, user)
+        to = (lead["email"] or "").strip()
+        if not EMAIL_RE.match(to):
+            raise HTTPException(400, f"The lead's email address doesn't look valid: {to or 'missing'}.")
+        msg, plain = build_email(user, to, subject, text)
+        status = _send(c, lead, user, to, subject, msg, plain, None, "emailed")
     _file_in_sent(msg)
     return {"ok": True, "status": status, "to": to}
 
