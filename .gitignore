@@ -16,3 +16,4 @@ previews.txt
 followup_previews.txt
 .env.server
 docs/LendersReport*.md
+*.sql
