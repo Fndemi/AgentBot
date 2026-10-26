@@ -631,7 +631,7 @@ const LABELS = { interested: ["Interested", "pos"], question: ["Question", "info
 const STAGES = { replied: ["Replied", "pri"], meeting: ["Meeting set", "info"], client: ["Client", "pos"], lost: ["Lost", ""],
   sent: ["Awaiting reply", ""], unsubscribed: ["Unsubscribed", "neg"], bounced: ["Bounced", "neg"], invalid: ["Invalid email", "neg"],
   new: ["Found", ""], verified: ["Ready to email", ""] };
-const scoreHTML = (v) => v == null || v === "" ? "" : `<span class="score ${+v >= 80 ? "hi" : ""}" title="Need score out of 100">${Math.round(+v)}</span>`;
+const scoreHTML = (v) => v == null || v === "" ? "" : `<span class="score ${+v >= 80 ? "hi" : ""}" title="Score">${Math.round(+v)}</span>`;
 const chip = (map, k) => { const [t, c] = map[k] || [k || "—", ""]; return `<span class="chip ${c}">${esc(t)}</span>`; };
 
 const state = { me: null, dryRun: false, fromEmail: "", view: "open", filter: "waiting", leads: [], counts: {}, users: [],
@@ -963,8 +963,7 @@ function renderList() {
     <button class="row" data-id="${l.id}" ${l.id === state.sel ? 'aria-current="true"' : ""}>
       <span class="l1">${l.waiting ? '<span class="dot" title="Waiting for an answer"></span>' : ""}<b class="truncate">${esc(l.company || l.email)}</b>
         <span class="when">${esc(when(l.last_received))}</span></span>
-      <span class="l2">${esc(l.last_summary || "No message text saved.")}</span>
-      <span class="l3">${scoreHTML(l.score)}${l.last_label ? chip(LABELS, l.last_label) : ""}${chip(STAGES, l.status)}${l.can_email ? "" : '<span class="chip neg plain">Can\'t be emailed</span>'}
+      <span class="l3">${scoreHTML(l.score)}${chip(STAGES, l.status)}${l.can_email ? "" : '<span class="chip neg plain">Can\'t be emailed</span>'}
         <span class="truncate" style="margin-left:auto">${l.owner ? (l.mine ? "You" : esc(l.owner)) : "Unclaimed"}</span></span>
     </button>`).join("");
 }
@@ -976,14 +975,12 @@ $("stage-f").addEventListener("change", renderList);
 $("ind-f").addEventListener("change", renderList);
 const ownerText = (l) => l.owner ? (l.mine ? "You" : esc(l.owner)) : "Unclaimed";
 function orgRow(l) {
-  const sent = `${l.emails} ${l.emails === 1 ? "email" : "emails"} sent${l.last_emailed ? ", last " + esc(when(l.last_emailed)) : ""}`;
   return `
     <button class="row" data-id="${l.id}" ${l.id === state.sel ? 'aria-current="true"' : ""}>
       <span class="l1">${l.waiting ? '<span class="dot" title="Waiting for an answer"></span>' : ""}<b class="truncate">${esc(l.company || l.email)}</b>
         <span class="when">${esc(when(l.last_emailed))}</span></span>
-      <span class="l2">${esc([l.email, l.phone, (l.industry || "").replace(/_/g, " ")].filter(Boolean).join(" · "))}</span>
+      <span class="l2">${esc(l.email || "")}</span>
       <span class="l3">${scoreHTML(l.score)}${chip(STAGES, l.status)}${l.can_email ? "" : '<span class="chip neg plain">Can\'t be emailed</span>'}
-        <span class="truncate">${sent}${l.replies ? ` · ${l.replies} ${l.replies === 1 ? "reply" : "replies"}` : ""}</span>
         <span class="truncate" style="margin-left:auto">${ownerText(l)}</span></span>
     </button>`;
 }
@@ -1032,16 +1029,13 @@ function renderDetail() {
   if (!state.sel) { el.innerHTML = `<div class="empty" style="margin:auto"><b>Pick a lead</b>Their emails, replies and notes show here.</div>`; return; }
   if (!state.detail) { el.innerHTML = `<div class="empty" style="margin:auto">Loading…</div>`; return; }
   const { lead, thread, can_reply, can_act } = state.detail, me = state.me, admin = me.role === "admin";
-  const site = lead.website ? `<a href="${esc(/^https?:/i.test(lead.website) ? lead.website : "https://" + lead.website)}" target="_blank" rel="noopener noreferrer">${esc(lead.website.replace(/^https?:\/\//, "").replace(/\/$/, ""))}</a>` : "";
   const owner = lead.claimed_by
     ? `<span class="owner" title="${lead.mine ? "You're handling this" : esc(lead.owner) + " is handling this"}"><span class="avatar sm">${esc(initials(lead.owner))}</span>${lead.mine ? "You" : esc(lead.owner)}</span>`
     : state.detail.has_response ? `<span class="owner muted" title="Nobody has claimed this lead">Unclaimed</span>`
     : `<span class="owner muted" title="Hasn't replied yet · can be claimed once it writes back">No reply yet</span>`;
-  // the score's reasons live in its tooltip, so the header stays one line
-  const why = lead.score != null ? [`Need score ${Math.round(+lead.score)} out of 100`, ...(lead.score_reasons || []), lead.source ? "From " + lead.source : ""].filter(Boolean) : [];
-  const score = lead.score != null ? `<span class="score ${+lead.score >= 80 ? "hi" : ""}" tabindex="0" title="${esc(why.join("\n"))}" aria-label="${esc(why.join(". "))}">${Math.round(+lead.score)}</span>` : "";
-  const meta = [lead.email ? `<span>${esc(lead.email)}</span>` : "", lead.phone ? `<span>${esc(lead.phone)}</span>` : "", site].filter(Boolean).join("");
-  const name = lead.company || lead.email, nameTip = [name, (lead.industry || "").replace(/_/g, " ")].filter(Boolean).join(" · ");
+  const score = scoreHTML(lead.score);
+  const meta = [lead.email ? `<span>${esc(lead.email)}</span>` : "", lead.phone ? `<span>${esc(lead.phone)}</span>` : ""].filter(Boolean).join("");
+  const name = lead.company || lead.email, nameTip = name;
   let buttons = "";
   if (can_reply && !lead.claimed_by && state.detail.has_response) buttons += `<button class="btn primary sm" data-a="claim">Claim lead</button>`;
   // a won or lost lead stays with whoever closed it; an admin can still release or reassign it
@@ -1139,16 +1133,16 @@ function filesHTML(list) {
     : `<span class="fchip locked-file" title="Only the person handling this lead or an admin can download it"><svg class="i"><use href="#i-clip"/></svg><span class="truncate">${esc(a.name)}</span><span class="sz">${fsize(a.size)}</span></span>`).join("")}</div>`;
 }
 
+const senderOf = (from) => (String(from).match(/^\s*"?([^"<]+?)"?\s*</) || [])[1] || String(from);
 function msgHTML(m, i, full, newest) {
   const when_ = `<span class="when" title="${esc(fullWhen(m.at))}">${esc(when(m.at))}</span>`;
   const key = m.kind + ":" + (m.id ?? i);
   if (m.kind === "note") return `<article class="msg note"><div class="m-head"><span class="avatar sm">${esc(initials(m.who))}</span><b>${esc(m.who)}</b><span class="muted">added a note</span>${when_}</div><div class="m-text">${m.body ? esc(m.body) : ""}</div></article>`;
   if (m.kind === "in") {
-    const sum = m.summary ? `<div class="m-sum"><b>Summary:</b> ${esc(m.summary)}</div>` : "";
     const waiting = !m.handled && m.label !== "bounce";  // every reply but a bounce needs reading
     const actions = state.detail.can_act ? `<div class="m-foot">${state.detail.can_reply && !viewOnly() ? `<button class="btn sm" data-a="reply-to" data-id="${m.id}">Reply to this</button>` : ""}${waiting ? `<button class="btn ghost sm" data-a="done" data-id="${m.id}"><svg class="i"><use href="#i-check"/></svg>Mark done</button>` : ""}</div>` : "";
-    return `<article class="msg in ${newest ? "newest" : ""}"><div class="m-head"><b>${esc(m.from || m.who)}</b>${m.label ? chip(LABELS, m.label) : ""}${waiting ? '<span class="chip pri plain">Waiting</span>' : ""}${when_}</div>
-      ${m.subject ? `<div class="m-subj">${esc(m.subject)}</div>` : ""}${bodyHTML(m, key, full)}${sum}${actions}</article>`;
+    return `<article class="msg in ${newest ? "newest" : ""}"><div class="m-head"><b title="${esc(m.from || m.who)}">${esc(senderOf(m.from || m.who))}</b>${waiting ? '<span class="chip pri plain">Waiting</span>' : ""}${when_}</div>
+      ${m.subject ? `<div class="m-subj">${esc(m.subject)}</div>` : ""}${bodyHTML(m, key, full)}${actions}</article>`;
   }
   const who = m.kind === "bot" ? `LeadBot <span class="muted">· ${m.step > 1 ? "follow-up " + (m.step - 1) : "first email"}</span>` : esc(m.who) + (m.to ? ` <span class="muted">to ${esc(m.to)}</span>` : "");
   const st = m.status === "dry_run" ? '<span class="chip warn plain">Test only, not sent</span>' : m.status === "failed" ? '<span class="chip neg plain">Failed to send</span>' : "";
@@ -1177,7 +1171,7 @@ function composerHTML(lead, canReply, canAct) {
       ? '<span class="draft-dot" title="Draft saved" aria-label="draft saved"></span>' : "";
     const icons = { reply: "i-send", new: "i-mail", note: "i-note" };
     return `<div class="c-bar">${Object.keys(MODES).map(k => `<button class="btn ${k === "reply" ? "primary" : ""}" data-a="open" data-m="${k}">
-      <svg class="i"><use href="#${icons[k]}"/></svg>${MODES[k]}${draft(k)}</button>`).join("")}<span class="hint">Drafts are kept when you close the composer</span></div>`;
+      <svg class="i"><use href="#${icons[k]}"/></svg>${MODES[k]}${draft(k)}</button>`).join("")}</div>`;
   }
   const ins = state.detail.thread.filter(m => m.kind === "in" && !["bounce", "out_of_office"].includes(m.label));
   const tabs = `<div class="tabs" role="tablist">
@@ -1186,26 +1180,25 @@ function composerHTML(lead, canReply, canAct) {
     <div class="c-head">${tabs}<button class="iconbtn" data-a="c-close" aria-label="Close the composer" title="Close (Esc). Your draft is kept."><svg class="i"><use href="#i-x"/></svg></button></div>
     <div class="c-scroll">${inner}</div>
     <div class="c-foot">${sendBtn}${attach ? attachBtn() : ""}<button class="btn ghost" data-a="c-close" title="Close. Your draft is kept.">Cancel</button><span class="hint">${hint}</span></div></div>`;
-  const from = `<span><b>From</b> ${esc(state.senderName)} from TalkSasa &lt;${esc(state.fromEmail)}&gt;</span>`;
   const sendHint = `Ctrl + Enter to send${state.dryRun ? " · test mode, nothing is emailed" : ""}`;
   const sendIcon = `<svg class="i"><use href="#i-send"/></svg>`;
   if (state.mode === "note") {
-    return panel(`<textarea class="textarea" id="c-text" rows="3" placeholder="Only your team sees notes, e.g. called them, wants a quote for 50,000 SMS"></textarea>`,
+    return panel(`<textarea class="textarea" id="c-text" rows="3" placeholder="Only your team sees notes"></textarea>`,
       `<button class="btn primary send" data-a="save-note" data-send>Save note</button>`, false, "Ctrl + Enter to save");
   }
   if (state.mode === "new") {
-    return panel(`<div class="c-meta"><span><b>To</b> ${esc(lead.email || "")}</span>${from}<span>A new conversation. LeadBot stops its automatic emails to this lead once you send.</span></div>
+    return panel(`<div class="c-meta"><span><b>To</b> ${esc(lead.email || "")}</span></div>
       <input class="input" id="c-subj" maxlength="200" placeholder="Subject" aria-label="Subject">
-      <textarea class="textarea" id="c-text" rows="5" placeholder="Write your email. ${esc(state.senderName)}, TalkSasa and the company phone are added at the bottom."></textarea>
+      <textarea class="textarea" id="c-text" rows="5" placeholder="Write your email"></textarea>
       ${pickedHTML()}`,
       `<button class="btn primary send" data-a="send-new" data-send>${sendIcon}${state.dryRun ? "Save test email" : "Send"}</button>`, true, sendHint);
   }
   const target = ins.find(m => m.id === state.replyTo) || ins[ins.length - 1];
   const to = (target?.from || lead.email || "").replace(/.*<([^>]+)>.*/, "$1");
   const subj = target?.subject ? (/^re:/i.test(target.subject) ? target.subject : "Re: " + target.subject) : "Re: TalkSasa";
-  return panel(`<div class="c-meta"><span><b>To</b> ${esc(to)}</span>${from}<span><b>Subject</b> ${esc(subj)}</span>
+  return panel(`<div class="c-meta"><span><b>To</b> ${esc(to)}</span><span><b>Subject</b> ${esc(subj)}</span>
       ${target && ins.length > 1 ? `<span>Answering their message from ${esc(when(target.at))}</span>` : ""}</div>
-    <textarea class="textarea" id="c-text" rows="5" placeholder="Write your reply. ${esc(state.senderName)}, TalkSasa and the company phone are added at the bottom, and their message is quoted below it."></textarea>
+    <textarea class="textarea" id="c-text" rows="5" placeholder="Write your reply"></textarea>
     ${pickedHTML()}`,
     `<button class="btn primary send" data-a="send" data-send data-reply="${target ? target.id : ""}">${sendIcon}${state.dryRun ? "Save test reply" : "Send reply"}</button>`, true, sendHint);
 }
