@@ -956,6 +956,21 @@ def _when_text(ts):
     return f"{d:%a}, {d.day} {d:%b %Y} at {d:%H:%M}"
 
 
+def _readable(text):
+    """Some mail programs put web code in the plain-text part ("<p>Hello</p><p><br></p>"):
+    the text it stands for, so a reply never quotes raw tags back to the client. Anything
+    else is returned as it is (a lone "<" or "a > b" in plain text stays)."""
+    text = text or ""
+    if not re.search(r"(?i)</(p|div)>|<br\s*/?>", text):
+        return text
+    text = re.sub(r"(?is)<(script|style)\b.*?</\1\s*>", "", text)
+    text = re.sub(r"(?i)<br\s*/?>", "\n", text)
+    text = re.sub(r"(?i)</(p|div|li|tr|h[1-6])\s*>", "\n", text)
+    text = html.unescape(re.sub(r"<[^>]*>", "", text))
+    text = re.sub(r"[ \t]+\n", "\n", text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
 def _quote(text, who, when):
     text = (text or "").strip()
     if not text:
@@ -997,8 +1012,9 @@ def build_email(user, to, subject, text, orig=None, who="", refs=(), files=()):
     plain = text + "\n\n" + signature(user)
     page = f'<div style="{FONT}">{_html_text(text)}{_html_signature(user)}'
     if orig is not None:
-        plain += _quote(orig["body"], who, when)
-        page += _html_quote(orig["body"], who, when)
+        theirs = _readable(orig["body"])
+        plain += _quote(theirs, who, when)
+        page += _html_quote(theirs, who, when)
     page += "</div>"
 
     msg = EmailMessage()

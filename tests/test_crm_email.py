@@ -70,6 +70,26 @@ def test_a_reply_is_html_with_a_plain_version_signature_and_grey_quote(team, out
     assert out[0]["body"] == plain.rstrip("\n") and out[0]["attachments"] == []
 
 
+def test_a_reply_quotes_web_code_in_their_email_as_text(team, outbox):
+    lead_id, reply_id = team["leads"]["free"]
+    with db.conn() as c:  # what some mail programs put in the plain-text part
+        c.execute("UPDATE replies SET body = ? WHERE id = ?",
+                  ("<p>Hello Mary,</p><p><br></p><p>We have a partner &amp; are set.</p><script>x()</script><p>Kind regards,</p>", reply_id))
+    assert team["asha"].post(f"/api/crm/leads/{lead_id}/reply", json={"body": "Thanks"}).status_code == 200
+    [msg] = outbox
+    plain = msg.get_body(("plain",)).get_content()
+    assert "> Hello Mary,\n> \n> We have a partner & are set.\n> Kind regards," in plain
+    page = visible_text(msg.get_body(("html",)).get_content())
+    assert "Hello Mary," in page and "We have a partner &amp; are set." in page
+    for raw in ("<p>", "&lt;p&gt;", "</p>", "&lt;br", "x()"):
+        assert raw not in plain and raw not in page
+
+
+def test_plain_text_with_angle_brackets_is_quoted_as_it_is():
+    import crm
+    assert crm._readable("2 < 3 and 5 > 4\nsee <info@x.com>") == "2 < 3 and 5 > 4\nsee <info@x.com>"
+
+
 def test_every_reply_is_signed_with_sender_name_whoever_sends_it(team, outbox, monkeypatch):
     lead_id, _ = team["leads"]["free"]
     monkeypatch.setattr(config, "SENDER_NAME", "Mary")
