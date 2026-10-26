@@ -586,7 +586,8 @@ def open_leads(scope: str = "open", user=Depends(current_user)):
     rows.sort(key=lambda r: r["last_received"] or "", reverse=True)
     rows.sort(key=lambda r: r["waiting"] == 0)
     counts = {"open": len(rows),
-              "waiting": sum(1 for r in rows if r["waiting"]),
+              # waiting on us: an email to answer, or nobody has the lead yet (e.g. it was released)
+              "waiting": sum(1 for r in rows if r["waiting"] or not r["claimed_by"]),
               "unclaimed": sum(1 for r in rows if not r["claimed_by"]),
               "mine": mine}  # the same leads My leads shows
     return {"leads": rows, "counts": counts, "me": user["id"]}

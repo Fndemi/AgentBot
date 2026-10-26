@@ -931,7 +931,8 @@ function visibleLeads() {
   return state.leads.filter(l => {
     if (l.id === state.sel) return true; // keep the open lead in view after you answer it
     if (state.view === "open") {  // My leads always lists every lead you have, as its count does
-      if (state.filter === "waiting" && !l.waiting) return false;
+      // Waiting on us: an email to answer, or a lead nobody has (e.g. one just released) to take
+      if (state.filter === "waiting" && !l.waiting && l.claimed_by) return false;
       if (state.filter === "unclaimed" && l.claimed_by) return false;
     }
     if (owner === "none" && l.claimed_by) return false;

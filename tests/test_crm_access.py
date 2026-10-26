@@ -245,3 +245,21 @@ def test_a_won_or_lost_lead_stays_with_whoever_closed_it(team):
     assert team["admin"].post(f"/api/crm/leads/{won}/release").status_code == 200   # an admin still can
     open_lead, _ = add_lead("info@still-open.com", me)
     assert asha.post(f"/api/crm/leads/{open_lead}/release").status_code == 200       # open leads release as before
+
+
+def test_a_released_lead_is_back_in_waiting_for_anyone_to_claim(team):
+    lead_id, reply_id = team["leads"]["free"]
+    asha, ben = team["asha"], signed_in(team["admin"].app, "ben@talksasa.co.ke")
+    assert ben.post(f"/api/crm/leads/{lead_id}/claim").status_code == 200
+    assert ben.post(f"/api/crm/replies/{reply_id}/done").status_code == 200    # Ben answered it
+    assert lead_id not in [l["id"] for l in asha.get("/api/crm/leads?scope=open").json()["leads"]]
+    waiting_before = asha.get("/api/crm/leads?scope=open").json()["counts"]["waiting"]
+
+    assert ben.post(f"/api/crm/leads/{lead_id}/release").status_code == 200
+    d = asha.get("/api/crm/leads?scope=open").json()
+    row = next(l for l in d["leads"] if l["id"] == lead_id)
+    assert row["claimed_by"] is None and row["waiting"] == 0          # nothing to answer, but nobody has it
+    assert d["counts"]["waiting"] == waiting_before + 1 and d["counts"]["unclaimed"] >= 1
+    assert lead_id not in [l["id"] for l in ben.get("/api/crm/leads?scope=mine").json()["leads"]]
+    assert asha.post(f"/api/crm/leads/{lead_id}/claim").status_code == 200
+    assert lead_id in [l["id"] for l in asha.get("/api/crm/leads?scope=mine").json()["leads"]]
