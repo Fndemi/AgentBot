@@ -694,7 +694,7 @@ function go(view, opts = {}) {
   $("v-templates").hidden = view !== "templates";
   document.querySelectorAll("[data-go]").forEach(b => b.dataset.go === view ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
   $("crumb").textContent = TITLES[view];
-  $("subtabs").hidden = view === "closed" || view === "orgs";
+  $("subtabs").hidden = view !== "open";
   $("org-filters").hidden = view !== "orgs";
   $("tiles").hidden = view === "closed" || view === "orgs";  // the cards count open leads
   closeMenu();
@@ -912,8 +912,7 @@ function updateBadges() {
   const c = state.counts;
   $("nb-open").textContent = c.waiting || ""; $("nb-open").hidden = !c.waiting;
   $("nb-mine").textContent = c.mine || ""; $("nb-mine").hidden = !c.mine;
-  // the tabs count the list they filter: on My leads, only yours
-  $("n-waiting").textContent = state.view === "mine" ? state.leads.filter(l => l.waiting).length : c.waiting ?? "";
+  $("n-waiting").textContent = c.waiting ?? "";
   $("n-unclaimed").textContent = c.unclaimed ?? "";
   for (const k of ["open", "waiting", "unclaimed", "mine"]) $("t-" + k).textContent = c[k] ?? "–";
 }
@@ -931,7 +930,7 @@ function visibleLeads() {
   const q = $("q").value.trim().toLowerCase(), owner = $("owner-f").value;
   return state.leads.filter(l => {
     if (l.id === state.sel) return true; // keep the open lead in view after you answer it
-    if (state.view === "open" || state.view === "mine") {
+    if (state.view === "open") {  // My leads always lists every lead you have, as its count does
       if (state.filter === "waiting" && !l.waiting) return false;
       if (state.filter === "unclaimed" && l.claimed_by) return false;
     }
