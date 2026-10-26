@@ -246,32 +246,41 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .empty b { color: var(--fg); font-weight: 500; font-size: 14px; }
 
 .detail { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.d-head { padding: 16px 24px; border-bottom: 1px solid var(--line); display: grid; gap: 10px; }
-.d-top { display: flex; align-items: flex-start; gap: 12px; }
-.d-top h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.3; }
-.d-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 12.5px; color: var(--fg-2); }
+/* compact header: who the lead is on the left, what you can do with it on the right */
+.d-head { padding: 10px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px 12px; flex: none; flex-wrap: wrap; }
+/* one row when it fits; otherwise the controls drop below, still on the right */
+.d-id { display: flex; align-items: center; gap: 4px 10px; min-width: 0; flex: 1 1 340px; }
+.d-id h2 { font-size: 16px; font-weight: 600; letter-spacing: -0.015em; line-height: 22px; flex: 0 1 auto; min-width: 60px; }
+.d-meta { display: flex; align-items: center; font-size: 12.5px; color: var(--fg-2); min-width: 0; flex: 0 1 auto; }
+.d-meta > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
+.d-meta > * + *::before { content: "·"; margin: 0 8px; color: var(--fg-3); }
+.d-meta a { flex-shrink: 3; }
 .d-meta a:hover { text-decoration: underline; }
-.d-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.d-actions .spacer { flex: 1; }
-.owner { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--fg-2); }
-.back { display: none; }
-.d-body { flex: 1; overflow-y: auto; padding: 20px 24px 8px; min-height: 0; }
-.thread { display: grid; gap: 14px; max-width: 760px; }
+.d-id .score { cursor: help; }
+.d-actions { display: flex; align-items: center; gap: 8px; flex: none; margin-left: auto; }
+.d-actions .select { width: auto; max-width: 128px; height: 28px; font-size: 12.5px; padding: 0 6px; }
+.owner { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--fg-2); white-space: nowrap; }
+.back, .list-toggle { display: none; }
+
+/* the conversation is the main area; the composer slides up over its lower half */
+.d-main { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+.d-body { flex: 1; overflow-y: auto; padding: 24px 24px 20px; min-height: 0; }
+.thread { display: grid; gap: 22px; max-width: 860px; margin: 0 auto; }
 .msg { border: 1px solid var(--line); border-radius: 10px; background: var(--card); box-shadow: var(--shadow-panel); min-width: 0; }
 .msg.in { border-color: var(--primary-line); }
 .msg.note { background: var(--warn-bg); border-color: transparent; box-shadow: none; }
 .msg.failed { border-color: var(--neg); }
-.m-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px 0; font-size: 12.5px; min-width: 0; flex-wrap: wrap; }
+.m-head { display: flex; align-items: center; gap: 8px; padding: 12px 16px 0; font-size: 12.5px; min-width: 0; flex-wrap: wrap; }
 .m-head b { font-weight: 600; }
 .m-head .when { margin-left: auto; color: var(--fg-3); font-size: 11.5px; white-space: nowrap; }
-.m-subj { padding: 4px 14px 0; font-size: 13px; font-weight: 500; }
-.m-text { padding: 8px 14px 12px; font-size: 13.5px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--fg); }
-.m-text.clamp { max-height: 9.5em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
-.m-sum { margin: 0 14px 10px; padding: 8px 10px; border-radius: 8px; background: var(--muted); font-size: 12.5px; color: var(--fg-2); }
+.m-subj { padding: 4px 16px 0; font-size: 13.5px; font-weight: 500; }
+.m-text { padding: 8px 16px 14px; font-size: 14.5px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--fg); }
+.m-text.clamp { max-height: 7.5em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 60%, transparent); mask-image: linear-gradient(#000 60%, transparent); }
+.m-sum { margin: 0 16px 12px; padding: 8px 10px; border-radius: 8px; background: var(--muted); font-size: 12.5px; color: var(--fg-2); }
 .m-sum b { color: var(--fg); font-weight: 500; }
-.m-quote { margin: 0 14px 12px; padding: 2px 0 2px 12px; border-left: 3px solid var(--line); font-size: 13px; color: var(--fg-3); white-space: pre-wrap; overflow-wrap: anywhere; }
+.m-quote { margin: 0 16px 14px; padding: 2px 0 2px 12px; border-left: 3px solid var(--line); font-size: 13.5px; line-height: 1.6; color: var(--fg-3); white-space: pre-wrap; overflow-wrap: anywhere; }
 .m-files, .c-files { display: flex; flex-wrap: wrap; gap: 6px; }
-.m-files { padding: 0 14px 12px; }
+.m-files { padding: 0 16px 12px; }
 .fchip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; height: 28px; padding: 0 6px 0 10px; border-radius: 7px; border: 1px solid var(--line);
   background: var(--bg); font-size: 12.5px; color: var(--fg); }
 .fchip .truncate { max-width: 220px; }
@@ -281,21 +290,35 @@ a.fchip:hover { background: var(--hover); }
 .fchip button { width: 22px; height: 22px; border: 0; border-radius: 5px; background: none; color: var(--fg-3); display: grid; place-items: center; }
 .fchip button:hover { background: var(--hover); color: var(--fg); }
 .attach input { display: none; }
-.m-foot { display: flex; gap: 6px; padding: 0 10px 10px; flex-wrap: wrap; }
+.m-foot { display: flex; gap: 6px; padding: 0 12px 12px; flex-wrap: wrap; }
 .missing { color: var(--fg-3); font-style: italic; }
 
-.composer { border-top: 1px solid var(--line); padding: 12px 24px 16px; display: grid; gap: 8px; background: var(--bg); }
-.c-tabs { display: flex; gap: 4px; align-items: center; }
-.c-tabs .tab { flex: none; padding: 0 12px; }
+/* composer: a slim bar until you pick Reply, New email or Internal note */
+.c-bar { flex: none; display: flex; align-items: center; gap: 8px; padding: 10px 24px; border-top: 1px solid var(--line); background: var(--bg); flex-wrap: wrap; }
+.c-bar .btn { height: 34px; }
+.c-bar .hint { margin-left: auto; font-size: 12px; color: var(--fg-3); }
+.draft-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); flex: none; }
+.composer { position: absolute; left: 0; right: 0; bottom: 0; height: 50%; min-height: min(320px, 100%); z-index: 5; display: flex; flex-direction: column;
+  background: var(--bg); border-top: 1px solid var(--line); border-radius: 12px 12px 0 0; box-shadow: var(--shadow-pop); }
+.composer.anim { animation: c-up .2s ease-out; }
+@keyframes c-up { from { transform: translateY(100%); } }
+@media (prefers-reduced-motion: reduce) { .composer.anim { animation: none; } }
+.c-head { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 14px 8px 24px; border-bottom: 1px solid var(--line); }
+.c-head .tab { flex: none; padding: 0 12px; }
+.c-head .iconbtn { margin-left: auto; }
+.c-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 24px; display: grid; gap: 10px; align-content: start; }
+.c-scroll .textarea { min-height: 140px; font-size: 14px; }
 .c-meta { font-size: 12px; color: var(--fg-3); display: flex; flex-wrap: wrap; gap: 4px 14px; }
 .c-meta b { color: var(--fg-2); font-weight: 500; }
-.c-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.c-foot .hint { font-size: 12px; color: var(--fg-3); margin-right: auto; }
+/* always visible: it sits below the scrolling part, never inside it */
+.c-foot { flex: none; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 24px 12px; border-top: 1px solid var(--line); background: var(--card); }
+.c-foot .btn { height: 40px; }
+.c-foot .hint { font-size: 12px; color: var(--fg-3); margin-left: auto; }
+.btn.send { padding: 0 20px; font-size: 14px; font-weight: 600; border-radius: 8px; }
+.btn.send[disabled], .btn.send[disabled]:hover { background: var(--muted); border-color: var(--input); color: var(--fg-3); opacity: 1; cursor: not-allowed; box-shadow: none; }
 .score { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 20px; padding: 0 6px; border-radius: 6px;
   font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; background: var(--muted); color: var(--fg-2); flex: none; }
 .score.hi { background: var(--primary-soft); color: var(--primary); }
-.d-score { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--fg-2); }
-.d-score .why { min-width: 0; }
 .rep-sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .kpi { padding: 14px 16px; display: grid; gap: 2px; }
 .kpi span { font-size: 12px; color: var(--fg-3); }
@@ -342,7 +365,13 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
 .toast.err { background: var(--neg); color: #FFFFFF; }
 .overlay { position: fixed; inset: 0; background: rgba(10, 10, 15, .35); z-index: 40; }
 
-@media (max-width: 1100px) { .crm { grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); } }
+/* narrower screens: a 280px lead list that can be folded away so the conversation gets the width */
+@media (min-width: 861px) and (max-width: 1279px) {
+  .crm { grid-template-columns: 280px minmax(0, 1fr); }
+  .crm.has-sel.list-hidden { grid-template-columns: minmax(0, 1fr); }
+  .crm.has-sel.list-hidden .list-pane { display: none; }
+  .list-toggle { display: grid; }
+}
 @media (max-width: 1000px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 860px) {
   .tiles { padding: 10px 12px; gap: 8px; }
@@ -366,9 +395,19 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
   .crm:not(.has-sel) .detail { display: none; }
   .list-pane { border-right: 0; }
   .back { display: inline-flex; }
-  .d-head, .d-body, .composer { padding-left: 16px; padding-right: 16px; }
-  .detail { overflow-y: auto; }
-  .d-body { flex: none; overflow: visible; }
+  .d-head, .d-body, .c-bar, .c-scroll, .c-foot { padding-left: 16px; padding-right: 16px; }
+  .c-head { padding-left: 12px; }
+  .d-head { padding-top: 8px; padding-bottom: 8px; }
+  .d-head .back { align-self: flex-start; }
+  .d-id { flex-wrap: wrap; flex: 1 1 calc(100% - 44px); }
+  .d-id h2 { flex: 0 1 calc(100% - 50px); }
+  .d-id .score { order: 1; }
+  .d-meta { order: 2; flex-basis: 100%; }
+  .d-actions { margin-left: 0; flex: 1 1 100%; flex-wrap: wrap; }
+  .d-actions .select { flex: 1 1 0; min-width: 0; max-width: none; }
+  .d-body { padding-top: 16px; }
+  .thread { gap: 16px; }
+  .c-bar .hint, .c-foot .hint { display: none; }
   .textarea { min-height: 96px; }
   .page { padding: 20px 16px 32px; }
   .formgrid { grid-template-columns: minmax(0, 1fr); }
@@ -400,6 +439,8 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
   <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.5 0 10 8 10 8a17.6 17.6 0 0 1-2.16 3.19"/><path d="M6.61 6.61A17.4 17.4 0 0 0 2 12s3.5 8 10 8a9.7 9.7 0 0 0 5.39-1.61"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="m2 2 20 20"/></symbol>
   <symbol id="i-clip" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></symbol>
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
   <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></symbol>
   <symbol id="i-building" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></symbol>
   <symbol id="i-archive" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="5" rx="1"/><path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/></symbol>
@@ -594,7 +635,9 @@ const scoreHTML = (v) => v == null || v === "" ? "" : `<span class="score ${+v >
 const chip = (map, k) => { const [t, c] = map[k] || [k || "—", ""]; return `<span class="chip ${c}">${esc(t)}</span>`; };
 
 const state = { me: null, dryRun: false, fromEmail: "", view: "open", filter: "waiting", leads: [], counts: {}, users: [],
-  sel: null, detail: null, mode: "reply", replyTo: null, drafts: {}, files: {}, busy: 0, loadedAt: null };
+  sel: null, detail: null, mode: "reply", replyTo: null, drafts: {}, files: {}, busy: 0, loadedAt: null,
+  composerOpen: false, composerAnim: false, expanded: new Set(), scrolledFor: null, scrollEnd: false, listHidden: false };
+try { state.listHidden = localStorage.getItem("crm-list-hidden") === "1"; } catch (e) {}
 // What can be attached (the server checks all of this again, and each file's real type)
 const FILE_EXTS = ["pdf", "doc", "docx", "xls", "xlsx", "csv", "png", "jpg", "jpeg"], MAX_FILES = 5, MAX_BYTES = 10 * 1024 * 1024;
 const fsize = (n) => n < 1024 ? n + " B" : n < 1048576 ? Math.round(n / 1024) + " KB" : (n / 1048576).toFixed(1) + " MB";
@@ -961,6 +1004,7 @@ function fillOrgFilters() {
 function openLead(id) {
   saveDraft();
   state.sel = id; state.detail = null; state.replyTo = null; state.mode = "reply";
+  state.composerOpen = false; state.expanded = new Set(); state.scrolledFor = null;
   renderList(); setHash(); renderDetail(); loadDetail(id);
 }
 async function loadDetail(id, { quiet } = {}) {
@@ -990,38 +1034,75 @@ function renderDetail() {
   const { lead, thread, can_reply, can_act } = state.detail, me = state.me, admin = me.role === "admin";
   const site = lead.website ? `<a href="${esc(/^https?:/i.test(lead.website) ? lead.website : "https://" + lead.website)}" target="_blank" rel="noopener noreferrer">${esc(lead.website.replace(/^https?:\/\//, "").replace(/\/$/, ""))}</a>` : "";
   const owner = lead.claimed_by
-    ? `<span class="owner"><span class="avatar sm">${esc(initials(lead.owner))}</span>${lead.mine ? "You're handling this" : esc(lead.owner) + " is handling this"}</span>`
-    : state.detail.has_response ? `<span class="owner muted">Nobody has claimed this lead</span>`
-    : `<span class="owner muted">Hasn't replied yet · can be claimed once it writes back</span>`;
+    ? `<span class="owner" title="${lead.mine ? "You're handling this" : esc(lead.owner) + " is handling this"}"><span class="avatar sm">${esc(initials(lead.owner))}</span>${lead.mine ? "You" : esc(lead.owner)}</span>`
+    : state.detail.has_response ? `<span class="owner muted" title="Nobody has claimed this lead">Unclaimed</span>`
+    : `<span class="owner muted" title="Hasn't replied yet · can be claimed once it writes back">No reply yet</span>`;
+  // the score's reasons live in its tooltip, so the header stays one line
+  const why = lead.score != null ? [`Need score ${Math.round(+lead.score)} out of 100`, ...(lead.score_reasons || []), lead.source ? "From " + lead.source : ""].filter(Boolean) : [];
+  const score = lead.score != null ? `<span class="score ${+lead.score >= 80 ? "hi" : ""}" tabindex="0" title="${esc(why.join("\n"))}" aria-label="${esc(why.join(". "))}">${Math.round(+lead.score)}</span>` : "";
+  const meta = [lead.email ? `<span>${esc(lead.email)}</span>` : "", lead.phone ? `<span>${esc(lead.phone)}</span>` : "", site].filter(Boolean).join("");
+  const name = lead.company || lead.email, nameTip = [name, (lead.industry || "").replace(/_/g, " ")].filter(Boolean).join(" · ");
   let buttons = "";
-  if (can_reply && can_act && !viewOnly()) buttons += `<button class="btn sm" data-a="mode" data-m="new"><svg class="i"><use href="#i-mail"/></svg>New email</button>`;
   if (can_reply && !lead.claimed_by && state.detail.has_response) buttons += `<button class="btn primary sm" data-a="claim">Claim lead</button>`;
   // a won or lost lead stays with whoever closed it; an admin can still release or reassign it
   if (can_reply && lead.claimed_by && (lead.mine || admin) && (admin || !["client", "lost"].includes(lead.status)))
     buttons += `<button class="btn ghost sm" data-a="release">Release</button>`;
-  if (can_reply && admin) buttons += `<select class="select" data-a="assign" style="width:auto;height:28px;font-size:12.5px" aria-label="Assign to">
+  if (can_reply && admin) buttons += `<select class="select" data-a="assign" aria-label="Assign to">
       <option value="">Assign to…</option>${state.users.filter(u => u.active).map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join("")}</select>`;
   const stageSel = can_act && can_reply && !viewOnly()
-    ? `<select class="select" data-a="stage" style="width:auto;height:28px;font-size:12.5px" aria-label="Stage">
+    ? `<select class="select" data-a="stage" aria-label="Stage">
         ${["replied", "meeting", "client", "lost"].map(s => `<option value="${s}" ${lead.status === s ? "selected" : ""}>${STAGES[s][0]}</option>`).join("")}
         ${["replied", "meeting", "client", "lost"].includes(lead.status) ? "" : `<option selected disabled>${esc((STAGES[lead.status] || [lead.status])[0])}</option>`}
       </select>` : chip(STAGES, lead.status);
 
+  // the newest message from the lead, and everything after it, is shown in full; older ones fold
+  let newest = -1;
+  thread.forEach((m, i) => { if (m.kind === "in") newest = i; });
+  const fullFrom = newest >= 0 ? newest : thread.length - 1;
+  const prev = el.querySelector(".d-body"), keep = prev && state.scrolledFor === state.sel && !state.scrollEnd ? prev.scrollTop : null;
+  $("crm").classList.toggle("list-hidden", state.listHidden);
+
   el.innerHTML = `
     <div class="d-head">
-      <div class="d-top">
-        <button class="iconbtn back" data-a="back" aria-label="Back to list"><svg class="i"><use href="#i-back"/></svg></button>
-        <div style="min-width:0;flex:1"><h2>${esc(lead.company || lead.email)}</h2>
-          <div class="d-meta"><span>${esc(lead.email || "")}</span>${lead.industry ? `<span>${esc(lead.industry.replace(/_/g, " "))}</span>` : ""}${site}</div></div>
-      </div>
-      ${lead.score != null ? `<div class="d-score">${scoreHTML(lead.score)}<span class="why"><b style="font-weight:500;color:var(--fg)">Need score</b>${lead.score_reasons?.length ? " · " + lead.score_reasons.map(esc).join(" · ") : ""}${lead.source ? ` <span class="muted">· from ${esc(lead.source)}</span>` : ""}</span></div>` : ""}
-      <div class="d-actions">${owner}<span class="spacer"></span>${buttons}${stageSel}</div>
+      <button class="iconbtn back" data-a="back" aria-label="Back to list"><svg class="i"><use href="#i-back"/></svg></button>
+      <button class="iconbtn list-toggle" data-a="toggle-list" aria-pressed="${state.listHidden}" aria-label="${state.listHidden ? "Show" : "Hide"} the lead list" title="${state.listHidden ? "Show" : "Hide"} the lead list"><svg class="i"><use href="#i-panel"/></svg></button>
+      <div class="d-id"><h2 class="truncate" title="${esc(nameTip)}">${esc(name)}</h2><div class="d-meta">${meta}</div>${score}</div>
+      <div class="d-actions">${owner}${buttons}${stageSel}</div>
     </div>
-    <div class="d-body"><div class="thread">${thread.length ? thread.map(msgHTML).join("") : `<p class="muted">Nothing in this conversation yet.</p>`}</div></div>
-    ${composerHTML(lead, can_reply, can_act)}`;
-  const body = el.querySelector(".d-body"); body.scrollTop = body.scrollHeight;
+    <div class="d-main">
+      <div class="d-body"><div class="thread">${thread.length ? thread.map((m, i) => msgHTML(m, i, i >= fullFrom, i === newest)).join("") : `<p class="muted">Nothing in this conversation yet.</p>`}</div></div>
+      ${composerHTML(lead, can_reply, can_act)}
+    </div>`;
+  state.composerAnim = false;
   const ta = $("c-text"); if (ta) ta.value = state.drafts[state.sel + ":" + state.mode] || "";
   const subj = $("c-subj"); if (subj) subj.value = state.drafts[state.sel + ":subject"] || "";
+  syncSend(); padForComposer();
+  const body = el.querySelector(".d-body"), top = body.querySelector(".msg.newest");
+  if (keep != null) body.scrollTop = keep;
+  else if (state.scrollEnd || !top) body.scrollTop = body.scrollHeight;
+  else body.scrollTop = top.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop - 16;
+  state.scrolledFor = state.sel; state.scrollEnd = false;
+}
+// Room under the conversation for the open composer, so the last message can scroll above it
+function padForComposer() {
+  const body = $("detail").querySelector(".d-body"), c = $("detail").querySelector(".composer");
+  if (body) body.style.paddingBottom = c ? c.offsetHeight + 20 + "px" : "";
+}
+window.addEventListener("resize", padForComposer);
+// Send stays disabled until there's something to send
+function syncSend() {
+  const b = $("detail").querySelector("[data-send]"); if (!b) return;
+  const text = ($("c-text")?.value || "").trim(), subj = $("c-subj"), noSubj = subj && !subj.value.trim();
+  b.disabled = !text || noSubj;
+  b.title = !b.disabled ? "" : noSubj ? "Add a subject first" : "Write your message first";
+}
+function openComposer(mode) {
+  saveDraft(); state.mode = mode; state.composerAnim = !state.composerOpen; state.composerOpen = true; renderDetail();
+  (mode === "new" && !$("c-subj")?.value ? $("c-subj") : $("c-text"))?.focus();
+}
+function closeComposer() {  // the draft stays in state.drafts and comes back when it's reopened
+  saveDraft(); state.composerOpen = false; renderDetail();
+  $("detail").querySelector(`.c-bar [data-m="${state.mode}"]`)?.focus();
 }
 
 // Where an email's older, quoted text (or a long signature) starts: the line index, or -1
@@ -1042,12 +1123,13 @@ function splitQuoted(body) {
   if (at < 0 || !main.trim()) return { main: String(body).replace(/\s+$/, ""), rest: "" };
   return { main, rest: lines.slice(at).join("\n").replace(/^\s+|\s+$/g, "") };
 }
-function bodyHTML(m) {
+// full: the newest message from the lead (or later) is never folded; only its quoted text is
+function bodyHTML(m, key, full) {
   if (!m.body) return `<div class="m-text"><span class="missing">The text of this email wasn't saved.</span></div>`;
-  const { main, rest } = splitQuoted(m.body), long = main.length > 600;
-  const foot = (long ? `<button class="btn ghost sm" data-a="expand">Show full email</button>` : "")
-    + (rest ? `<button class="btn ghost sm" data-a="quoted" aria-expanded="false">Show quoted text</button>` : "");
-  return `<div class="m-text ${long ? "clamp" : ""}">${esc(main)}</div>${foot ? `<div class="m-foot">${foot}</div>` : ""}${rest ? `<div class="m-quote" hidden>${esc(rest)}</div>` : ""}`;
+  const { main, rest } = splitQuoted(m.body), open = state.expanded.has(key);
+  const long = !full && (main.length > 320 || main.split("\n").length > 6);
+  const more = long || rest ? `<div class="m-foot"><button class="btn ghost sm" data-a="more" data-k="${esc(key)}" aria-expanded="${open}">${open ? "Show less" : "Show more"}</button></div>` : "";
+  return `<div class="m-text ${long && !open ? "clamp" : ""}">${esc(main)}</div>${rest && open ? `<div class="m-quote">${esc(rest)}</div>` : ""}${more}`;
 }
 function filesHTML(list) {
   if (!list?.length) return "";
@@ -1057,20 +1139,21 @@ function filesHTML(list) {
     : `<span class="fchip locked-file" title="Only the person handling this lead or an admin can download it"><svg class="i"><use href="#i-clip"/></svg><span class="truncate">${esc(a.name)}</span><span class="sz">${fsize(a.size)}</span></span>`).join("")}</div>`;
 }
 
-function msgHTML(m) {
+function msgHTML(m, i, full, newest) {
   const when_ = `<span class="when" title="${esc(fullWhen(m.at))}">${esc(when(m.at))}</span>`;
+  const key = m.kind + ":" + (m.id ?? i);
   if (m.kind === "note") return `<article class="msg note"><div class="m-head"><span class="avatar sm">${esc(initials(m.who))}</span><b>${esc(m.who)}</b><span class="muted">added a note</span>${when_}</div><div class="m-text">${m.body ? esc(m.body) : ""}</div></article>`;
   if (m.kind === "in") {
     const sum = m.summary ? `<div class="m-sum"><b>Summary:</b> ${esc(m.summary)}</div>` : "";
     const waiting = !m.handled && m.label !== "bounce";  // every reply but a bounce needs reading
     const actions = state.detail.can_act ? `<div class="m-foot">${state.detail.can_reply && !viewOnly() ? `<button class="btn sm" data-a="reply-to" data-id="${m.id}">Reply to this</button>` : ""}${waiting ? `<button class="btn ghost sm" data-a="done" data-id="${m.id}"><svg class="i"><use href="#i-check"/></svg>Mark done</button>` : ""}</div>` : "";
-    return `<article class="msg in"><div class="m-head"><b>${esc(m.from || m.who)}</b>${m.label ? chip(LABELS, m.label) : ""}${waiting ? '<span class="chip pri plain">Waiting</span>' : ""}${when_}</div>
-      ${m.subject ? `<div class="m-subj">${esc(m.subject)}</div>` : ""}${bodyHTML(m)}${sum}${actions}</article>`;
+    return `<article class="msg in ${newest ? "newest" : ""}"><div class="m-head"><b>${esc(m.from || m.who)}</b>${m.label ? chip(LABELS, m.label) : ""}${waiting ? '<span class="chip pri plain">Waiting</span>' : ""}${when_}</div>
+      ${m.subject ? `<div class="m-subj">${esc(m.subject)}</div>` : ""}${bodyHTML(m, key, full)}${sum}${actions}</article>`;
   }
   const who = m.kind === "bot" ? `LeadBot <span class="muted">· ${m.step > 1 ? "follow-up " + (m.step - 1) : "first email"}</span>` : esc(m.who) + (m.to ? ` <span class="muted">to ${esc(m.to)}</span>` : "");
   const st = m.status === "dry_run" ? '<span class="chip warn plain">Test only, not sent</span>' : m.status === "failed" ? '<span class="chip neg plain">Failed to send</span>' : "";
   return `<article class="msg ${m.status === "failed" ? "failed" : ""}"><div class="m-head"><b>${who}</b>${st}${when_}</div>
-    ${m.subject ? `<div class="m-subj">${esc(m.subject)}</div>` : ""}${bodyHTML(m)}${filesHTML(m.attachments)}${m.error ? `<div class="m-sum" style="color:var(--neg)">${esc(m.error)}</div>` : ""}</article>`;
+    ${m.subject ? `<div class="m-subj">${esc(m.subject)}</div>` : ""}${bodyHTML(m, key, full)}${filesHTML(m.attachments)}${m.error ? `<div class="m-sum" style="color:var(--neg)">${esc(m.error)}</div>` : ""}</article>`;
 }
 
 function pickedHTML() {
@@ -1079,8 +1162,8 @@ function pickedHTML() {
   return `<div class="c-files">${files.map((f, i) => `<span class="fchip"><svg class="i"><use href="#i-clip"/></svg><span class="truncate">${esc(f.name)}</span><span class="sz">${fsize(f.size)}</span><button type="button" data-a="unattach" data-i="${i}" aria-label="Remove ${esc(f.name)}" title="Remove"><svg class="i"><use href="#i-x"/></svg></button></span>`).join("")}
     ${files.length ? `<span class="hint" style="align-self:center;font-size:12px;color:var(--fg-3)">${files.length} of ${MAX_FILES} files · ${fsize(total)} of 10 MB</span>` : ""}</div>`;
 }
-const attachBtn = () => `<label class="btn ghost sm attach" title="PDF, Word, Excel, CSV, PNG or JPG. Up to ${MAX_FILES} files, 10 MB in total.">
-  <input type="file" id="c-files" multiple accept="${FILE_EXTS.map(e => "." + e).join(",")}"><svg class="i"><use href="#i-clip"/></svg>Attach files</label>`;
+const attachBtn = () => `<label class="btn attach" title="PDF, Word, Excel, CSV, PNG or JPG. Up to ${MAX_FILES} files, 10 MB in total.">
+  <input type="file" id="c-files" multiple accept="${FILE_EXTS.map(e => "." + e).join(",")}"><svg class="i"><use href="#i-clip"/></svg>Attach file</label>`;
 
 // Sales can only look at an unclaimed organisation until it writes back (the server refuses the rest)
 const viewOnly = () => state.me.role !== "admin" && !state.detail.lead.claimed_by && !state.detail.has_response;
@@ -1088,36 +1171,43 @@ function composerHTML(lead, canReply, canAct) {
   if (canAct && viewOnly()) return `<div class="locked">This organisation hasn't replied yet. You can read what was sent; once it writes back you can claim it and reply.</div>`;
   if (!canAct) return `<div class="locked">${esc(lead.owner)} is handling this lead, so only they or an admin can reply. You can still read the conversation.</div>`;
   if (!canReply) return `<div class="locked">${lead.status === "unsubscribed" ? "This lead unsubscribed" : "This lead's email bounced or isn't valid"}, so they can't be emailed. Read their reply, then press Mark done.</div>`;
+  const MODES = { reply: "Reply", new: "New email", note: "Internal note" };
+  if (!state.composerOpen) {
+    const draft = (k) => (state.drafts[state.sel + ":" + k] || "").trim() || (state.files[state.sel + ":" + k] || []).length
+      ? '<span class="draft-dot" title="Draft saved" aria-label="draft saved"></span>' : "";
+    const icons = { reply: "i-send", new: "i-mail", note: "i-note" };
+    return `<div class="c-bar">${Object.keys(MODES).map(k => `<button class="btn ${k === "reply" ? "primary" : ""}" data-a="open" data-m="${k}">
+      <svg class="i"><use href="#${icons[k]}"/></svg>${MODES[k]}${draft(k)}</button>`).join("")}<span class="hint">Drafts are kept when you close the composer</span></div>`;
+  }
   const ins = state.detail.thread.filter(m => m.kind === "in" && !["bounce", "out_of_office"].includes(m.label));
-  const tabs = `<div class="c-tabs tabs" role="tablist" style="display:inline-flex;justify-self:start">
-      ${["reply", "new", "note"].map(k => `<button class="tab" role="tab" data-a="mode" data-m="${k}" aria-selected="${state.mode === k}">${{ reply: "Reply", new: "New email", note: "Internal note" }[k]}</button>`).join("")}</div>`;
+  const tabs = `<div class="tabs" role="tablist">
+      ${Object.keys(MODES).map(k => `<button class="tab" role="tab" data-a="mode" data-m="${k}" aria-selected="${state.mode === k}">${MODES[k]}</button>`).join("")}</div>`;
+  const panel = (inner, sendBtn, attach, hint) => `<div class="composer ${state.composerAnim ? "anim" : ""}" role="region" aria-label="${MODES[state.mode]}">
+    <div class="c-head">${tabs}<button class="iconbtn" data-a="c-close" aria-label="Close the composer" title="Close (Esc). Your draft is kept."><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="c-scroll">${inner}</div>
+    <div class="c-foot">${sendBtn}${attach ? attachBtn() : ""}<button class="btn ghost" data-a="c-close" title="Close. Your draft is kept.">Cancel</button><span class="hint">${hint}</span></div></div>`;
   const from = `<span><b>From</b> ${esc(state.me.name)} from TalkSasa &lt;${esc(state.fromEmail)}&gt;</span>`;
   const sendHint = `Ctrl + Enter to send${state.dryRun ? " · test mode, nothing is emailed" : ""}`;
-  const sendLabel = state.dryRun ? "Save test email" : "Send";
+  const sendIcon = `<svg class="i"><use href="#i-send"/></svg>`;
   if (state.mode === "note") {
-    return `<div class="composer">${tabs}
-      <textarea class="textarea" id="c-text" rows="3" placeholder="Only your team sees notes, e.g. called them, wants a quote for 50,000 SMS"></textarea>
-      <div class="c-foot"><span class="hint">Ctrl + Enter to save</span><button class="btn primary" data-a="save-note">Save note</button></div></div>`;
+    return panel(`<textarea class="textarea" id="c-text" rows="3" placeholder="Only your team sees notes, e.g. called them, wants a quote for 50,000 SMS"></textarea>`,
+      `<button class="btn primary send" data-a="save-note" data-send>Save note</button>`, false, "Ctrl + Enter to save");
   }
   if (state.mode === "new") {
-    return `<div class="composer">${tabs}
-      <div class="c-meta"><span><b>To</b> ${esc(lead.email || "")}</span>${from}<span>A new conversation. LeadBot stops its automatic emails to this lead once you send.</span></div>
+    return panel(`<div class="c-meta"><span><b>To</b> ${esc(lead.email || "")}</span>${from}<span>A new conversation. LeadBot stops its automatic emails to this lead once you send.</span></div>
       <input class="input" id="c-subj" maxlength="200" placeholder="Subject" aria-label="Subject">
       <textarea class="textarea" id="c-text" rows="5" placeholder="Write your email. Your name, TalkSasa and your phone are added at the bottom."></textarea>
-      ${pickedHTML()}
-      <div class="c-foot"><span class="hint">${sendHint}</span>${attachBtn()}
-        <button class="btn primary" data-a="send-new"><svg class="i"><use href="#i-send"/></svg>${sendLabel}</button></div></div>`;
+      ${pickedHTML()}`,
+      `<button class="btn primary send" data-a="send-new" data-send>${sendIcon}${state.dryRun ? "Save test email" : "Send"}</button>`, true, sendHint);
   }
   const target = ins.find(m => m.id === state.replyTo) || ins[ins.length - 1];
   const to = (target?.from || lead.email || "").replace(/.*<([^>]+)>.*/, "$1");
   const subj = target?.subject ? (/^re:/i.test(target.subject) ? target.subject : "Re: " + target.subject) : "Re: TalkSasa";
-  return `<div class="composer">${tabs}
-    <div class="c-meta"><span><b>To</b> ${esc(to)}</span>${from}<span><b>Subject</b> ${esc(subj)}</span>
+  return panel(`<div class="c-meta"><span><b>To</b> ${esc(to)}</span>${from}<span><b>Subject</b> ${esc(subj)}</span>
       ${target && ins.length > 1 ? `<span>Answering their message from ${esc(when(target.at))}</span>` : ""}</div>
     <textarea class="textarea" id="c-text" rows="5" placeholder="Write your reply. Your name, TalkSasa and your phone are added at the bottom, and their message is quoted below it."></textarea>
-    ${pickedHTML()}
-    <div class="c-foot"><span class="hint">${sendHint}</span>${attachBtn()}
-      <button class="btn primary" data-a="send" data-reply="${target ? target.id : ""}"><svg class="i"><use href="#i-send"/></svg>${state.dryRun ? "Save test reply" : "Send reply"}</button></div></div>`;
+    ${pickedHTML()}`,
+    `<button class="btn primary send" data-a="send" data-send data-reply="${target ? target.id : ""}">${sendIcon}${state.dryRun ? "Save test reply" : "Send reply"}</button>`, true, sendHint);
 }
 
 function addFiles(list) {
@@ -1145,14 +1235,19 @@ $("detail").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-a]"); if (!b || b.tagName === "SELECT") return;
   const id = state.sel, a = b.dataset.a;
   if (a === "back") { saveDraft(); state.sel = null; state.detail = null; setHash(); renderList(); renderDetail(); return; }
-  if (a === "expand") { const t = b.closest(".msg").querySelector(".m-text"); t.classList.remove("clamp"); const f = b.parentElement; b.remove(); if (!f.children.length) f.remove(); return; }
-  if (a === "quoted") {
-    const q = b.closest(".msg").querySelector(".m-quote"), open = q.hidden;
-    q.hidden = !open; b.setAttribute("aria-expanded", open); b.textContent = open ? "Hide quoted text" : "Show quoted text"; return;
+  if (a === "more") {
+    const k = b.dataset.k; state.expanded.has(k) ? state.expanded.delete(k) : state.expanded.add(k);
+    saveDraft(); renderDetail(); $("detail").querySelector(`[data-a="more"][data-k="${CSS.escape(k)}"]`)?.focus(); return;
   }
+  if (a === "toggle-list") {
+    state.listHidden = !state.listHidden;
+    try { localStorage.setItem("crm-list-hidden", state.listHidden ? "1" : ""); } catch (err) {}
+    saveDraft(); renderDetail(); $("detail").querySelector('[data-a="toggle-list"]')?.focus(); return;
+  }
+  if (a === "open" || a === "mode") { openComposer(b.dataset.m); return; }
+  if (a === "c-close") { closeComposer(); return; }
   if (a === "unattach") { const k = state.sel + ":" + state.mode; saveDraft(); (state.files[k] || []).splice(+b.dataset.i, 1); renderDetail(); return; }
-  if (a === "mode") { saveDraft(); state.mode = b.dataset.m; renderDetail(); (b.dataset.m === "new" ? $("c-subj") : $("c-text"))?.focus(); return; }
-  if (a === "reply-to") { saveDraft(); state.mode = "reply"; state.replyTo = +b.dataset.id; renderDetail(); $("c-text")?.focus(); return; }
+  if (a === "reply-to") { state.replyTo = +b.dataset.id; openComposer("reply"); return; }
   b.disabled = true;
   try {
     if (a === "claim") await act(() => api(`/api/crm/leads/${id}/claim`, { method: "POST" }), "Lead claimed. It's yours.");
@@ -1161,7 +1256,7 @@ $("detail").addEventListener("click", async (e) => {
     if (a === "save-note") {
       const text = $("c-text").value.trim(); if (!text) { toast("Write the note first.", true); return; }
       await act(() => api(`/api/crm/leads/${id}/notes`, { method: "POST", body: { body: text } }), "Note saved.");
-      state.drafts[id + ":note"] = ""; $("c-text").value = "";
+      state.drafts[id + ":note"] = ""; $("c-text").value = ""; state.composerOpen = false; state.scrollEnd = true;
     }
     if (a === "send") {
       const text = $("c-text").value.trim(); if (!text) { toast("Write your reply first.", true); return; }
@@ -1169,6 +1264,7 @@ $("detail").addEventListener("click", async (e) => {
         body: { body: text, reply_id: b.dataset.reply ? +b.dataset.reply : null, attachments: await attachments(id + ":reply") } }));
       toast(r.status === "dry_run" ? "Saved as a test reply. Nothing was emailed." : "Reply sent to " + r.to + ".");
       state.drafts[id + ":reply"] = ""; state.files[id + ":reply"] = []; $("c-text").value = ""; state.replyTo = null;
+      state.composerOpen = false; state.scrollEnd = true;
     }
     if (a === "send-new") {
       const subject = $("c-subj").value.trim(), text = $("c-text").value.trim();
@@ -1178,10 +1274,15 @@ $("detail").addEventListener("click", async (e) => {
         body: { subject, body: text, attachments: await attachments(id + ":new") } }));
       toast(r.status === "dry_run" ? "Saved as a test email. Nothing was emailed." : "Email sent to " + r.to + ".");
       state.drafts[id + ":new"] = state.drafts[id + ":subject"] = ""; state.files[id + ":new"] = []; state.mode = "reply";
+      state.composerOpen = false; state.scrollEnd = true;
     }
     await Promise.all([loadDetail(id), reloadListOnly()]);
   } catch (err) { /* toast already shown */ }
-  finally { b.disabled = false; }
+  finally { b.disabled = false; syncSend(); }
+});
+$("detail").addEventListener("input", (e) => { if (e.target.id === "c-text" || e.target.id === "c-subj") syncSend(); });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && state.composerOpen && !$("v-leads").hidden && $("detail").querySelector(".composer")) { e.preventDefault(); closeComposer(); }
 });
 $("detail").addEventListener("change", async (e) => {
   if (e.target.id === "c-files") { addFiles([...e.target.files]); return; }
