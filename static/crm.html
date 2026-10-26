@@ -1117,10 +1117,21 @@ function splitQuoted(body) {
   if (at < 0 || !main.trim()) return { main: String(body).replace(/\s+$/, ""), rest: "" };
   return { main, rest: lines.slice(at).join("\n").replace(/^\s+|\s+$/g, "") };
 }
+// Some mail programs put web code in the plain-text part ("<p>Hello</p><p><br></p>"): show it as
+// the text it stands for. Parsed inertly (DOMParser runs no scripts) and only its text is kept.
+function readable(body) {
+  const s = String(body);
+  if (!/<\/(p|div)>|<br\s*\/?>/i.test(s)) return s;
+  const marked = s.replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|li|tr|h[1-6])>/gi, "$&\n");
+  const doc = new DOMParser().parseFromString(marked, "text/html");
+  doc.querySelectorAll("script, style").forEach(e => e.remove());
+  const text = doc.body.textContent || "";
+  return text.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
 // full: the newest message from the lead (or later) is never folded; only its quoted text is
 function bodyHTML(m, key, full) {
   if (!m.body) return `<div class="m-text"><span class="missing">The text of this email wasn't saved.</span></div>`;
-  const { main, rest } = splitQuoted(m.body), open = state.expanded.has(key);
+  const { main, rest } = splitQuoted(readable(m.body)), open = state.expanded.has(key);
   const long = !full && (main.length > 320 || main.split("\n").length > 6);
   const more = long || rest ? `<div class="m-foot"><button class="btn ghost sm" data-a="more" data-k="${esc(key)}" aria-expanded="${open}">${open ? "Show less" : "Show more"}</button></div>` : "";
   return `<div class="m-text ${long && !open ? "clamp" : ""}">${esc(main)}</div>${rest && open ? `<div class="m-quote">${esc(rest)}</div>` : ""}${more}`;
