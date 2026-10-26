@@ -43,29 +43,47 @@ def visible_text(html):
     return re.sub(r"<[^>]+>", "", html)
 
 
-def test_a_reply_is_html_with_a_plain_version_signature_and_grey_quote(team, outbox):
+def test_a_reply_is_html_with_a_plain_version_signature_and_grey_quote(team, outbox, monkeypatch):
     lead_id, reply_id = team["leads"]["free"]
     with db.conn() as c:
         c.execute("UPDATE replies SET body = ? WHERE id = ?",
                   ("Tell me more about bulk SMS.\n\n> On Mon, Florence <florence@talksasa.co.ke> wrote:\n> Hello", reply_id))
-        c.execute("UPDATE users SET phone = '+254 711 000000' WHERE id = ?", (team["ids"]["asha"],))
+        c.execute("UPDATE users SET phone = '+254 799 999999' WHERE id = ?", (team["ids"]["asha"],))
+    monkeypatch.setattr(config, "SENDER_PHONE", "+254 711 000000")  # wins over Asha's own phone
     r = team["asha"].post(f"/api/crm/leads/{lead_id}/reply", json={"body": "Hi,\nHappy to help.\nAsha"})
     assert r.status_code == 200
     [msg] = outbox
     plain = msg.get_body(("plain",)).get_content()
-    assert plain.startswith("Hi,\nHappy to help.\nAsha\n\nAsha\nTalkSasa Communications Ltd\n+254 711 000000\n\nOn ")
+    assert plain.startswith("Hi,\nHappy to help.\nAsha\n\nFlorence\nTalkSasa Communications Ltd\n+254 711 000000\n\nOn ")
+    assert msg["From"] == "Florence from TalkSasa <sales@talksasa.co.ke>"
     assert "info@free-school.com wrote:\n> Tell me more about bulk SMS." in plain
     page = msg.get_body(("html",)).get_content()
     text = visible_text(page)
     assert "Hi,<br>\nHappy to help.<br>\nAsha" in page                      # line breaks kept
     assert "font-family:Arial" in page and "background:#f5f5f5" in page   # readable font, grey quote
-    assert "TalkSasa Communications Ltd" in text and "+254 711 000000" in text
+    assert "TalkSasa Communications Ltd" in text and "+254 711 000000" in text and "+254 799 999999" not in text
     assert re.search(r"On \w{3}, \d+ \w{3} \d{4} at \d\d:\d\d, info@free-school.com wrote:", text)
     assert "Tell me more about bulk SMS." in text and "florence@talksasa.co.ke" in text
     assert ">" not in text and "&gt;" not in text
     # the conversation keeps the plain version
     out = [m for m in team["asha"].get(f"/api/crm/leads/{lead_id}").json()["thread"] if m["kind"] == "out"]
     assert out[0]["body"] == plain.rstrip("\n") and out[0]["attachments"] == []
+
+
+def test_every_reply_is_signed_with_sender_name_whoever_sends_it(team, outbox, monkeypatch):
+    lead_id, _ = team["leads"]["free"]
+    monkeypatch.setattr(config, "SENDER_NAME", "Mary")
+    assert team["asha"].get("/api/auth/me").json()["sender_name"] == "Mary"
+    assert team["asha"].post(f"/api/crm/leads/{lead_id}/reply", json={"body": "Hi from Asha"}).status_code == 200
+    assert team["admin"].post(f"/api/crm/leads/{lead_id}/reply", json={"body": "Hi from Ada"}).status_code == 200
+    for msg in outbox:  # Asha's reply, then Ada's on the same lead: the lead only ever hears from Mary
+        assert msg["From"] == "Mary from TalkSasa <sales@talksasa.co.ke>"
+        assert "\n\nMary\nTalkSasa Communications Ltd" in msg.get_body(("plain",)).get_content()
+        assert "Asha" not in msg["From"] and "Ada" not in msg["From"]
+
+    monkeypatch.setattr(config, "SENDER_NAME", "")  # not set: the sender's own name
+    assert team["admin"].post(f"/api/crm/leads/{lead_id}/reply", json={"body": "Hi again"}).status_code == 200
+    assert outbox[-1]["From"] == "Ada from TalkSasa <sales@talksasa.co.ke>"
 
 
 def test_a_new_email_claims_the_lead_and_stops_the_bots_emails(team, outbox):

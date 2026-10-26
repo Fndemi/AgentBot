@@ -13,6 +13,8 @@ Other commands:
 
 Settings (.env, all optional):
     CRM_FROM_EMAIL   address replies go out from (default FROM_EMAIL, e.g. florence@...; later sales@...)
+    SENDER_NAME      the name every reply is signed with ("Mary from TalkSasa"), whoever sends it
+    SENDER_PHONE     the phone in every reply's signature, whoever sends it
     CRM_SMTP_USER    / CRM_SMTP_PASS   login for that mailbox (default SMTP_USER / SMTP_PASS)
     CRM_SENT_FOLDER  IMAP folder to file a copy of each reply in (default "Sent"; blank = don't)
     CRM_DRY_RUN      true = record replies but don't actually send them (for testing)
@@ -440,7 +442,7 @@ def logout(request: Request):
 
 @router.get("/api/auth/me")
 def me(user=Depends(current_user)):
-    return {"user": user, "dry_run": CRM_DRY_RUN, "from_email": CRM_FROM_EMAIL}
+    return {"user": user, "dry_run": CRM_DRY_RUN, "from_email": CRM_FROM_EMAIL, "sender_name": sender_name(user)}
 
 
 @router.post("/api/auth/password")
@@ -928,9 +930,17 @@ def read_attachments(items):
 FONT = "font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#222222"
 
 
+def sender_name(user):
+    """The name every email is signed with: SENDER_NAME in .env, whoever presses Send, so a lead
+    hears from one person all along. The sender's own name only if SENDER_NAME is blank."""
+    return (config.SENDER_NAME or "").strip() or user["name"]
+
+
 def signature(user):
-    lines = [user["name"], config.COMPANY]
-    phone = (user.get("phone") or "").strip() or (config.SENDER_PHONE or "").strip()
+    """Name, company and phone. Like the name, the phone is SENDER_PHONE whoever sends;
+    the sender's own phone only if SENDER_PHONE is blank."""
+    lines = [sender_name(user), config.COMPANY]
+    phone = (config.SENDER_PHONE or "").strip() or (user.get("phone") or "").strip()
     if phone:
         lines.append(phone)
     return "\n".join(lines)
@@ -992,7 +1002,7 @@ def build_email(user, to, subject, text, orig=None, who="", refs=(), files=()):
     page += "</div>"
 
     msg = EmailMessage()
-    msg["From"] = formataddr((f"{user['name']} from TalkSasa", CRM_FROM_EMAIL))
+    msg["From"] = formataddr((f"{sender_name(user)} from TalkSasa", CRM_FROM_EMAIL))
     msg["To"] = to
     msg["Reply-To"] = CRM_FROM_EMAIL
     msg["Subject"] = subject

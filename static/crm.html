@@ -530,7 +530,7 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
             <div class="formgrid">
               <label>Full name <input class="input" name="name" required autocomplete="off"></label>
               <label>Email <input class="input" name="email" type="email" required autocomplete="off"></label>
-              <label><span>Phone for their email signature <span class="hint">(optional)</span></span><input class="input" name="phone" autocomplete="off" placeholder="+254 7…"></label>
+              <label><span>Phone <span class="hint">(optional · emails show the company phone, this one only if none is set)</span></span><input class="input" name="phone" autocomplete="off" placeholder="+254 7…"></label>
               <label>Role
                 <select class="select" name="role"><option value="sales">Sales</option><option value="admin">Admin</option></select></label>
               <label class="full"><span>Temporary password <span class="hint">· they'll choose their own the first time they sign in</span></span>
@@ -1186,7 +1186,7 @@ function composerHTML(lead, canReply, canAct) {
     <div class="c-head">${tabs}<button class="iconbtn" data-a="c-close" aria-label="Close the composer" title="Close (Esc). Your draft is kept."><svg class="i"><use href="#i-x"/></svg></button></div>
     <div class="c-scroll">${inner}</div>
     <div class="c-foot">${sendBtn}${attach ? attachBtn() : ""}<button class="btn ghost" data-a="c-close" title="Close. Your draft is kept.">Cancel</button><span class="hint">${hint}</span></div></div>`;
-  const from = `<span><b>From</b> ${esc(state.me.name)} from TalkSasa &lt;${esc(state.fromEmail)}&gt;</span>`;
+  const from = `<span><b>From</b> ${esc(state.senderName)} from TalkSasa &lt;${esc(state.fromEmail)}&gt;</span>`;
   const sendHint = `Ctrl + Enter to send${state.dryRun ? " · test mode, nothing is emailed" : ""}`;
   const sendIcon = `<svg class="i"><use href="#i-send"/></svg>`;
   if (state.mode === "note") {
@@ -1196,7 +1196,7 @@ function composerHTML(lead, canReply, canAct) {
   if (state.mode === "new") {
     return panel(`<div class="c-meta"><span><b>To</b> ${esc(lead.email || "")}</span>${from}<span>A new conversation. LeadBot stops its automatic emails to this lead once you send.</span></div>
       <input class="input" id="c-subj" maxlength="200" placeholder="Subject" aria-label="Subject">
-      <textarea class="textarea" id="c-text" rows="5" placeholder="Write your email. Your name, TalkSasa and your phone are added at the bottom."></textarea>
+      <textarea class="textarea" id="c-text" rows="5" placeholder="Write your email. ${esc(state.senderName)}, TalkSasa and the company phone are added at the bottom."></textarea>
       ${pickedHTML()}`,
       `<button class="btn primary send" data-a="send-new" data-send>${sendIcon}${state.dryRun ? "Save test email" : "Send"}</button>`, true, sendHint);
   }
@@ -1205,7 +1205,7 @@ function composerHTML(lead, canReply, canAct) {
   const subj = target?.subject ? (/^re:/i.test(target.subject) ? target.subject : "Re: " + target.subject) : "Re: TalkSasa";
   return panel(`<div class="c-meta"><span><b>To</b> ${esc(to)}</span>${from}<span><b>Subject</b> ${esc(subj)}</span>
       ${target && ins.length > 1 ? `<span>Answering their message from ${esc(when(target.at))}</span>` : ""}</div>
-    <textarea class="textarea" id="c-text" rows="5" placeholder="Write your reply. Your name, TalkSasa and your phone are added at the bottom, and their message is quoted below it."></textarea>
+    <textarea class="textarea" id="c-text" rows="5" placeholder="Write your reply. ${esc(state.senderName)}, TalkSasa and the company phone are added at the bottom, and their message is quoted below it."></textarea>
     ${pickedHTML()}`,
     `<button class="btn primary send" data-a="send" data-send data-reply="${target ? target.id : ""}">${sendIcon}${state.dryRun ? "Save test reply" : "Send reply"}</button>`, true, sendHint);
 }
@@ -1469,7 +1469,7 @@ async function start() {
   let me;
   try { me = await api("/api/auth/me"); } catch (e) { return; }
   if (me.user.must_change) { location.replace("/login"); return; }
-  state.me = me.user; state.dryRun = me.dry_run; state.fromEmail = me.from_email || "";
+  state.me = me.user; state.dryRun = me.dry_run; state.fromEmail = me.from_email || ""; state.senderName = me.sender_name || me.user.name;
   $("me-name").textContent = me.user.name; $("me-av").textContent = initials(me.user.name);
   $("me-role").textContent = me.user.role === "admin" ? "Admin" : "Sales";
   $("nav-team").hidden = $("nav-dash").hidden = $("nav-report").hidden = $("nav-templates").hidden = me.user.role !== "admin";
