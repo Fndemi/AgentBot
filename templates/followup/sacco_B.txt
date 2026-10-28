@@ -1,0 +1,13 @@
+Hello {company} team,
+
+Your free test of {free_sms} SMS is still available. In a 15-minute meeting we'd pick the first message to test, get it going, and start registering {company}'s own sender name, which usually takes {setup_days}.
+
+Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

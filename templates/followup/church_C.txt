@@ -1,0 +1,13 @@
+Hello {company} team,
+
+To give an idea of cost: a Sunday reminder to 500 members costs about KES 125, at {price_from} per SMS, and you can see who received it.
+
+In 15 minutes I can show you exactly how you'd send it. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

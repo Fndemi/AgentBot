@@ -1,0 +1,13 @@
+Hello {company} team,
+
+Your free test of {free_sms} SMS is still available, with our API docs. Registering your own sender name usually takes {setup_days}.
+
+In 15 minutes we'd agree the first messages to test and start the registration. Would {slot1} or {slot2} work for you and whoever handles integrations? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

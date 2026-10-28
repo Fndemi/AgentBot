@@ -19,6 +19,7 @@ import db
 import notify
 import personalise
 import ranking
+import rotation
 import targeting
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
@@ -75,21 +76,50 @@ def attachment():
     return path
 
 
-def load_template(industry):
-    """Use templates/<industry>.txt if it exists, otherwise templates/default.txt.
+def load_template(industry, variant=None):
+    """Use templates/<industry>.txt if it exists, otherwise templates/default.txt; with a
+    variant, templates/<industry>_<variant>.txt (rotation.py), which must exist.
     First line is the subject, the rest is the body. The body is fixed text apart from
     {opener} and {uses}, which personalise.py fills for each lead."""
     name = (industry or "default").lower().replace(" ", "_")
+    if variant:
+        name = f"{name}_{variant}"
     path = TEMPLATE_DIR / f"{name}.txt"
-    if not path.exists():
+    if not path.exists() and not variant:
         path, name = TEMPLATE_DIR / "default.txt", "default"
     subject, body = path.read_text(encoding="utf-8").split("\n", 1)
     return name, subject.replace("Subject:", "").strip(), body.strip()
 
 
+def variants(lead):
+    """The rotation variants (A, B, C) its niche has a first email for; [] for a niche that
+    isn't in the rotation."""
+    key = personalise.industry_key(lead)
+    return [v for v in rotation.VARIANTS if (TEMPLATE_DIR / f"{key}_{v}.txt").is_file()]
+
+
+def first_variant(lead):
+    """The variant of the lead's first email: the one saved on it, otherwise the one its niche
+    has sent least (rotation.pick). None for a niche that isn't in the rotation."""
+    available = variants(lead)
+    if not available:
+        return None
+    saved = dict(lead).get("template_variant")
+    return saved if saved in available else rotation.pick(personalise.industry_key(lead), available)
+
+
+def first_subject(lead):
+    """The subject template of the lead's first email: its variant's, or for a lead with
+    none, its industry's own template (also the subject of every pre-rotation email)."""
+    variant = dict(lead).get("template_variant")
+    if variant in variants(lead):
+        return load_template(lead["industry"], variant)[1]
+    return load_template(lead["industry"])[1]
+
+
 def fill(text, lead, attached=False, for_html=False, extra=None):
     """The template with this lead's details in it. `extra` adds or replaces placeholders
-    (the follow-ups' own {uses} and {offer})."""
+    (the follow-ups' own {uses} and {offer}, and their meeting slots)."""
     values = dict(
         opener=personalise.opener(lead),
         uses=personalise.uses(lead),
@@ -105,6 +135,8 @@ def fill(text, lead, attached=False, for_html=False, extra=None):
         attachment_line=ATTACHMENT_LINE if attached else "",
         # whole signature line; empty when there is no profile link
         profile_line=profile_line(),
+        # {free_sms} {setup_days} {price_from} {slot1} {slot2} {booking_line} {meet_options}
+        **rotation.gaps(lead),
     )
     values.update(extra or {})
     return text.format(**values)
@@ -133,9 +165,21 @@ def to_html(text):
 
 
 def build(lead):
-    """The first email to a lead: its industry's template, with the PDF if there is one."""
+    """The first email to a lead. In a rotation niche: its variant's template
+    (first_variant), with no PDF ({profile_line} links to the profile instead). Otherwise its
+    industry's template, with the PDF if there is one."""
+    variant = first_variant(lead)
+    if variant:
+        tname, subject, body = load_template(lead["industry"], variant)
+        return compose(lead, fill(subject, lead), body), tname
     tname, subject, body = load_template(lead["industry"])
     return compose(lead, fill(subject, lead), body, attachment()), tname
+
+
+def variant_of(tname):
+    """The variant in a template name: "sacco_A" and "followup/sacco_A" -> "A", else None."""
+    m = re.search(r"_([A-Z])$", tname or "")
+    return m.group(1) if m else None
 
 
 def compose(lead, subject, body, pdf=None, in_reply_to=None, extra=None, references=None):
@@ -186,13 +230,21 @@ FOLLOWUP_USES = 2  # {uses} in a follow-up: the first two on the industry's list
 # wording than its template has now (that email may not have named these uses)
 FOLLOWUP1_LINE = "Just following up on my email about sending {uses} by SMS."
 OLD_WORDING_LINE = "Just following up on my earlier email about bulk SMS."
+# Added to the old follow-up 1 of a lead emailed before the rotation, just before the signature
+SIGNATURE_START = "Kind regards,"
+LEGACY_MEETING_LINES = ("It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you? "
+                        "If neither works, just tell me which day suits you better.\n\n{booking_line}")
 
 
 def followup_template(lead, n=1):
-    """templates/followup/<industry>.txt (n=1) or templates/followup2/<industry>.txt (n=2),
-    or None if that industry has no such follow-up."""
-    folder = FOLLOWUP_DIR if n == 1 else FOLLOWUP2_DIR
-    path = folder / f"{personalise.industry_key(lead)}.txt"
+    """Follow-up 1 is templates/followup/<industry>_<variant>.txt for a lead with a rotation
+    variant, templates/followup/<industry>.txt (the old one) for a lead without. Follow-up 2 is
+    templates/followup2/<industry>.txt for both. None if that industry has no such follow-up."""
+    key, variant = personalise.industry_key(lead), dict(lead).get("template_variant")
+    if n == 1:
+        path = FOLLOWUP_DIR / (f"{key}_{variant}.txt" if variant else f"{key}.txt")
+    else:
+        path = FOLLOWUP2_DIR / f"{key}.txt"
     return path if path.exists() else None
 
 
@@ -218,29 +270,49 @@ def old_wording(lead, thread):
     return not saved or not _same_subject(saved, fill(load_template(lead["industry"])[1], lead))
 
 
+def followup_body(lead, n, body, thread):
+    """Follow-up n's template text as it goes to this lead. A lead emailed before the rotation
+    (no variant) gets its old follow-up 1 with LEGACY_MEETING_LINES added before the signature,
+    and OLD_WORDING_LINE instead of the uses line if its first email had old wording."""
+    if n != 1 or dict(lead).get("template_variant"):
+        return body
+    if old_wording(lead, thread):
+        if FOLLOWUP1_LINE not in body:  # never send the uses line to an old-wording lead by mistake
+            raise RuntimeError(f"follow-up 1 for {personalise.industry_key(lead)} doesn't contain the line "
+                               f"to swap for old-wording leads: {FOLLOWUP1_LINE!r}")
+        body = body.replace(FOLLOWUP1_LINE, OLD_WORDING_LINE)
+    at = body.find("\n" + SIGNATURE_START)
+    if at < 0:
+        raise RuntimeError(f"follow-up 1 for {personalise.industry_key(lead)} has no {SIGNATURE_START!r} "
+                           "line to add the meeting request before")
+    return body[:at].rstrip() + "\n\n" + LEGACY_MEETING_LINES + "\n" + body[at:]
+
+
+def followup_extra(lead, n):
+    """The gaps a follow-up fills beyond fill's own: {uses}, {offer} and its own meeting slots."""
+    slot1, slot2 = rotation.slots(dict(lead).get("id"), n + 1)
+    return dict(followup_values(lead), slot1=slot1, slot2=slot2)
+
+
 def build_followup(lead, n=1):
     """Follow-up n (1 or 2) to a lead's first email: its industry's follow-up template, no
     PDF, sent as a reply in the same thread. The subject is "Re: " + the subject the first
     email actually went out with (the template's subject only if none was saved).
     In-Reply-To is the latest email we sent the lead, References all of ours oldest first.
-    If the first email had old wording (old_wording), follow-up 1 opens with
-    OLD_WORDING_LINE instead of naming the uses.
-    `lead` is a row from db.awaiting_followup; the thread is read from the sent table."""
+    A lead from before the rotation gets its old follow-up 1 with a meeting request
+    (followup_body). `lead` is a row from db.awaiting_followup; the thread is read from the
+    sent table."""
     path = followup_template(lead, n)
     lead = dict(lead)
     thread = db.sent_thread(lead["id"]) if lead.get("id") else []
-    body = path.read_text(encoding="utf-8").strip()
-    if n == 1 and old_wording(lead, thread):
-        if FOLLOWUP1_LINE not in body:  # never send the uses line to an old-wording lead by mistake
-            raise RuntimeError(f"{path} doesn't contain the line to swap for old-wording leads: {FOLLOWUP1_LINE!r}")
-        body = body.replace(FOLLOWUP1_LINE, OLD_WORDING_LINE)
-    first_subject = ((thread[0]["sent_subject"] if thread else lead.get("sent_subject"))
-                     or fill(load_template(lead["industry"])[1], lead))
-    subject = first_subject if first_subject.lower().startswith("re:") else f"Re: {first_subject}"
+    body = followup_body(lead, n, path.read_text(encoding="utf-8").strip(), thread)
+    first = ((thread[0]["sent_subject"] if thread else lead.get("sent_subject"))
+             or fill(first_subject(lead), lead))
+    subject = first if first.lower().startswith("re:") else f"Re: {first}"
     ids = [r["message_id"] for r in thread if r["message_id"]] or [lead.get("message_id")]
     ids = [i for i in ids if i]
     msg = compose(lead, subject, body,
-                  in_reply_to=ids[-1] if ids else None, references=ids, extra=followup_values(lead))
+                  in_reply_to=ids[-1] if ids else None, references=ids, extra=followup_extra(lead, n))
     return msg, f"{path.parent.name}/{path.stem}"
 
 
@@ -347,7 +419,12 @@ def deliver(smtp, lead, msg, tname, followup=0):
     the first email, else the follow-up's number (1 or 2).
     Every send goes through here, so this is also where the limits are kept: a first email
     only to a lead never emailed, follow-up n only after exactly n emails, at most
-    MAX_FOLLOWUPS of them, and only when follow-ups are approved."""
+    MAX_FOLLOWUPS of them, only when follow-ups are approved, and never while a fact the
+    templates quote is missing (rotation.refusal).
+    The lead's rotation variant is saved on the sent row, and on the lead with its first email."""
+    refused = rotation.refusal()
+    if refused:
+        raise RuntimeError(f"{lead['email']}: {refused}")
     if not personalise.approved(lead):
         raise RuntimeError(f"{lead['email']}: industry {lead['industry'] or 'default'!r} is not approved in uses.yaml")
     emailed = db.sent_count(lead["id"])
@@ -364,7 +441,8 @@ def deliver(smtp, lead, msg, tname, followup=0):
     sent_at = time.time()
     variant = ("followup" if followup == 1 else f"followup{followup:d}" if followup
                else "personal" if personalise.picked_uses(lead) else "template")
-    db.record_sent(lead["id"], msg["Message-ID"], tname, str(msg["Subject"]), plain_of(msg), variant)
+    db.record_sent(lead["id"], msg["Message-ID"], tname, str(msg["Subject"]), plain_of(msg), variant,
+                   variant_of(tname) or dict(lead).get("template_variant"))
     save_to_sent(msg, sent_at)
 
 
@@ -497,6 +575,15 @@ def _paused(reason):
         pass  # the message above says it too
 
 
+def _refused(reason):
+    text = f"Not sending: {reason}."
+    print(f"WARNING: {text}")
+    try:
+        notify.send("⛔ LeadBot " + text)
+    except Exception:
+        pass  # the warning above says it too
+
+
 SEND_LOCK = "send"
 LOCK_SECONDS = 3600  # renewed after every email; a run that crashes frees it after this
 
@@ -549,6 +636,12 @@ def run(dry_run=False):
         return
     if paused:
         print(f"NOTE: a real send would be paused: {paused}.")
+    refused = rotation.refusal()
+    if refused and not dry_run:
+        _refused(refused)
+        return
+    if refused:
+        print(f"WARNING: a real send would refuse to send: {refused}.")
     if dry_run:
         return _dry_run()
     # One send run at a time, across processes (auto, cron, a manual send): a second one

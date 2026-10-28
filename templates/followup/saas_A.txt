@@ -1,0 +1,13 @@
+Hello {company} team,
+
+If you already have an SMS provider, we can also sit behind it as a backup route, ready to take your OTPs if your main one slows down. All it needs is your sender name registered on our route and an API key ready.
+
+In 15 minutes we can agree the set-up with your developer. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

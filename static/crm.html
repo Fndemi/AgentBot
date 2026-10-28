@@ -571,7 +571,7 @@ td .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; 
             </div>
             <div class="set-block">
               <p class="set-title">Attached PDF</p>
-              <p class="hint">Attached to every first email. Follow-ups never carry it.</p>
+              <p class="hint">Attached to first emails, except the A/B/C ones, which link to the profile with {profile_line} instead. Follow-ups never carry it.</p>
               <div id="set-pdf"><p class="muted">Loading…</p></div>
               <div class="set-foot"><label class="btn sm">Upload a new PDF<input type="file" id="set-file" accept="application/pdf,.pdf" hidden></label>
                 <button class="btn ghost sm" id="set-remove" hidden>Don't attach a PDF</button></div>
@@ -725,8 +725,20 @@ const GAP_HELP = {
   sender: "Sender name (SENDER_NAME in .env)", our_company: "Our company name (COMPANY in .env)",
   phone: "Phone (SENDER_PHONE in .env)", website: "Our website, as a link", profile_line: "\"Company profile: <link>\" when PROFILE_URL is set",
   profile_url: "PROFILE_URL from .env", industry: "The lead's industry", offer: "The visit/call or rates offer for this industry",
+  free_sms: "Free test size (OFFER_FREE_SMS in .env)", setup_days: "How long sender-name registration takes (SETUP_TIME in .env)",
+  price_from: "Starting price per SMS (PRICE_FROM in .env)", slot1: "First suggested meeting time, e.g. \"Tuesday 4 Nov at 10am\"",
+  slot2: "Second suggested meeting time, on another day", booking_line: "\"Or pick any time that suits you here: <link>\" when BOOKING_URL is set",
+  meet_options: "Visit, video call or phone, in the order that suits the industry",
 };
-const tpl = { list: [], name: null, kind: "first", data: null, problem: null, field: null, timer: null };
+// variant: the rotation variant being edited (A, B, C), null for the industry's own (legacy)
+// templates, undefined before one is picked
+const tpl = { list: [], name: null, kind: "first", variant: undefined, data: null, problem: null, field: null, timer: null };
+// the template's file name: follow-up 2 is one per industry, shared by every variant
+const tplFile = (name, kind, variant) => variant && kind !== "followup2" ? `${name}_${variant}` : name;
+function tplKinds(t, variant) {
+  const v = variant && (t.variants || []).find(x => x.variant === variant);
+  return v ? v.kinds.concat(t.kinds.includes("followup2") ? ["followup2"] : []) : t.kinds;
+}
 const IND_NAMES = { default: "Default (other industries)", sacco: "SACCO", ngo: "NGO", saas: "SaaS", hr_payroll: "HR & payroll",
                     ecommerce: "E-commerce", proptech: "PropTech", insurtech: "InsurTech", edtech: "EdTech", healthtech: "HealthTech", agritech: "AgriTech" };
 const indName = (n) => IND_NAMES[n] || n.replace(/_/g, " ").replace(/^./, c => c.toUpperCase());
@@ -776,42 +788,56 @@ async function loadTemplates() {
   }
   catch (e) { $("tpl-items").innerHTML = `<div class="empty"><b>Couldn't load templates</b>${esc(e.message)}</div>`; return; }
   renderTplList();
-  if (tpl.name && !tplDirty()) openTemplate(tpl.name, tpl.kind, true);
+  if (tpl.name && !tplDirty()) openTemplate(tpl.name, tpl.kind, true, tpl.variant);
 }
 function renderTplList() {
   const q = $("tpl-q").value.trim().toLowerCase();
   const rows = tpl.list.filter(t => !q || indName(t.name).toLowerCase().includes(q));
   $("tpl-items").innerHTML = rows.map(t => `<button class="tpl-item" data-name="${esc(t.name)}" aria-current="${t.name === tpl.name}">
-      <span class="truncate">${esc(indName(t.name))}</span>${t.approved ? '<span class="chip pos">Sending</span>' : '<span class="chip plain">Off</span>'}</button>`).join("")
+      <span class="truncate">${esc(indName(t.name))}${t.variants.length ? ` <span class="muted">· ${t.variants.map(v => v.variant).join(" ")}</span>` : ""}</span>${t.approved ? '<span class="chip pos">Sending</span>' : '<span class="chip plain">Off</span>'}</button>`).join("")
     || `<p class="muted" style="padding:12px">No industry matches.</p>`;
 }
-async function openTemplate(name, kind, force) {
+async function openTemplate(name, kind, force, variant) {
   if (!force && tplDirty() && !confirm("Your changes to this template aren't saved. Leave them?")) return;
   const t = tpl.list.find(x => x.name === name); if (!t) return;
-  if (!t.kinds.includes(kind)) kind = "first";
-  tpl.name = name; tpl.kind = kind; tpl.field = null; renderTplList();
+  // a niche in the rotation opens on its first variant unless one (or "legacy", null) is asked for
+  if (variant === undefined) variant = name === tpl.name && tpl.variant !== undefined ? tpl.variant : (t.variants[0]?.variant ?? null);
+  if (variant && !t.variants.some(v => v.variant === variant)) variant = t.variants[0]?.variant ?? null;
+  if (!tplKinds(t, variant).includes(kind)) kind = "first";
+  tpl.name = name; tpl.kind = kind; tpl.variant = variant; tpl.field = null; renderTplList();
   if (state.view === "templates") history.replaceState(null, "", "#templates/" + name);
   $("tpl-edit").innerHTML = `<div class="empty">Loading…</div>`;
-  try { tpl.data = await api(`/api/crm/templates/${kind}/${name}`); }
+  try { tpl.data = await api(`/api/crm/templates/${kind}/${tplFile(name, kind, variant)}`); }
   catch (e) { $("tpl-edit").innerHTML = `<div class="empty"><b>Couldn't open it</b>${esc(e.message)}</div>`; return; }
-  if (tpl.name !== name || tpl.kind !== kind) return;  // another one was picked meanwhile
+  if (tpl.name !== name || tpl.kind !== kind || tpl.variant !== variant) return;  // another one was picked meanwhile
   renderTplEditor(t);
   tplPreview();
 }
 function renderTplEditor(t) {
-  const d = tpl.data;
+  const d = tpl.data, kinds = tplKinds(t, tpl.variant), v = t.variants.find(x => x.variant === tpl.variant);
+  const versions = t.variants.length ? `<div class="tabs" role="tablist" aria-label="Variant">${t.variants.map(x => `<button class="tab" role="tab" data-variant="${x.variant}"
+        aria-selected="${x.variant === tpl.variant}" title="${x.enabled ? "" : "Switched off in uses.yaml: new leads don't get it"}">${esc(x.variant)} · ${esc(x.technique)}${x.enabled ? "" : " (off)"}</button>`).join("")}
+      <button class="tab" role="tab" data-variant="" aria-selected="${!tpl.variant}" title="The templates used before the A/B/C rotation">Legacy</button></div>` : "";
+  const about = !t.variants.length ? "" : d.kind === "followup2"
+    ? "Follow-up 2 is one email for this industry, sent to every lead whatever its variant, legacy leads included."
+    : tpl.variant ? (v.enabled ? `Variant ${v.variant} (${v.technique}). New leads get the variant sent least so far in this industry and keep it for their follow-ups.`
+                               : `Variant ${v.variant} is switched off in uses.yaml (variants:), so new leads don't get it. Leads that already have it keep it.`)
+    : d.kind === "first" ? "Legacy: the first email used before the A/B/C rotation. New leads don't get it; LeadBot uses its subject to tell which older leads had this wording."
+    : "Legacy: leads emailed before the A/B/C rotation finish with this follow-up 1. LeadBot adds the meeting request (two times and the booking link) just before \"Kind regards,\".";
   $("tpl-edit").innerHTML = `
-    <div class="tpl-head"><div><h3>${esc(indName(d.name))}</h3>
+    <div class="tpl-head"><div><h3>${esc(indName(t.name))}</h3>
         <p class="muted">${t.approved ? "Leads in this industry are being emailed." : "Not approved in uses.yaml, so nobody in this industry is emailed yet."}</p></div>
+      <div style="display:grid;gap:8px;justify-items:end">${versions}
       <div class="tabs" role="tablist">${Object.keys(KIND_NAMES).map(k => `<button class="tab" role="tab" data-kind="${k}" aria-selected="${k === d.kind}"
-        ${t.kinds.includes(k) ? "" : `disabled title="This industry has no ${KIND_NAMES[k].toLowerCase()}"`}>${KIND_NAMES[k]}</button>`).join("")}</div></div>
+        ${kinds.includes(k) ? "" : `disabled title="This industry has no ${KIND_NAMES[k].toLowerCase()} here"`}>${KIND_NAMES[k]}</button>`).join("")}</div></div></div>
+    ${about ? `<p class="lead2">${esc(about)}</p>` : ""}
     <div class="formgrid">
       ${d.kind === "first" ? `<label class="full">Subject <input class="input" id="tpl-subject" value="${esc(d.subject)}" maxlength="150"></label>`
         : `<p class="full hint">Follow-ups go out as a reply in the same thread: the subject is "Re: " and the first email's subject, and no PDF is attached.</p>`}
       <label class="full">Email text <textarea class="textarea mono" id="tpl-body" rows="${Math.min(30, d.body.split("\n").length + 2)}">${esc(d.body)}</textarea></label>
       <div class="full gaps"><span class="hint">Gaps LeadBot fills in. Click one to add it where the cursor is:</span>
         ${d.fields.map(f => `<button type="button" class="gap" data-gap="${f}" title="${esc(GAP_HELP[f] || "")}">{${f}}</button>`).join("")}</div>
-      ${d.kind === "followup" ? `<p class="full note">Keep the line <b>"Just following up on my email about sending {uses} by SMS."</b> exactly as it is.
+      ${d.kind === "followup" && !tpl.variant ? `<p class="full note">Keep the line <b>"Just following up on my email about sending {uses} by SMS."</b> exactly as it is.
         For leads whose first email had older wording, LeadBot swaps it for a general line.</p>` : ""}
     </div>
     <div class="formfoot"><button class="btn primary" id="tpl-save">Save</button><button class="btn ghost" id="tpl-reset" hidden>Discard changes</button>
@@ -829,11 +855,11 @@ function tplState() {
 }
 async function tplPreview() {
   const b = $("tpl-body"); if (!b) return;
-  const s = $("tpl-subject"), name = tpl.name, kind = tpl.kind;
+  const s = $("tpl-subject"), name = tpl.name, kind = tpl.kind, variant = tpl.variant;
   let out;
   try {
-    const r = await api(`/api/crm/templates/${kind}/${name}/preview`, { method: "POST", body: { subject: s ? s.value : null, body: b.value } });
-    if (tpl.name !== name || tpl.kind !== kind) return;
+    const r = await api(`/api/crm/templates/${kind}/${tplFile(name, kind, variant)}/preview`, { method: "POST", body: { subject: s ? s.value : null, body: b.value } });
+    if (tpl.name !== name || tpl.kind !== kind || tpl.variant !== variant) return;
     tpl.problem = r.problem;
     out = r.problem ? `<div class="tpl-problem">${esc(r.problem)}</div>`
       : `<div class="tpl-mail"><p><b>Subject:</b> ${esc(r.subject)}</p>${r.attachments.length ? `<p><b>Attached:</b> ${r.attachments.map(esc).join(", ")}</p>` : ""}<pre>${esc(r.text)}</pre></div>`;
@@ -850,7 +876,9 @@ $("tpl-edit").addEventListener("input", (e) => {
 });
 $("tpl-edit").addEventListener("click", async (e) => {
   const tab = e.target.closest(".tab[data-kind]");
-  if (tab && !tab.disabled) return openTemplate(tpl.name, tab.dataset.kind);
+  if (tab && !tab.disabled) return openTemplate(tpl.name, tab.dataset.kind, false, tpl.variant);
+  const ver = e.target.closest(".tab[data-variant]");
+  if (ver) return openTemplate(tpl.name, tpl.kind, false, ver.dataset.variant || null);
   const gap = e.target.closest(".gap");
   if (gap) {  // put {gap} where the cursor was, in the subject or the text
     const f = tpl.field || $("tpl-body"), text = "{" + gap.dataset.gap + "}";
@@ -861,20 +889,20 @@ $("tpl-edit").addEventListener("click", async (e) => {
     return;
   }
   const b = e.target.closest("button"); if (!b) return;
-  const name = tpl.name, kind = tpl.kind;
+  const name = tpl.name, kind = tpl.kind, variant = tpl.variant, file = tplFile(name, kind, variant);
   try {
-    if (b.id === "tpl-reset") return openTemplate(name, kind, true);
+    if (b.id === "tpl-reset") return openTemplate(name, kind, true, variant);
     if (b.id === "tpl-save") {
       b.disabled = true;
       const s = $("tpl-subject");
-      await act(() => api(`/api/crm/templates/${kind}/${name}`, { method: "POST", body: { subject: s ? s.value : null, body: $("tpl-body").value } }),
+      await act(() => api(`/api/crm/templates/${kind}/${file}`, { method: "POST", body: { subject: s ? s.value : null, body: $("tpl-body").value } }),
                 "Saved. The next emails use it.");
-      return openTemplate(name, kind, true);
+      return openTemplate(name, kind, true, variant);
     }
     if (b.dataset.restore) {
       if (!confirm("Put this earlier version back? The text now in use is kept in the list, so you can undo this.")) return;
-      await act(() => api(`/api/crm/templates/${kind}/${name}/restore/${b.dataset.restore}`, { method: "POST" }), "Earlier version restored.");
-      return openTemplate(name, kind, true);
+      await act(() => api(`/api/crm/templates/${kind}/${file}/restore/${b.dataset.restore}`, { method: "POST" }), "Earlier version restored.");
+      return openTemplate(name, kind, true, variant);
     }
   } catch (err) { if (b.id === "tpl-save") tplState(); }
 });
@@ -1348,6 +1376,9 @@ async function loadReport() {
       <p class="muted" style="font-size:12.5px;margin:-8px 0 16px">Reply rate = organisations that replied ÷ those whose email didn't bounce. Auto-replies don't count. A group needs at least ${d.min_sample} delivered emails before its rate means much.</p>
       <div style="display:grid;gap:16px">
         ${repTable("By industry", "", d.groups.segment)}
+        ${d.groups.template.length ? repTable("By template", "Each industry's A, B and C first emails, with the follow-ups that go with them. Leads emailed before the rotation aren't counted here.", d.groups.template)
+          : `<div class="panel"><h3>By template</h3><p class="lead2" style="padding-bottom:14px">No leads emailed from the A/B/C templates in this period yet.</p></div>`}
+        ${d.groups.technique.length ? repTable("By technique", "A (quick question) vs B (free test) vs C (niche angle), across every industry.", d.groups.technique) : ""}
         ${d.has_scores ? repTable("By need score", "If the scoring works, higher bands should reply more. If they don't, the rules need changing.", d.groups.score) : `<div class="panel"><h3>By need score</h3><p class="lead2" style="padding-bottom:14px">No scores yet. They appear once the targeting step has scored your leads.</p></div>`}
         ${d.has_source ? repTable("By where the lead came from", "", d.groups.source) : ""}
       </div>`;

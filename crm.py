@@ -1230,7 +1230,7 @@ def report(days: int = 0, user=Depends(admin_only)):
         sc = _score_cols(c)
         since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d") if days else "0000"
         rows = c.execute(f"""
-            SELECT l.id, COALESCE(NULLIF(l.industry, ''), 'default') AS industry, l.status,
+            SELECT l.id, COALESCE(NULLIF(l.industry, ''), 'default') AS industry, l.status, l.template_variant,
                    {('l.' + sc['score']) if sc['score'] else 'NULL'} AS score,
                    {("COALESCE(NULLIF(l." + sc['source'] + ", ''), 'Web search')") if sc['source'] else "'Web search'"} AS source,
                    MIN(s.sent_on) AS first_sent,
@@ -1246,13 +1246,20 @@ def report(days: int = 0, user=Depends(admin_only)):
     def blank():
         return {"emailed": 0, "bounced": 0, "reachable": 0, "replied": 0, "interested": 0, "meetings": 0, "clients": 0}
 
-    groups = {"segment": {}, "score": {}, "source": {}}
+    import rotation
+    # template: niche x variant; technique: A vs B vs C across niches. Leads emailed before
+    # the rotation (no variant) are in neither.
+    groups = {"segment": {}, "score": {}, "source": {}, "template": {}, "technique": {}}
     total = blank()
     for r in rows:
         bounced = r["status"] == "bounced" or bool(r["bounced_reply"])
         interested = bool(r["interested_reply"]) or r["status"] in ("meeting", "client")
         meeting = r["status"] in ("meeting", "client")
         keys = {"segment": r["industry"], "score": _band(r["score"]), "source": r["source"]}
+        variant = r["template_variant"]
+        if variant:
+            keys["template"] = f"{r['industry']} · {variant}"
+            keys["technique"] = f"{variant} · {rotation.TECHNIQUES.get(variant, '')}".rstrip(" ·")
         for g, key in keys.items():
             for bucket in (groups[g].setdefault(key, blank()),) + ((total,) if g == "segment" else ()):
                 bucket["emailed"] += 1
@@ -1276,6 +1283,8 @@ def report(days: int = 0, user=Depends(admin_only)):
         items = [dict(finish(v), name=k) for k, v in d.items()]
         if g in order:
             items.sort(key=lambda x: order[g].index(x["name"]) if x["name"] in order[g] else 99)
+        elif g in ("template", "technique"):
+            items.sort(key=lambda x: x["name"])  # niche, then A, B, C
         else:
             items.sort(key=lambda x: (-x["emailed"], x["name"]))  # ties by name, on any database
         out[g] = items
@@ -1388,14 +1397,18 @@ def edit_user(user_id: int, body: EditUserIn, admin=Depends(admin_only)):
 # ---------------------------------------------------------------- email templates (admin)
 # The bot reads templates/<industry>.txt (first email: a "Subject:" line, then the text),
 # templates/followup/ and templates/followup2/ (text only) every time it builds an email,
-# so a template saved here is used from the next email that goes out.
+# so a template saved here is used from the next email that goes out. A niche in the A/B/C
+# rotation (rotation.py) also has <industry>_A.txt, _B.txt and _C.txt as first emails and in
+# followup/; its plain <industry>.txt ones are then the legacy templates of leads emailed before.
 
 TEMPLATE_DIR = HERE / "templates"
 TEMPLATE_KINDS = {"first": TEMPLATE_DIR, "followup": TEMPLATE_DIR / "followup", "followup2": TEMPLATE_DIR / "followup2"}
 TEMPLATE_NAME = re.compile(r"^[a-z0-9_]+$")
+VARIANT_NAME = re.compile(r"^([a-z0-9_]+)_([A-Z])$")  # sacco_A: one rotation variant's template
 # The gaps sender.fill can fill; a follow-up also gets {offer} (sender.FOLLOWUP_OFFERS)
 TEMPLATE_FIELDS = ("company", "uses", "opener", "attachment_line", "sender", "our_company", "phone", "website",
-                   "profile_line", "profile_url", "industry")
+                   "profile_line", "profile_url", "industry",
+                   "free_sms", "setup_days", "price_from", "slot1", "slot2", "booking_line", "meet_options")
 MAX_TEMPLATE_CHARS = 6000
 
 
@@ -1405,7 +1418,7 @@ def _fields(kind):
 
 def _template_path(kind, name):
     """The template's file. Only files that already exist: templates are edited here, never created."""
-    if kind not in TEMPLATE_KINDS or not TEMPLATE_NAME.match(name or ""):
+    if kind not in TEMPLATE_KINDS or not (TEMPLATE_NAME.match(name or "") or VARIANT_NAME.match(name or "")):
         raise HTTPException(404, "No such template.")
     path = TEMPLATE_KINDS[kind] / f"{name}.txt"
     if not path.is_file():
@@ -1431,20 +1444,28 @@ def _write_template(kind, path, subject, body):
 
 
 def _sample_lead(name):
-    return {"id": None, "company": "Example Company", "industry": "" if name == "default" else name,
-            "email": "info@example.co.ke", "opener": None, "uses": None, "confidence": None}
+    """The example company for a template's preview; for sacco_A, a SACCO lead on variant A."""
+    m = VARIANT_NAME.match(name)
+    industry, variant = (m.group(1), m.group(2)) if m else (name, None)
+    return {"id": None, "company": "Example Company", "industry": "" if industry == "default" else industry,
+            "email": "info@example.co.ke", "opener": None, "uses": None, "confidence": None,
+            "template_variant": variant}
 
 
 def _render(kind, name, subject, body):
     """The email an example company would get from this template: built the way the bot builds it."""
     import sender
     lead = _sample_lead(name)
-    if kind == "first":
-        msg = sender.compose(lead, sender.fill(subject, lead), body, sender.attachment())
+    if kind == "first":  # a rotation variant's first email carries no PDF
+        msg = sender.compose(lead, sender.fill(subject, lead), body,
+                             None if lead["template_variant"] else sender.attachment())
     else:
-        first = sender.fill(sender.load_template(lead["industry"])[1], lead)
-        msg = sender.compose(lead, first if first.lower().startswith("re:") else "Re: " + first, body,
-                             extra=sender.followup_values(lead))
+        n = 1 if kind == "followup" else 2
+        if n == 2 and sender.variants(lead):  # shown under its niche's first variant
+            lead["template_variant"] = sender.variants(lead)[0]
+        first = sender.fill(sender.first_subject(lead), lead)
+        msg = sender.compose(lead, first if first.lower().startswith("re:") else "Re: " + first,
+                             sender.followup_body(lead, n, body, []), extra=sender.followup_extra(lead, n))
     return {"subject": str(msg["Subject"]), "text": sender.plain_of(msg),
             "attachments": [p.get_filename() for p in msg.iter_attachments()]}
 
@@ -1473,9 +1494,12 @@ def _template_problem(kind, name, subject, body):
             if field is not None and (field not in allowed or spec or conv):
                 return (f"{{{field}}} isn't a gap LeadBot can fill. Use one of: "
                         + ", ".join("{" + f + "}" for f in sorted(allowed)) + ".")
-    if kind == "followup" and sender.FOLLOWUP1_LINE not in body:
-        # sender.build_followup swaps this line for leads whose first email had older wording
-        return f'Keep this line exactly as it is, LeadBot changes it for leads emailed with older wording: "{sender.FOLLOWUP1_LINE}"'
+    if kind == "followup" and not VARIANT_NAME.match(name):  # a legacy follow-up 1 (sender.followup_body)
+        if sender.FOLLOWUP1_LINE not in body:
+            # swapped for leads whose first email had older wording
+            return f'Keep this line exactly as it is, LeadBot changes it for leads emailed with older wording: "{sender.FOLLOWUP1_LINE}"'
+        if "\n" + sender.SIGNATURE_START not in body:
+            return f'Keep the "{sender.SIGNATURE_START}" line: LeadBot adds the meeting request just before it.'
     try:
         _render(kind, name, subject, body)
     except Exception as e:  # anything the bot itself would trip over when sending
@@ -1490,14 +1514,25 @@ class TemplateIn(BaseModel):
 
 @router.get("/api/crm/templates")
 def list_templates(admin=Depends(admin_only)):
+    """Every industry's templates. variants: its rotation variants, each with the kinds it has
+    (first, followup; followup2 is the industry's own, shared by all), and whether uses.yaml
+    lets new leads get it."""
     import personalise
+    import rotation
     out = []
     for path in sorted(TEMPLATE_DIR.glob("*.txt")):
         name = path.stem
         if not TEMPLATE_NAME.match(name):
             continue
+        variants = [{"variant": v, "technique": rotation.TECHNIQUES.get(v, ""),
+                     "kinds": [k for k in ("first", "followup") if (TEMPLATE_KINDS[k] / f"{name}_{v}.txt").is_file()]}
+                    for v in rotation.VARIANTS if (TEMPLATE_DIR / f"{name}_{v}.txt").is_file()]
+        on = rotation.enabled(personalise.industry_key({"industry": name}), [v["variant"] for v in variants])
+        for v in variants:
+            v["enabled"] = v["variant"] in on
         out.append({"name": name, "approved": bool(personalise.approved({"industry": name})),
-                    "kinds": [k for k, d in TEMPLATE_KINDS.items() if (d / f"{name}.txt").is_file()]})
+                    "kinds": [k for k, d in TEMPLATE_KINDS.items() if (d / f"{name}.txt").is_file()],
+                    "variants": variants})
     return {"templates": out}
 
 

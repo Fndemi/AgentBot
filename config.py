@@ -74,6 +74,16 @@ WEBSITE = env("WEBSITE", "https://talksasa.com")
 # PDF attached to every email. Path is relative to this folder. Empty = no attachment.
 ATTACH_PDF = env("ATTACH_PDF", "TalkSasa_Overview.pdf")
 PROFILE_URL = env("PROFILE_URL", "")  # optional, e.g. a company profile PDF or page
+# Facts the A/B/C templates quote (rotation.py): the free test size ("500"), how long sender-name
+# registration usually takes ("about a week") and the starting price ("KES 0.25"). No email
+# goes out while any of these three is empty.
+OFFER_FREE_SMS = env("OFFER_FREE_SMS", "").strip()
+SETUP_TIME = env("SETUP_TIME", "").strip()
+PRICE_FROM = env("PRICE_FROM", "").strip()
+# Booking page for {booking_line} ("Or pick any time that suits you here: <link>"). Empty = no such line.
+BOOKING_URL = env("BOOKING_URL", "").strip()
+# Meeting times offered in {slot1} and {slot2}, Nairobi time, comma-separated
+MEETING_TIMES = env("MEETING_TIMES", "10am,11:30am,2pm,3:30pm")
 
 # Web search for discover.py (websearch.py): Tavily basic search, falling back to DuckDuckGo
 # when the key is missing, Tavily fails or this month's TAVILY_MONTHLY_CAP calls are used

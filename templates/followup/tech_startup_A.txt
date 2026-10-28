@@ -1,0 +1,13 @@
+Hello {company} team,
+
+Getting started is simple: we send you an API key and {free_sms} free SMS to build and test with, and help you register your own sender name, which usually takes {setup_days}.
+
+In 15 minutes we can get your developer going. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

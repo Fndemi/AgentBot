@@ -1,9 +1,13 @@
 Hello {company} team,
 
-I won't keep filling your inbox. If SMS becomes useful for you later, just reply to this email and I'll get back to you the same day.
+One last note from me. Before next term's fee reminders and closing notices, I'd be glad to show you how {company} could send them by SMS, and set up a free test while we're at it.
+
+It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you, or is there another day that suits you better?
+
+{booking_line}
 
 Kind regards,
 {sender}
 TalkSasa Communications Ltd
-+254 762 000 008
-+254 712 295 880
+{phone}
+{website}

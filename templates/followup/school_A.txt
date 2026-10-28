@@ -1,0 +1,15 @@
+Hello {company} team,
+
+Here's the kind of reminder I meant:
+
+"Dear parent, the Term 3 fee balance for your child is KES 12,000. Kindly clear by 15 Nov via Paybill [your paybill]. - {company}"
+
+Each parent can get their own child's balance from one Excel list. I'd be glad to walk you through it in 15 minutes. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

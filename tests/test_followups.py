@@ -113,7 +113,8 @@ def test_second_follow_up_threads_under_the_first_email(world, mail):
     assert second["In-Reply-To"] == first["Message-ID"]
     assert second["References"] == f"{FIRST_ID} {first['Message-ID']}"
     text = second.get_body(("plain",)).get_content()
-    assert "I won't keep filling your inbox. If SMS becomes useful for you later" in text
+    # a lead from before the rotation gets its niche's new follow-up 2
+    assert "One last note from me. Whether it's a backup route or a lower price per SMS" in text
     assert 'just reply "unsubscribe"' in text
     assert not list(second.iter_attachments())
 
@@ -221,8 +222,8 @@ def test_old_wording_lead_gets_the_bulk_sms_line(world, mail):
     assert "OTPs and transaction alerts" not in text
     assert "Kind regards,\nFlorence\nTalkSasa Communications Ltd\n+254 762 000 008\n+254 712 295 880\n" in text
     age_all_sends(10)
-    sender.run()  # follow-up 2 is the same for everyone
-    assert "I won't keep filling your inbox." in plain(sent_to(mail, "info@zenka.co.ke")[1])
+    sender.run()  # follow-up 2 is the niche's new one, the same for everyone
+    assert "One last note from me." in plain(sent_to(mail, "info@zenka.co.ke")[1])
 
 
 def test_unknown_first_subject_counts_as_old_wording(world, mail):

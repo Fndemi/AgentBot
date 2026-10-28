@@ -38,8 +38,9 @@ def save(admin, kind, name, body, subject=None):
 
 
 def test_the_bot_sends_what_was_saved(admin):
-    save(admin, "first", "sacco", "Hello {company} team,\n\nNew wording.\n\n{attachment_line}", "SMS for your members")
-    msg, _ = sender.build({"company": "Umoja SACCO", "industry": "sacco", "email": "info@umoja.example"})
+    save(admin, "first", "sacco_A", "Hello {company} team,\n\nNew wording.\n\n{profile_line}", "SMS for your members")
+    msg, _ = sender.build({"company": "Umoja SACCO", "industry": "sacco", "email": "info@umoja.example",
+                           "template_variant": "A"})
     assert msg["Subject"] == "SMS for your members"
     assert "Hello Umoja SACCO team," in sender.plain_of(msg) and "New wording." in sender.plain_of(msg)
 
@@ -77,7 +78,10 @@ def test_follow_up_1_keeps_the_line_swapped_for_old_wording(admin):
     with pytest.raises(HTTPException) as e:
         save(admin, "followup", "sacco", "Hello {company} team,\n\nJust checking in. {offer}")
     assert FOLLOWUP1 in e.value.detail
-    save(admin, "followup", "sacco", f"Hello {{company}} team,\n\n{FOLLOWUP1} Also: {{offer}}")
+    with pytest.raises(HTTPException) as e:  # the meeting request is added before the signature
+        save(admin, "followup", "sacco", f"Hello {{company}} team,\n\n{FOLLOWUP1} Also: {{offer}}")
+    assert "Kind regards," in e.value.detail
+    save(admin, "followup", "sacco", f"Hello {{company}} team,\n\n{FOLLOWUP1} Also: {{offer}}\n\nKind regards,\n{{sender}}")
     assert "Also:" in (admin["dir"] / "followup" / "sacco.txt").read_text(encoding="utf-8")
 
 

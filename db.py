@@ -69,7 +69,10 @@ CREATE TABLE IF NOT EXISTS leads (
     scored_at TEXT,
     -- when someone first emailed this lead from the CRM: the bot sends it nothing more
     -- (no first email, no follow-ups) from then on
-    crm_emailed_at TEXT
+    crm_emailed_at TEXT,
+    -- A, B or C: the rotation template its first email came from (see rotation.py); its
+    -- follow-ups use the same. NULL = emailed before the rotation, or not emailed yet
+    template_variant TEXT
 );
 CREATE TABLE IF NOT EXISTS sent (
     id INTEGER PRIMARY KEY,
@@ -79,7 +82,9 @@ CREATE TABLE IF NOT EXISTS sent (
     sent_on TEXT DEFAULT (date('now')),
     -- exactly what went out: the subject and the plain-text body
     sent_subject TEXT,
-    sent_body TEXT
+    sent_body TEXT,
+    -- the lead's rotation variant (A, B or C) when this email went out, NULL before the rotation
+    template_variant TEXT
 );
 CREATE TABLE IF NOT EXISTS replies (
     id INTEGER PRIMARY KEY,
@@ -321,7 +326,8 @@ def init():
                                  ("leads", "phone", "TEXT"), ("leads", "physical_address", "TEXT"),
                                  ("leads", "date_licensed", "TEXT"), ("leads", "imported_at", "TEXT"),
                                  ("leads", "scored_at", "TEXT"), ("leads", "source_email", "TEXT"),
-                                 ("leads", "crm_emailed_at", "TEXT"), ("replies", "message_id", "TEXT")):
+                                 ("leads", "crm_emailed_at", "TEXT"), ("replies", "message_id", "TEXT"),
+                                 ("leads", "template_variant", "TEXT"), ("sent", "template_variant", "TEXT")):
             if col not in columns(c, table):
                 c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {kind}")
         # Leads from before these existed
@@ -422,18 +428,23 @@ def find_lead_by_email(email):
     with conn() as c:
         return c.execute("SELECT * FROM leads WHERE email=?", (email.lower(),)).fetchone()
 
-def record_sent(lead_id, message_id, template, subject=None, body=None, subject_variant=None):
+def record_sent(lead_id, message_id, template, subject=None, body=None, subject_variant=None,
+                template_variant=None):
     """Record an email that went out. Its send claim, if any, is removed in the same
-    transaction, so the email counts once towards the daily limit."""
+    transaction, so the email counts once towards the daily limit. template_variant (A, B or
+    C) is saved on the sent row, and on the lead if it has none yet."""
     with conn() as c:
         c.execute("DELETE FROM send_claims WHERE lead_id=?", (lead_id,))
-        sent_id = c.execute("INSERT INTO sent (lead_id, message_id, template, sent_subject, sent_body)"
-                            " VALUES (?,?,?,?,?) RETURNING id",
-                            (lead_id, message_id, template, subject, body)).fetchone()[0]
+        sent_id = c.execute("INSERT INTO sent (lead_id, message_id, template, sent_subject, sent_body,"
+                            " template_variant) VALUES (?,?,?,?,?,?) RETURNING id",
+                            (lead_id, message_id, template, subject, body, template_variant)).fetchone()[0]
+        if template_variant:
+            c.execute("UPDATE leads SET template_variant=COALESCE(template_variant, ?) WHERE id=?",
+                      (template_variant, lead_id))
         step = c.execute("SELECT COUNT(*) FROM sent WHERE lead_id=?", (lead_id,)).fetchone()[0]
         # the campaign is the niche template the email was built from
         log_event(c, lead_id, "email_sent", sent_id=sent_id, step=step, subject=subject,
-                  subject_variant=subject_variant, campaign=template)
+                  subject_variant=subject_variant, campaign=template, template_variant=template_variant)
 
 # step = 1 for the first email to a lead, 2 for the first follow-up, and so on
 SENT_LOG = """

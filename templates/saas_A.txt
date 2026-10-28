@@ -1,0 +1,18 @@
+Subject: Verification codes that arrive on time
+Hello {company} team,
+
+Quick question: when a customer's verification code arrives late, how many of them give up on signing in or signing up?
+
+I'm {sender} from TalkSasa Communications in Nairobi. We send OTPs, account alerts and customer notifications by SMS through a simple API, and we can help you register your product's own sender name.
+
+Could we take 15 minutes to compare our delivery with what you use now, {meet_options}? Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

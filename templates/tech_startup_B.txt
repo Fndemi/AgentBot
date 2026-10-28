@@ -1,0 +1,18 @@
+Subject: Free SMS credits for {company}
+Hello {company} team,
+
+I'm {sender} from TalkSasa Communications in Nairobi. We'd like to give {company} {free_sms} free SMS to build and test with: OTPs, alerts or customer notifications through our API.
+
+There's no contract and no minimum. After the free credits you pay as you go, from {price_from} per SMS.
+
+We can get your developer set up in a 15-minute call, {meet_options}. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

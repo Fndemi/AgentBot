@@ -1,0 +1,18 @@
+Subject: When your SMS provider goes down
+Hello {company} team,
+
+Quick question: what happens to your OTPs and transaction alerts if your SMS provider has an outage?
+
+I'm {sender} from TalkSasa Communications in Nairobi. Most fintechs already work with an SMS provider, and we're happy to work alongside yours as a second route, ready to take your traffic if your main one slows down or fails.
+
+Could we take 15 minutes to see if a backup route makes sense for {company}, {meet_options}? Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

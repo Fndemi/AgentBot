@@ -3,6 +3,9 @@
 #           false = the sender skips them and leaves them waiting.
 # uses: the approved SMS uses, for templates that have a {uses} slot (the first three
 #       are used). The seven approved templates name their uses in their own fixed text.
+# variants: (optional, A/B/C rotation niches only) which first emails new leads may get, e.g.
+#       variants: [A, B] switches C off. Leave it out for all three. A lead that already has
+#       a variant keeps it, and its follow-ups, whatever this says.
 default:
   approved: false
   uses: [customer updates, reminders, alerts, promotions]

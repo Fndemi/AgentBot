@@ -1,0 +1,18 @@
+Subject: Reaching every member of {company}
+Hello {company} team,
+
+Older members and those without smartphones often miss WhatsApp announcements. An SMS reaches any phone, including basic ones.
+
+I'm {sender} from TalkSasa Communications in Nairobi. You can send one message to the whole congregation from a simple web page or an Excel list, from {price_from} per SMS.
+
+I'd like to show whoever sends announcements how it works. It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

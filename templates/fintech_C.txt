@@ -1,0 +1,16 @@
+Subject: SMS cost check for {company}
+Hello {company} team,
+
+I'm {sender} from TalkSasa Communications in Nairobi. At fintech volumes, a small difference in price per SMS adds up: at 100,000 messages a month, every 10 cents per SMS is KES 10,000.
+
+In a 15-minute call I can compare our pricing with what you pay now and tell you honestly whether we can beat it. If we can't, I'll say so. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

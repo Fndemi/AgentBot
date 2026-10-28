@@ -1,0 +1,18 @@
+Subject: Announcements at {company}
+Hello {company} team,
+
+Quick question: how do members who missed Sunday service hear about events, contributions or bereavement notices?
+
+I'm {sender} from TalkSasa Communications in Nairobi. We help churches send service updates, event reminders and contribution thank-you messages by SMS, and we can help you register the church's own sender name so members know who it's from.
+
+I'd like to show you how it could work for {company}, using one of your real announcements as an example. It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

@@ -1,0 +1,13 @@
+Hello {company} team,
+
+The free side-by-side test is still available: {free_sms} SMS and our API docs. Registering your sender name on our route usually takes {setup_days}.
+
+In 15 minutes we'd agree which messages to test and start registering your sender name on our route. Would {slot1} or {slot2} work for you and your tech lead? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

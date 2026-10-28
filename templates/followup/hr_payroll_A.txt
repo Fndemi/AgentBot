@@ -1,0 +1,15 @@
+Hello {company} team,
+
+Here's the kind of alert I meant:
+
+"Hi Jane, your October payslip is ready. Log in at [your portal] with code 482913 to view it. - {company}"
+
+It can go out automatically through our API at each pay run. I'd be glad to walk your team through it in 15 minutes. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

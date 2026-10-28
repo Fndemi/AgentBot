@@ -1,0 +1,15 @@
+Hello {company} team,
+
+Here's the kind of message I meant:
+
+"Dear member, join us this Sunday at 10am for the Thanksgiving service. The fundraiser for the new hall follows. - {company}"
+
+I'd be glad to walk you through how it works in 15 minutes. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

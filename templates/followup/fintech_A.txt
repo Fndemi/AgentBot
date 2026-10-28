@@ -1,0 +1,13 @@
+Hello {company} team,
+
+A backup route only needs two things prepared in advance: your sender name registered on our route and an API key ready. Then you can move traffic quickly if you ever need to, and you only pay for what you send through us.
+
+In 15 minutes we can agree the set-up with whoever handles your SMS integration. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

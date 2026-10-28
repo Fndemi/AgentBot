@@ -1,0 +1,18 @@
+Subject: Payslip alerts for staff without email
+Hello {company} team,
+
+Quick question: how do your clients' casual and field staff, who often have no work email or app, find out their payslip is ready?
+
+I'm {sender} from TalkSasa Communications in Nairobi. We help HR and payroll companies send payslip alerts, login codes and leave approvals by SMS, which reaches any phone.
+
+I'd like to show you how it could plug into {company}. It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

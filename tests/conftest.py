@@ -80,6 +80,18 @@ def same_mailbox_and_sender(monkeypatch):
     monkeypatch.setattr(config, "SENDER_NAME", "Florence")
 
 
+@pytest.fixture(autouse=True)
+def template_facts(monkeypatch):
+    """The facts the A/B/C templates quote, the phone in their signature and the meeting
+    times, the same whatever .env says. No booking link unless a test sets one."""
+    monkeypatch.setattr(config, "OFFER_FREE_SMS", "500")
+    monkeypatch.setattr(config, "SETUP_TIME", "about a week")
+    monkeypatch.setattr(config, "PRICE_FROM", "KES 0.25")
+    monkeypatch.setattr(config, "BOOKING_URL", "")
+    monkeypatch.setattr(config, "MEETING_TIMES", "10am,11:30am,2pm,3:30pm")
+    monkeypatch.setattr(config, "SENDER_PHONE", "+254 762 000 008")
+
+
 @pytest.fixture
 def leads(tmp_path, monkeypatch):
     """A fresh database with three emailed leads, one of them on gmail.com."""
