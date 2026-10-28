@@ -93,6 +93,16 @@ def template_facts(monkeypatch):
     monkeypatch.setattr(config, "WEBSITE", "https://talksasa.com")
 
 
+@pytest.fixture(autouse=True)
+def no_paused_industries(monkeypatch):
+    """No industry is paused (paused_until in uses.yaml) unless a test pauses one, so tests
+    don't change with the date they run on."""
+    import personalise
+    for key, entry in personalise.USES.items():
+        if "paused_until" in entry:
+            monkeypatch.setitem(personalise.USES, key, {k: v for k, v in entry.items() if k != "paused_until"})
+
+
 @pytest.fixture
 def leads(tmp_path, monkeypatch):
     """A fresh database with three emailed leads, one of them on gmail.com."""

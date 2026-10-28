@@ -6,6 +6,9 @@
 # variants: (optional, A/B/C rotation niches only) which first emails new leads may get, e.g.
 #       variants: [A, B] switches C off. Leave it out for all three. A lead that already has
 #       a variant keeps it, and its follow-ups, whatever this says.
+# paused_until: (optional) a date, e.g. 2027-01-05. Until then the industry gets no first emails
+#       and no follow-ups; its leads stay exactly as they are. On that date (Nairobi time)
+#       sending resumes by itself where each lead left off.
 default:
   approved: false
   uses: [customer updates, reminders, alerts, promotions]
@@ -110,6 +113,7 @@ sacco:
   uses: [loan reminders, deposit confirmations, AGM notices]
 school:
   approved: true
+  paused_until: 2027-01-05
   uses: [fee reminders, parent alerts, exam results]
 security:
   approved: false

@@ -337,9 +337,9 @@ def followups_due():
     A lead that replied, bounced or unsubscribed is no longer at 'sent', so it gets none."""
     if not config.FOLLOWUPS_APPROVED:
         return []
-    today, suppressed = date.today(), db.suppressed_emails()
+    today, suppressed, nairobi = date.today(), db.suppressed_emails(), rotation.today()
     return [(lead, n) for n in range(1, MAX_FOLLOWUPS + 1) for lead in db.awaiting_followup(n)
-            if personalise.approved(lead) and followup_template(lead, n)
+            if personalise.approved(lead) and not personalise.paused(lead, nairobi) and followup_template(lead, n)
             and business_days_after(date.fromisoformat(lead["sent_on"]), config.FOLLOWUP_AFTER_DAYS) <= today
             and lead["email"] not in suppressed
             and not db.recent_out_of_office(lead["id"], OUT_OF_OFFICE_HOLD_DAYS)]
@@ -423,14 +423,18 @@ def deliver(smtp, lead, msg, tname, followup=0):
     the first email, else the follow-up's number (1 or 2).
     Every send goes through here, so this is also where the limits are kept: a first email
     only to a lead never emailed, follow-up n only after exactly n emails, at most
-    MAX_FOLLOWUPS of them, only when follow-ups are approved, and never while a fact the
-    templates quote is missing (rotation.refusal).
+    MAX_FOLLOWUPS of them, only when follow-ups are approved, never to an industry paused in
+    uses.yaml (paused_until), and never while a fact the templates quote is missing
+    (rotation.refusal).
     The lead's rotation variant is saved on the sent row, and on the lead with its first email."""
     refused = rotation.refusal()
     if refused:
         raise RuntimeError(f"{lead['email']}: {refused}")
     if not personalise.approved(lead):
         raise RuntimeError(f"{lead['email']}: industry {lead['industry'] or 'default'!r} is not approved in uses.yaml")
+    if personalise.paused(lead, rotation.today()):
+        raise RuntimeError(f"{lead['email']}: {personalise.industry_key(lead)} is paused until "
+                           f"{personalise.paused_until(lead)} in uses.yaml")
     emailed = db.sent_count(lead["id"])
     if followup and not config.FOLLOWUPS_APPROVED:
         raise RuntimeError(f"{lead['email']}: follow-ups are not approved (FOLLOWUPS_APPROVED in .env)")
@@ -531,7 +535,20 @@ def approved_waiting(quiet=False):
         print(f"Skipped {len(low)} waiting leads with a need score below MIN_SCORE "
               f"({config.MIN_SCORE})" + (f", {unscored} of them not scored yet" if unscored else ""))
     low_ids = {l["id"] for l in low}
-    return [l for l in leads if l["id"] not in low_ids]
+    today = rotation.today()  # a paused industry's leads stay waiting, untouched
+    return [l for l in leads if l["id"] not in low_ids and not personalise.paused(l, today)]
+
+
+def paused_niches():
+    """{industry: date} for the industries paused today by paused_until in uses.yaml."""
+    today = rotation.today()
+    return {key: personalise.paused_until({"industry": key}) for key in personalise.USES
+            if personalise.paused({"industry": key}, today)}
+
+
+def _say_paused():
+    for key, until in sorted(paused_niches().items()):
+        print(f"{key} paused until {until.isoformat()}")
 
 
 def spread(leads, n):
@@ -646,6 +663,7 @@ def run(dry_run=False):
         return
     if refused:
         print(f"WARNING: a real send would refuse to send: {refused}.")
+    _say_paused()
     if dry_run:
         return _dry_run()
     # One send run at a time, across processes (auto, cron, a manual send): a second one

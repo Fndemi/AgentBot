@@ -18,6 +18,7 @@ was saved on the lead earlier.
 """
 import json
 import re
+from datetime import date
 from pathlib import Path
 
 import yaml
@@ -167,6 +168,26 @@ def approved(lead):
     """Whether this lead's industry is approved for sending in uses.yaml.
     An industry with no entry of its own counts as "default"."""
     return bool(USES[industry_key(lead)].get("approved"))
+
+
+def paused_until(lead):
+    """The date in uses.yaml (paused_until: 2027-01-05) until which this lead's industry gets
+    no emails at all, or None."""
+    key = industry_key(lead)
+    value = USES[key].get("paused_until")
+    if value is None or isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value).strip())
+    except ValueError:
+        raise ValueError(f"uses.yaml: {key} has paused_until: {value!r}, which isn't a date like 2027-01-05")
+
+
+def paused(lead, on):
+    """Whether this lead's industry is paused on the day `on`: until its paused_until date,
+    which is the first day it is emailed again."""
+    until = paused_until(lead)
+    return until is not None and on < until
 
 
 def use_items(lead):
