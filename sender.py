@@ -29,8 +29,6 @@ PROFILE_LABEL = "Company profile"  # the words before the profile link, unless a
 # Tried in this order when the server doesn't flag a folder as \Sent
 SENT_NAMES = ("Sent", "Sent Items", "Sent Messages", "Sent Mail", "INBOX.Sent",
               "INBOX.Sent Items", "INBOX.Sent Messages", "INBOX/Sent", "[Gmail]/Sent Mail")
-# What the website line reads as. In the HTML email it is a link to config.WEBSITE
-WEBSITE_LABEL = "TalkSasa"
 _warned = set()
 _sent_folder = None  # found once per run
 
@@ -46,6 +44,12 @@ def setting(key, default):
     `default` (from .env) when it was never set there. An empty string is a real value: "none"."""
     value = db.get_setting(key)
     return default if value is None else value
+
+
+def website_text():
+    """How our website reads in emails: WEBSITE without "https://" and "www.", e.g. talksasa.com.
+    In the HTML version it is a link to the full WEBSITE address."""
+    return re.sub(r"^(https?://)?(www\.)?", "", config.WEBSITE.strip(), flags=re.I).rstrip("/")
 
 
 def profile_url():
@@ -129,7 +133,7 @@ def fill(text, lead, attached=False, for_html=False, extra=None):
         our_company=config.COMPANY,
         phone=config.SENDER_PHONE,
         # plain text shows the name only; the HTML version turns the address into a link
-        website=config.WEBSITE if for_html else WEBSITE_LABEL,
+        website=config.WEBSITE if for_html else website_text(),
         profile_url=profile_url(),
         # own paragraph before the sign-off; empty when nothing is attached
         attachment_line=ATTACHMENT_LINE if attached else "",
@@ -143,10 +147,10 @@ def fill(text, lead, attached=False, for_html=False, extra=None):
 
 
 def _link(m):
-    """Our own website reads as WEBSITE_LABEL; any other link shows its address."""
+    """Our own website reads as website_text(); any other link shows its address."""
     url = m.group(0)
     ours = url.rstrip("/") == html.escape(config.WEBSITE, quote=False).rstrip("/")
-    return f'<a href="{url}">{WEBSITE_LABEL if ours else url}</a>'
+    return f'<a href="{url}">{html.escape(website_text(), quote=False) if ours else url}</a>'
 
 
 def to_html(text):

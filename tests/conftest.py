@@ -90,6 +90,7 @@ def template_facts(monkeypatch):
     monkeypatch.setattr(config, "BOOKING_URL", "")
     monkeypatch.setattr(config, "MEETING_TIMES", "10am,11:30am,2pm,3:30pm")
     monkeypatch.setattr(config, "SENDER_PHONE", "+254 762 000 008")
+    monkeypatch.setattr(config, "WEBSITE", "https://talksasa.com")
 
 
 @pytest.fixture

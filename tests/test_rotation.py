@@ -16,7 +16,7 @@ import rotation
 import sender
 
 NICHES = ("sacco", "school", "church", "fintech", "digital_lender", "hr_payroll", "saas", "tech_startup")
-SIGNATURE = "Kind regards,\nFlorence\nTalkSasa Communications Ltd\n+254 762 000 008\nTalkSasa\n\n--\n"
+SIGNATURE = "Kind regards,\nFlorence\nTalkSasa Communications Ltd\n+254 762 000 008\ntalksasa.com\n\n--\n"
 SLOT = r"(Monday|Tuesday|Wednesday|Thursday|Friday) \d{1,2} [A-Z][a-z]{2} at (10am|11:30am|2pm|3:30pm)"
 
 
@@ -368,3 +368,15 @@ def test_crm_lists_and_edits_the_variants(world, tmp_path, monkeypatch):
     assert "New C text." in plain(msg)
     with pytest.raises(crm.HTTPException):
         crm.get_template("followup2", "sacco_A", admin)  # follow-up 2 is one per industry
+
+
+@pytest.mark.parametrize("website, shown", [("https://talksasa.com", "talksasa.com"),
+                                            ("https://www.talksasa.com/", "talksasa.com"),
+                                            ("http://www.talksasa.co.ke/sms", "talksasa.co.ke/sms")])
+def test_website_shows_as_its_address_and_links_to_it(world, monkeypatch, website, shown):
+    monkeypatch.setattr(config, "WEBSITE", website)
+    msg, _ = sender.build({"id": 1, "company": "Umoja", "industry": "sacco", "email": "a@u.co.ke",
+                           "template_variant": "A"})
+    assert f"+254 762 000 008\n{shown}\n\n--\n" in plain(msg)
+    assert f'<a href="{website}">{shown}</a>' in sender.html_of(msg)
+    assert ">TalkSasa<" not in sender.html_of(msg)
