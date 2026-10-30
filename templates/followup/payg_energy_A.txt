@@ -1,0 +1,15 @@
+{greeting}
+
+Here's the kind of message I meant, sent automatically through our API after each payment:
+
+"Payment of KES 300 received. Your unlock code is 4821 7390 5512. Valid for 7 days. - {company}"
+
+The same set-up can send a friendly reminder a day before a customer's credit runs out. I'd be glad to walk your team through it in 15 minutes. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

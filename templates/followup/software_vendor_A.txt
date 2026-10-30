@@ -1,0 +1,13 @@
+{greeting}
+
+To make it concrete: your system connects to our API once, and with a reseller account each of your clients gets its own account, with its own sender name if they need one.
+
+For your clients, it means sending a reminder straight from the system they already use. I'd be glad to walk your team through it in 15 minutes. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

@@ -1,0 +1,20 @@
+Subject: SMS for the systems you build
+{greeting}
+
+{opener}
+
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider.
+
+Most systems you build for Kenyan businesses probably end up needing SMS: OTPs, payment confirmations, reminders and alerts. When a client asks you to add SMS to a project, which provider do you use, and how easy is it to set up for each client?
+
+I'd welcome a 15-minute call to show your developers our API and how we could make SMS simpler for your clients' projects. If it's not a fit, I'll say so. Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

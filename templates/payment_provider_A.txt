@@ -1,0 +1,20 @@
+Subject: When your SMS provider goes down
+{greeting}
+
+{opener}
+
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider.
+
+Your OTPs and payment confirmations can't wait. If your SMS provider has an outage, your customers can't verify payments and your support lines fill up. You probably already work with an SMS provider, and we're happy to work alongside yours as a second route, ready to take your traffic if your main one slows down.
+
+I'd welcome a 15-minute call to see whether a backup route makes sense for you. If it doesn't, I'll say so. Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

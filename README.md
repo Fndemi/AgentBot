@@ -49,7 +49,7 @@ To run unattended on Linux, add to crontab:
 
 `templates/<industry>.txt` is used when a lead's `industry` matches (e.g. `sacco`, `school`). Otherwise `default.txt`. The subject is the template's own fixed `Subject:` line. Only industries marked `approved: true` in `uses.yaml` are emailed; leads in other industries are skipped and stay waiting. With `USE_AI_OPENER=false` in `.env` (the default) emails are templates only: no opener, and `{uses}` is the first three uses for the industry in `uses.yaml`. With `true`, the body has two AI slots: `{opener}` (one sentence, at most 20 words, saying what the lead does in our own words; left out when there is no good one, so the email starts with "I'm Florence from TalkSasa Communications in Nairobi.") and `{uses}` (picked from that industry's approved list in `uses.yaml`, never invented). Other placeholders: `{company} {sender} {our_company} {phone} {website} {profile_line} {attachment_line}` (`{profile_line}` is "Company profile: <PROFILE_URL>", or nothing if `PROFILE_URL` is empty).
 
-### A/B/C rotation (sacco, school, church, fintech, digital_lender, hr_payroll, saas, tech_startup, ecommerce, delivery_app, edtech, healthtech, microfinance)
+### A/B/C rotation (sacco, school, church, fintech, digital_lender, hr_payroll, saas, tech_startup, ecommerce, delivery_app, edtech, healthtech, microfinance, payment_provider, payg_energy, software_agency, software_vendor)
 
 These niches have three first emails, one per technique: `templates/<niche>_A.txt` (quick question), `_B.txt` (free test) and `_C.txt` (niche angle), each with its own follow-up 1 in `templates/followup/<niche>_<variant>.txt`, and one follow-up 2 for all of them, `templates/followup2/<niche>.txt`. A lead gets the variant sent least so far in its niche (random on a tie) when its first email goes out, and keeps it for its follow-ups; it is saved on the lead and on every sent row (`template_variant`). `variants: [A, B]` in `uses.yaml` switches a variant off for new leads. These first emails carry no PDF: `{profile_line}` links to the profile instead.
 
@@ -65,7 +65,7 @@ With `USE_AI_OPENER=true`, `WRITER_MODEL` writes `{opener}`: one sentence (at mo
 
 ## Getting leads (companies.csv)
 
-Microfinance banks: `python targeting.py import-microfinance` adds every bank in the Central Bank of Kenya's latest directory of licensed microfinance banks (found on centralbank.go.ke/bank-supervision) as a `microfinance` lead, skipping any already there. `python targeting.py import-lenders` does the same for CBK's directory of digital credit providers.
+Microfinance banks: `python targeting.py import-microfinance` adds every bank in the Central Bank of Kenya's latest directory of licensed microfinance banks (found on centralbank.go.ke/bank-supervision) as a `microfinance` lead, skipping any already there. `python targeting.py import-lenders` does the same for CBK's directory of digital credit providers. `python targeting.py import-payment-providers` adds every entry in CBK's latest directories of authorised payment service providers and licensed money remittance providers as `payment_provider` leads (a company in both is added once).
 
 Columns: `company,website,industry,email`. Leave `email` blank to have it scraped. Good public sources: SASRA licensed SACCO list, Ministry of Education school lists, Kenya Yellow Pages, chamber of commerce and trade association member lists. Skip LinkedIn and Google Maps scraping (against their terms).
 

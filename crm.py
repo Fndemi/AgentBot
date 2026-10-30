@@ -1550,10 +1550,10 @@ def list_templates(admin=Depends(admin_only)):
     import personalise
     import rotation
     out = []
-    for path in sorted(TEMPLATE_DIR.glob("*.txt")):
-        name = path.stem
-        if not TEMPLATE_NAME.match(name):
-            continue
+    # every industry with a template of its own or only A/B/C ones (a niche added with the rotation)
+    names = sorted({p.stem for p in TEMPLATE_DIR.glob("*.txt") if TEMPLATE_NAME.match(p.stem)}
+                   | {m.group(1) for p in TEMPLATE_DIR.glob("*.txt") if (m := VARIANT_NAME.match(p.stem))})
+    for name in names:
         variants = [{"variant": v, "technique": rotation.TECHNIQUES.get(v, ""),
                      "kinds": [k for k in ("first", "followup") if (TEMPLATE_KINDS[k] / f"{name}_{v}.txt").is_file()]}
                     for v in rotation.VARIANTS if (TEMPLATE_DIR / f"{name}_{v}.txt").is_file()]

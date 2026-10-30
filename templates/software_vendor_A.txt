@@ -1,0 +1,20 @@
+Subject: SMS inside {company}'s system
+{greeting}
+
+{opener}
+
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider.
+
+If your software is used by schools, clinics, SACCOs or shops, your clients probably expect it to send SMS: fee reminders, appointment reminders, loan alerts or receipts. Do your clients ask for SMS inside your system, and how do you provide it today?
+
+I'd welcome a 15-minute call to see whether TalkSasa could make SMS a simple built-in feature for your clients. If it's not a fit, I'll say so. Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

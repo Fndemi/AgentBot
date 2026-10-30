@@ -1,0 +1,13 @@
+{greeting}
+
+Following up on a possible partnership. A simple start is one or two of your clients: we set up their sender names, your system sends through our API, and you see how it works before rolling it out more widely.
+
+Would a 15-minute call on {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

@@ -1,0 +1,20 @@
+Subject: Partner rates for {company}
+{greeting}
+
+{opener}
+
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider.
+
+As an agency building systems for other businesses, you're a natural partner for us: every client project of yours that sends OTPs, reminders or alerts needs a reliable SMS route. We offer you partner rates, a reseller account with a separate account for each of your clients, and local support when something needs fixing quickly.
+
+I'd welcome a 15-minute call to see whether a partnership would make sense for you. If it doesn't, I'll be upfront about it. Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

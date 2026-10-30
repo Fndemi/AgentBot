@@ -96,6 +96,12 @@ ngo:
 professional:
   approved: false
   uses: [appointment reminders, deadline reminders, document-ready notices]
+payg_energy:
+  approved: true
+  uses: [unlock codes, payment reminders, low-credit alerts]
+payment_provider:
+  approved: true
+  uses: [OTPs, payment confirmations, transfer alerts]
 proptech:
   approved: false
   uses: [rent reminders, payment confirmations, viewing reminders, OTPs]
@@ -108,6 +114,13 @@ retail:
 saas:
   approved: true
   uses: [OTPs, account alerts, customer notifications]
+# software_agency and software_vendor: the uses are for their clients' customers
+software_agency:
+  approved: true
+  uses: [OTPs, reminders, alerts]
+software_vendor:
+  approved: true
+  uses: [OTPs, reminders, alerts]
 sacco:
   approved: true
   uses: [loan reminders, deposit confirmations, AGM notices]

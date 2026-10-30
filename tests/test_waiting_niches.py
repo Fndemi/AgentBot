@@ -117,7 +117,7 @@ def test_every_niche_uses_these_rules(niche):
 
 def test_other_industries_keep_their_rules():
     assert score(industry="retail", text="")[1][0] == "+40 start (retail)"
-    assert targeting.SCORE_VERSION == 4  # so every lead is scored again with the new rules
+    assert targeting.SCORE_VERSION >= 4  # so every lead is scored again with the new rules
 
 
 # --- Microfinance importer ---

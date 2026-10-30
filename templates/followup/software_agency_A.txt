@@ -1,0 +1,13 @@
+{greeting}
+
+To make it concrete: with a TalkSasa reseller account you can open a separate account for each of your clients, each with its own sender name if they need one, all through the same API.
+
+Your developers integrate once and reuse it across projects. I'd be glad to walk them through it in 15 minutes. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

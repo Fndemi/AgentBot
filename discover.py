@@ -221,6 +221,29 @@ QUERIES = {
         "social media marketing company Kenya contact",
         "SEO agency Nairobi contact us",
     ],
+    "payment_provider": [
+        "payment gateway Kenya",
+        "payment service provider Kenya",
+        "money remittance company Kenya",
+    ],
+    "payg_energy": [
+        "pay as you go solar Kenya",
+        "solar home system company Kenya",
+        "pay as you go clean cooking Kenya",
+    ],
+    "software_agency": [
+        "software development company Nairobi",
+        "web and mobile app developers Kenya",
+        "system integrator Kenya",
+    ],
+    "software_vendor": [
+        "school management system Kenya",
+        "hospital management system Kenya",
+        "SACCO management software Kenya",
+        "POS system Kenya",
+        "ERP software Kenya",
+        "property management software Kenya",
+    ],
     "coworking": [
         "coworking space Nairobi contact",
         "shared office space {town} Kenya contact us",
@@ -253,6 +276,7 @@ PORTFOLIO_PAGES_PER_SITE = 2
 PRIORITY = [
     "sacco", "microfinance",
     "tech_startup", "fintech", "saas", "ecommerce", "delivery_app", "edtech", "healthtech",
+    "payment_provider", "payg_energy", "software_agency", "software_vendor",
     "agritech", "proptech", "insurtech", "logistics_tech", "events_ticketing",
     "digital_marketing_agency", "coworking",
     "school", "college", "church", "chama", "health", "transport",

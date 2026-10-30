@@ -11,6 +11,12 @@ Nothing here sends email.
       becomes a lead in industry microfinance, with its phone, address, website and licence
       date. Without a path, the newest directory linked from CBK's bank supervision page is
       downloaded. Duplicates are skipped and addresses checked as for import-lenders.
+  python targeting.py import-payment-providers [PSP PDF] [MRP PDF]
+      every entry in CBK's latest directory of authorised payment service providers and its
+      latest directory of licensed money remittance providers becomes a lead in industry
+      payment_provider, with its contact details. Without paths the newest directories
+      linked from CBK's site are downloaded. Duplicates are skipped (a company in both
+      lists is added once) and addresses checked as for import-lenders.
   python targeting.py swap-emails
       for imported leads whose address is a legal@, compliance@, report..@, accounts@ or
       finance@ inbox or a person's: looks on their website for info@, hello@, sales@ or
@@ -54,6 +60,12 @@ INDUSTRY = "digital_lender"
 CBK_SUPERVISION_URL = "https://www.centralbank.go.ke/bank-supervision/"
 MFB_LINK = re.compile(r'href="(https?://[^"]*Directory-of-Licen[cs]ed-Microfinance-Banks[^"]*\.pdf)"', re.I)
 MICROFINANCE = "microfinance"
+CBK_NPS_URL = "https://www.centralbank.go.ke/national-payments-system/"
+PSP_LINK = re.compile(r'href="(https?://[^"]*Directory-of-Authori[sz]ed-Payment-Service-Providers[^"]*\.pdf)"', re.I)
+MRP_LINK = re.compile(r'href="(https?://[^"]*Directory-of-Licen[cs]ed-Money-Remittance-Providers[^"]*\.pdf)"', re.I)
+PAYMENT_PROVIDER = "payment_provider"
+MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September",
+          "October", "November", "December")
 
 # Page headers and footers repeated on every page of the directory, and bare page numbers
 PAGE_JUNK = re.compile(r"^(?:CENTRAL BANK OF KENYA|DIRECTORY OF DIGITAL CREDIT PROVIDERS|"
@@ -64,11 +76,15 @@ ENTRY = re.compile(r"^(\d+)\.\s+(.+)$")
 # "Physical Location:", "Telephone+254..." with no colon); a line with no label continues
 # the one before it.
 LABELS = [
-    ("postal", re.compile(r"^Postal\s+Address\s*:", re.I)),
+    ("postal", re.compile(r"^Postal\s+Add?ress\s*:", re.I)),  # "Adress" is in one directory
     ("phone", re.compile(r"^Telephone(?:\s+No\.?|\s+Number)?\s*:?\s*-?", re.I)),
     ("email", re.compile(r"^(?:Official\s+)?E-?mail(?:\s+address)?\s*:", re.I)),
     ("address", re.compile(r"^Physical\s+(?:Address|Location)\s*:", re.I)),
-    ("licensed", re.compile(r"^(?:Date\s+)?Licen[cs]ed\s*:", re.I)),
+    ("licensed", re.compile(r"^(?:Date\s+)?(?:First\s+)?Licen[cs]ed\s*:", re.I)),
+    # who runs it (the payment service provider directory): kept out of the other fields
+    ("officer", re.compile(r"^(?:Acting\s+)?(?:Chief\s+Executive(?:\s+Officer)?|Managing\s+Director|CEO|"
+                           r"General\s+Manager|Country\s+Manager|(?:Executive\s+)?Director|Chairman|"
+                           r"Principal\s+Officer)\s*:", re.I)),
     ("website", re.compile(r"^Website\s*:", re.I)),
     ("fax", re.compile(r"^Fax\s*:", re.I)),
     ("branches", re.compile(r"^Branches\s*:", re.I)),
@@ -218,16 +234,130 @@ def import_lenders(src=CBK_DCP_URL, source=CBK_DCP_SOURCE, source_url=CBK_DCP_UR
     import_directory(src, source, source_url, INDUSTRY)
 
 
-def latest_microfinance_url():
-    """The newest directory of licensed microfinance banks linked from CBK's bank supervision
-    page: the one uploaded last (wp-content/uploads/YYYY/MM/...)."""
-    r = requests.get(CBK_SUPERVISION_URL, timeout=60, headers=BROWSER_HEADERS)
+def latest_cbk_pdf(page_url, pattern, what):
+    """The newest PDF matching `pattern` linked from a CBK page: the one uploaded last
+    (wp-content/uploads/YYYY/MM/...)."""
+    r = requests.get(page_url, timeout=60, headers=BROWSER_HEADERS)
     r.raise_for_status()
-    links = set(MFB_LINK.findall(r.text))
+    links = set(pattern.findall(r.text))
     if not links:
-        raise SystemExit(f"No microfinance bank directory linked from {CBK_SUPERVISION_URL}.")
-    return max(links, key=lambda u: (re.search(r"/uploads/(\d{4})/(\d{2})/", u).groups()
-                                     if re.search(r"/uploads/(\d{4})/(\d{2})/", u) else ("0", "0"), u))
+        raise SystemExit(f"No {what} linked from {page_url}.")
+    def uploaded(u):
+        m = re.search(r"/uploads/(\d{4})/(\d{2})/", u)
+        return (m.groups() if m else ("0", "0"), u)
+    return max(links, key=uploaded)
+
+
+def latest_microfinance_url():
+    """The newest directory of licensed microfinance banks on CBK's bank supervision page."""
+    return latest_cbk_pdf(CBK_SUPERVISION_URL, MFB_LINK, "microfinance bank directory")
+
+
+def cbk_source(prefix, url):
+    """'<prefix> Aug 2026' from a directory's file name that has a month and a year in it."""
+    m = re.search(r"\b(" + "|".join(m[:3] for m in MONTHS) + r")[a-z]*[-_\s,]*(?:\d{1,2}[-_\s,]+)?(\d{4})", url, re.I)
+    return f"{prefix} {m.group(1).title()[:3]} {m.group(2)}" if m else prefix
+
+
+# --- Directories laid out as tables (payment service providers, money remittance providers) ---
+
+TABLE_HEADER = re.compile(r"CENTRAL BANK|Name of MRP|INSTITUTION|APPROVED SERVICES|Contact Details|Date of Licen", re.I)
+
+
+def table_rows(data):
+    """Each numbered entry of a directory PDF laid out as a table: [number, cell lines, ...].
+    A row with no number that isn't a header carries on the entry before it (it was cut by
+    a page break)."""
+    import pdfplumber
+    entries = []
+    with pdfplumber.open(io.BytesIO(data)) as pdf:
+        for page in pdf.pages:
+            for table in page.extract_tables():
+                for row in table:
+                    cells = [(c or "").strip() for c in row]
+                    if not cells:
+                        continue
+                    num = re.fullmatch(r"(\d+)\.?", cells[0])
+                    if num and int(num.group(1)) == len(entries) + 1:
+                        entries.append([int(num.group(1))] + [c.splitlines() for c in cells[1:]])
+                    elif entries and not num and any(cells[1:]) and not TABLE_HEADER.search(" ".join(cells)):
+                        for i, c in enumerate(cells[1:], 1):
+                            if i < len(entries[-1]):
+                                entries[-1][i] += c.splitlines()
+    return entries
+
+
+CUT_ADDRESS = re.compile(r"[\w.%+-]+@([\w.-]*)$")
+
+
+def _cut(line):
+    """The address a line ends with if it is cut short ("info@x.c"), else None."""
+    m = CUT_ADDRESS.search(line or "")
+    return m.group(0).lower() if m and ("." not in m.group(1) or len(m.group(1).rsplit(".", 1)[1]) < 2) else None
+
+
+def join_lines(lines, known=()):
+    """Lines of a table cell, with an address split over two lines ("info@x.c" / "om") put
+    back. An address the cell cuts short with no rest in the cell is completed from `known`
+    (every address in the PDF's text), only if exactly one of those starts with it."""
+    out = []
+    for line in (l.strip() for l in lines):
+        if not line:
+            continue
+        if out and _cut(out[-1]) and re.fullmatch(r"[a-z0-9.-]{1,12}", line):
+            out[-1] += line
+            continue
+        out.append(line)
+    for i, line in enumerate(out):
+        cut = _cut(line)
+        whole = [k for k in known if k.startswith(cut) and k != cut] if cut else []
+        if len(whole) == 1:
+            out[i] = line[:len(line) - len(cut)] + whole[0]
+    return out
+
+
+def pdf_addresses(data):
+    """Every address in a PDF's text, with ones split over two lines put back."""
+    return set(EMAIL.findall("\n".join(join_lines(pdf_text(data).splitlines())).lower()))
+
+
+def parse_psp(data):
+    """CBK's directory of authorised payment service providers: each entry's details are
+    labelled lines in its first cell (name, Postal Address, Telephone, Email, Website,
+    Physical Address, Date First Licensed, Chief Executive Officer)."""
+    out, known = [], pdf_addresses(data)
+    for number, details, *_ in table_rows(data):
+        entry, field = {"number": number}, "name"
+        for line in join_lines(details, known):
+            for name, label in LABELS:
+                found = label.match(line)
+                if found:
+                    field, line = name, line[found.end():]
+                    break
+            entry[field] = " ".join(filter(None, [entry.get(field), line.strip()]))
+        out.append(clean(entry))
+    return out
+
+
+def parse_mrp(data):
+    """CBK's directory of licensed money remittance providers: name, location, contact
+    details (postal address, Tel:, email) and date of licensing, each in its own column."""
+    out, known = [], pdf_addresses(data)
+    for number, name, location, contact, licensed, *_ in table_rows(data):
+        lines = join_lines(contact, known)
+        phone = next((re.sub(r"^Tel\s*:?\s*", "", l, flags=re.I) for l in lines if re.match(r"Tel\b", l, re.I)), "")
+        out.append(clean({"number": number, "name": " ".join(join_lines(name)), "address": " ".join(join_lines(location)),
+                          "email": " ".join(lines), "phone": phone, "licensed": " ".join(join_lines(licensed))}))
+    return out
+
+
+def import_payment_providers(psp_src=None, mrp_src=None):
+    """Every authorised payment service provider and licensed money remittance provider in
+    CBK's latest directories, as payment_provider leads. A company in both is added once."""
+    psp_src = psp_src or latest_cbk_pdf(CBK_NPS_URL, PSP_LINK, "payment service provider directory")
+    import_directory(psp_src, cbk_source("CBK PSP directory", psp_src), psp_src, PAYMENT_PROVIDER, parse_psp)
+    mrp_src = mrp_src or latest_cbk_pdf(CBK_SUPERVISION_URL, MRP_LINK, "money remittance provider directory")
+    import_directory(mrp_src, cbk_source("CBK MRP directory", mrp_src), mrp_src, PAYMENT_PROVIDER, parse_mrp)
 
 
 def microfinance_source(url):
@@ -244,11 +374,13 @@ def import_microfinance(src=None, source=None, source_url=None):
     import_directory(src, source or microfinance_source(src), url or src, MICROFINANCE)
 
 
-def import_directory(src, source, source_url, industry):
+def import_directory(src, source, source_url, industry, parse=None):
     """Add every entry in a CBK directory PDF as a lead in `industry`, with its contact
     details, source and source_url. Duplicates (same email, company name or domain as a lead
-    already there) are skipped; each new address is checked as `main.py verify` does."""
-    entries = parse_directory(pdf_text(fetch(src)))
+    already there) are skipped; each new address is checked as `main.py verify` does.
+    `parse` reads the PDF's bytes into entries (default: a directory of labelled lines)."""
+    data = fetch(src)
+    entries = parse(data) if parse else parse_directory(pdf_text(data))
     if not entries:
         raise SystemExit(f"No entries found in {src}.")
     db.init()
@@ -614,11 +746,11 @@ def unreadable_sites():
 
 
 # --- Need score ---
-# 0-100 from fixed rules. Digital lenders and the five newer niches (ONLINE_NICHES) start at
-# 50, each with its own rules; every other industry at 40 and gains 10 for each sign on its
+# 0-100 from fixed rules. Digital lenders and the newer niches (ONLINE_NICHES, PAYTECH_NICHES)
+# start at 50, each with its own rules; every other industry at 40 and gains 10 for each sign on its
 # website that it messages many people. A website that can't be read gives 10 instead of
 # what reading it might have, except in ONLINE_NICHES, whose rules don't include that.
-SCORE_VERSION = 4  # 1 was ranking.py's old points; raise this when the rules below change
+SCORE_VERSION = 5  # 1 was ranking.py's old points; raise this when the rules below change
 LENDER_START, OTHER_START, ONLINE_START = 50, 40, 50
 SITE_WORKERS = 8  # websites read at the same time
 # A website that can't be read even as a browser: it may still be a busy lender's, so it
@@ -634,6 +766,14 @@ ONLINE = re.compile(r"\b(?:mobile app|apps?|api|google play|play\s?store|app\s?s
                     r"(?:order|book|learn|shop|buy|pay)\s+online|online\s+(?:orders?|ordering|booking|"
                     r"bookings|appointments?|learning|classes|courses|shopping|store|shop)|e-?learning)\b", re.I)
 PAYMENTS = re.compile(r"\bm-?\s?pesa\b|\bpay\s?bill\b|\bpayments?\b", re.I)
+PAYTECH_NICHES = ("payment_provider", "payg_energy", "software_agency", "software_vendor")
+SOFTWARE_NICHES = ("software_agency", "software_vendor")
+API_DEVELOPERS = re.compile(r"\b(?:apis?|developers?|developer portal|sdks?)\b", re.I)
+# A client list ("our clients", "trusted by"...) or schools, hospitals, SACCOs or businesses
+# named as who they serve ("built for schools", "used by 200 SACCOs")
+CLIENTS = re.compile(r"\b(?:our clients|clients include|our customers|trusted by|case stud(?:y|ies))\b|"
+                     r"\b(?:for|serving|serves|serve|used by|trusted by|built for|chosen by)\s+(?:[\w,]+\s+){0,3}?"
+                     r"(?:schools|hospitals|clinics|saccos|businesses|smes)\b", re.I)
 # "10,000+ customers", "over 2 million learners", "500 patients": three digits or more
 PEOPLE_COUNT = re.compile(r"\b(?:\d{1,3}(?:,\d{3})+|\d{3,}|\d+(?:\.\d+)?\s*(?:million|thousand|k|m))\+?"
                           r"\s+(?:[a-z]+\s+){0,2}?(?:customers|learners|students|patients|members|clients|borrowers)\b", re.I)
@@ -682,6 +822,22 @@ def need_score(lead, text):
             points.append((-20, f"email is free mail ({domain_of(email)})"))
         if lead.get("status") == "invalid":
             points.append((-30, "email invalid"))
+    elif lead.get("industry") in PAYTECH_NICHES:
+        points.append((ONLINE_START, f"start ({lead['industry']})"))
+        if website and website not in FREE_MAIL:
+            points.append((15, f"own website domain ({website})"))
+        if (seen := _seen(API_DEVELOPERS, text)):
+            points.append((15, "site mentions an API or developers" + seen))
+        if (seen := _seen(PAYMENTS, text)):
+            points.append((10, "site mentions M-Pesa, paybill or payments" + seen))
+        if (seen := _seen(APP, text)):
+            points.append((10, "site mentions an app" + seen))
+        if lead["industry"] in SOFTWARE_NICHES and (seen := _seen(CLIENTS, text)):
+            points.append((15, "site lists clients or serves schools, hospitals, SACCOs or businesses" + seen))
+        if domain_of(email) in FREE_MAIL:
+            points.append((-20, f"email is free mail ({domain_of(email)})"))
+        if lead.get("status") == "invalid":
+            points.append((-30, "email invalid"))
     else:
         points.append((OTHER_START, f"start ({lead.get('industry') or 'no industry'})"))
         for pattern, why in ((SMS_ALERTS, "SMS alerts"), (MPESA, "M-Pesa or paybill"),
@@ -691,7 +847,7 @@ def need_score(lead, text):
                 continue  # app or portal: 10 points once
             if (seen := _seen(pattern, text)):
                 points.append((10, f"site mentions {why}{seen}"))
-    if text is None and lead.get("industry") not in ONLINE_NICHES:
+    if text is None and lead.get("industry") not in ONLINE_NICHES + PAYTECH_NICHES:
         points.append((10, UNREADABLE) if website else (0, "no website to read"))
     elif text is None:
         points.append((0, "couldn't read website"))
@@ -772,6 +928,8 @@ if __name__ == "__main__":
     elif cmd == "import-microfinance":
         source, source_url = take_option(args, "--source"), take_option(args, "--source-url")
         import_microfinance(args[0] if args else None, source, source_url)
+    elif cmd == "import-payment-providers":
+        import_payment_providers(args[0] if args else None, args[1] if len(args) > 1 else None)
     elif cmd == "swap-emails":
         print(f"Swapped {swap_emails()} emails.")
     elif cmd == "score":

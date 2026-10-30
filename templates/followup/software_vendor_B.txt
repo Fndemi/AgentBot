@@ -1,0 +1,13 @@
+{greeting}
+
+Your free test of {free_sms} SMS is still available. In 15 minutes we'd get your developers an API key and agree which client messages to try first. Registering a sender name usually takes {setup_days}.
+
+Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

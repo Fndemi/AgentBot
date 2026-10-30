@@ -825,7 +825,7 @@ function renderTplEditor(t) {
   const d = tpl.data, kinds = tplKinds(t, tpl.variant), v = t.variants.find(x => x.variant === tpl.variant);
   const versions = t.variants.length ? `<div class="tabs" role="tablist" aria-label="Variant">${t.variants.map(x => `<button class="tab" role="tab" data-variant="${x.variant}"
         aria-selected="${x.variant === tpl.variant}" title="${x.enabled ? "" : "Switched off in uses.yaml: new leads don't get it"}">${esc(x.variant)} · ${esc(x.technique)}${x.enabled ? "" : " (off)"}</button>`).join("")}
-      <button class="tab" role="tab" data-variant="" aria-selected="${!tpl.variant}" title="The templates used before the A/B/C rotation">Legacy</button></div>` : "";
+      ${t.kinds.includes("first") ? `<button class="tab" role="tab" data-variant="" aria-selected="${!tpl.variant}" title="The templates used before the A/B/C rotation">Legacy</button>` : ""}</div>` : "";
   const about = !t.variants.length ? "" : d.kind === "followup2"
     ? "Follow-up 2 is one email for this industry, sent to every lead whatever its variant, legacy leads included."
     : tpl.variant ? (v.enabled ? `Variant ${v.variant} (${v.technique}). New leads get the variant sent least so far in this industry and keep it for their follow-ups.`
