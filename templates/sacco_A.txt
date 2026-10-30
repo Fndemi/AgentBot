@@ -1,5 +1,7 @@
 Subject: Loan reminders at {company}
-Hello {company} team,
+{greeting}
+
+{opener}
 
 Quick question: how do members find out a loan instalment is due before it becomes late?
 

@@ -1,4 +1,4 @@
-Hello {company} team,
+{greeting}
 
 One last note from me. If keeping every member informed matters to {company}, I'd be glad to show you how announcements could reach them all by SMS, and set up a free test for your next event.
 

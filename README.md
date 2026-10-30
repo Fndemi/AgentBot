@@ -57,6 +57,12 @@ Every one of them asks for a 15-minute meeting: `{slot1}` and `{slot2}` are two 
 
 Leads emailed before the rotation keep their old wording: `templates/<niche>.txt` and `templates/followup/<niche>.txt` stay as the legacy templates. Their follow-up 1 gets the meeting request added before the signature, and their follow-up 2 is the niche's new one. The old follow-up 2s are kept in `templates/legacy/followup2/` and no longer sent.
 
+### Who the email goes to, and the opener
+
+Just before a lead's first email, LeadBot reads its website (`contacts.py`; no manual step). If the team, about or leadership page names a decision-maker (CEO, founder, CTO, head of product, operations, partnerships, marketing or finance) and that person's exact address is published on the same site, the name, title, address and page are saved on the lead, the email goes to them and `{greeting}` is "Hello Jane,". An address is never guessed or built from a name. Otherwise the email goes to the first of sales@, partnerships@, business@, tech@, ops@, hello@, contact@, info@ the site shows on its own domain, otherwise to the address the lead already had (kept in `source_email` when it changes). Leads already emailed never change address.
+
+With `USE_AI_OPENER=true`, `WRITER_MODEL` writes `{opener}`: one sentence (at most 25 words) about one specific fact on the lead's own site, saved with the exact sentence it comes from and that page's address. It is used only if it passes a check in code (that sentence is on that page; the opener adds no number or name the page doesn't have) and a second check by the AI (`GROQ_MODEL`). If anything fails, the email is the normal template without an opener, and the lead page in the CRM says why. The A/B/C first emails have `{opener}` as the first line after the greeting. The CRM lead page shows the contact, the opener and its source; What's working compares emails with and without an opener, and to a named contact against a role address.
+
 ## Getting leads (companies.csv)
 
 Columns: `company,website,industry,email`. Leave `email` blank to have it scraped. Good public sources: SASRA licensed SACCO list, Ministry of Education school lists, Kenya Yellow Pages, chamber of commerce and trade association member lists. Skip LinkedIn and Google Maps scraping (against their terms).

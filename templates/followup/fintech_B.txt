@@ -1,4 +1,4 @@
-Hello {company} team,
+{greeting}
 
 The free side-by-side test is still available: {free_sms} SMS and our API docs. Registering your sender name on our route usually takes {setup_days}.
 

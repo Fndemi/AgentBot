@@ -1,5 +1,7 @@
 Subject: Verification codes that arrive on time
-Hello {company} team,
+{greeting}
+
+{opener}
 
 Quick question: when a customer's verification code arrives late, how many of them give up on signing in or signing up?
 

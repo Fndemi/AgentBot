@@ -1,4 +1,4 @@
-Hello {company} team,
+{greeting}
 
 One last note from me. Whenever SMS comes up for {company}, whether it's sign-up codes, alerts or a better price, I'd be glad to help you get started with free credits.
 

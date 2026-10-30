@@ -1,5 +1,7 @@
 Subject: SMS for {company}'s product
-Hello {company} team,
+{greeting}
+
+{opener}
 
 Quick question: is SMS part of your product yet, for sign-up codes, alerts or customer updates, or is it on the roadmap?
 

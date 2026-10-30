@@ -1,5 +1,7 @@
 Subject: SMS cost check for {company}
-Hello {company} team,
+{greeting}
+
+{opener}
 
 I'm {sender} from TalkSasa Communications in Nairobi. Lenders send a lot of reminders, so price per SMS adds up: at 100,000 reminders a month, every 10 cents per SMS is KES 10,000.
 

@@ -1,4 +1,4 @@
-Hello {company} team,
+{greeting}
 
 Your free test of {free_sms} SMS is still available, for your next event or Sunday reminder. In a 15-minute meeting we'd get the first message ready and start registering the church's own sender name, which usually takes {setup_days}.
 

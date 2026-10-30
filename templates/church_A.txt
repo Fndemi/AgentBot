@@ -1,5 +1,7 @@
 Subject: Announcements at {company}
-Hello {company} team,
+{greeting}
+
+{opener}
 
 Quick question: how do members who missed Sunday service hear about events, contributions or bereavement notices?
 

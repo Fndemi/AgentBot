@@ -79,6 +79,7 @@ def scrape_site(url):
 
 
 _pages = {}  # site -> page texts, so one run doesn't fetch the same site twice
+_page_urls = {}  # site -> the address of each of those pages, in the same order
 _taglines = {}  # site -> the homepage's title, descriptions and main headings
 
 
@@ -91,7 +92,7 @@ def site_pages(url):
         url = "https://" + url
     if url in _pages:
         return _pages[url]
-    pages = []
+    pages, urls = [], []
     for path in ABOUT_PATHS:
         soup = fetch(urljoin(url, path))
         if soup is None:
@@ -107,11 +108,20 @@ def site_pages(url):
         text = " ".join(soup.get_text(" ").split())
         if text and text not in pages:  # some sites serve the homepage for every path
             pages.append(text)
+            urls.append(urljoin(url, path))
         time.sleep(1)  # be polite
         if len(pages) == 2:
             break
-    _pages[url] = pages
+    _pages[url], _page_urls[url] = pages, urls
     return pages
+
+
+def site_sources(url):
+    """[(page address, readable text)] for the pages site_pages read, homepage first."""
+    pages = site_pages(url)
+    if url and not url.startswith("http"):
+        url = "https://" + url
+    return list(zip(_page_urls.get(url, []), pages))
 
 
 def site_taglines(url):

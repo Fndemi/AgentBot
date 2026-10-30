@@ -211,6 +211,13 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
   .tpl-list { position: static; max-height: 240px; }
 }
 
+/* lead page: who LeadBot wrote to and its opener */
+.personal { margin: 0 0 16px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--card);
+  display: grid; gap: 10px; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.personal .eyebrow { display: block; padding: 0; margin-bottom: 2px; }
+.personal p { margin: 0; }
+.personal a { color: var(--primary); }
+
 /* greeting for sales above the lead list, like the dashboard's */
 .hello { flex: none; padding: 18px 20px 0; background-image: var(--glow); }
 .hello .date { font-size: 12.5px; font-weight: 500; color: var(--fg-3); }
@@ -720,7 +727,7 @@ $("refresh").onclick = () => refreshAll(true);
 const KIND_NAMES = { first: "First email", followup: "Follow-up 1", followup2: "Follow-up 2" };
 const GAP_HELP = {
   company: "The organisation's name", uses: "SMS uses for the industry, from uses.yaml",
-  opener: "A first sentence written about them (empty unless switched on in .env)",
+  opener: "One checked sentence about a fact on their own website (empty unless USE_AI_OPENER=true, or when a check failed)",
   attachment_line: "\"I've attached a one-page overview of TalkSasa.\" when the PDF is attached",
   sender: "Sender name (SENDER_NAME in .env)", our_company: "Our company name (COMPANY in .env)",
   phone: "Phone (SENDER_PHONE in .env)", website: "Our website, as a link", profile_line: "\"Company profile: <link>\" when PROFILE_URL is set",
@@ -729,6 +736,7 @@ const GAP_HELP = {
   price_from: "Starting price per SMS (PRICE_FROM in .env)", slot1: "First suggested meeting time, e.g. \"Tuesday 4 Nov at 10am\"",
   slot2: "Second suggested meeting time, on another day", booking_line: "\"Or pick any time that suits you here: <link>\" when BOOKING_URL is set",
   meet_options: "Visit, video call or phone, in the order that suits the industry",
+  greeting: "\"Hello Jane,\" for a named contact found on their website, otherwise \"Hello <company> team,\"",
 };
 // variant: the rotation variant being edited (A, B, C), null for the industry's own (legacy)
 // templates, undefined before one is picked
@@ -1092,7 +1100,7 @@ function renderDetail() {
       <div class="d-actions">${owner}${buttons}${stageSel}</div>
     </div>
     <div class="d-main">
-      <div class="d-body"><div class="thread">${thread.length ? thread.map((m, i) => msgHTML(m, i, i >= fullFrom, i === newest)).join("") : `<p class="muted">Nothing in this conversation yet.</p>`}</div></div>
+      <div class="d-body">${personalHTML(lead.personal)}<div class="thread">${thread.length ? thread.map((m, i) => msgHTML(m, i, i >= fullFrom, i === newest)).join("") : `<p class="muted">Nothing in this conversation yet.</p>`}</div></div>
       ${composerHTML(lead, can_reply, can_act)}
     </div>`;
   state.composerAnim = false;
@@ -1104,6 +1112,22 @@ function renderDetail() {
   else if (state.scrollEnd || !top) body.scrollTop = body.scrollHeight;
   else body.scrollTop = top.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop - 16;
   state.scrolledFor = state.sel; state.scrollEnd = false;
+}
+// Who LeadBot wrote to and the opener it used, with the sentence on their own site it came from
+function personalHTML(p) {
+  if (!p) return "";
+  const link = (url) => url ? ` <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url.replace(/^https?:\/\/(www\.)?/, ""))}</a>` : "";
+  const c = p.contact;
+  const who = c && p.to_contact ? `<b>${esc(c.name)}</b>, ${esc(c.title)} · ${esc(c.email)}<br><span class="muted">Named on</span>${link(c.url)}`
+    : c ? `<b>${esc(c.name)}</b>, ${esc(c.title)} · ${esc(c.email)} <span class="muted">(found, but not used: that address is another lead's or opted out)</span>`
+    : p.checked ? `<span class="muted">Nobody named with their own address on the site, so a role address.</span>`
+    : `<span class="muted">Their website hasn't been read for a contact yet.</span>`;
+  const op = p.opener ? `“${esc(p.opener)}”<br><span class="muted">From their site:</span> “${esc(p.opener_source)}”${link(p.opener_url)}`
+    : `<span class="muted">None${p.opener_note ? ": " + esc(p.opener_note) : ""}.</span>`;
+  const sent = p.first_email && p.first_email.with_opener != null
+    ? `<p class="muted" style="margin:6px 0 0">First email: ${p.first_email.to_contact ? "to the named contact" : "to a role address"}, ${p.first_email.with_opener ? "with the opener" : "without an opener"}.</p>` : "";
+  return `<div class="personal"><div><span class="eyebrow">Written to</span><p>${who}${p.previous_email ? `<br><span class="muted">Was ${esc(p.previous_email)} before the website was read</span>` : ""}</p></div>
+    <div><span class="eyebrow">Opener</span><p>${op}</p></div>${sent}</div>`;
 }
 // Room under the conversation for the open composer, so the last message can scroll above it
 function padForComposer() {
@@ -1379,6 +1403,9 @@ async function loadReport() {
         ${d.groups.template.length ? repTable("By template", "Each industry's A, B and C first emails, with the follow-ups that go with them. Leads emailed before the rotation aren't counted here.", d.groups.template)
           : `<div class="panel"><h3>By template</h3><p class="lead2" style="padding-bottom:14px">No leads emailed from the A/B/C templates in this period yet.</p></div>`}
         ${d.groups.technique.length ? repTable("By technique", "A (quick question) vs B (free test) vs C (niche angle), across every industry.", d.groups.technique) : ""}
+        ${d.groups.opener.length ? repTable("Opener vs none", "First emails with a checked opener about a fact on their own website, against those without. Only emails sent since this was recorded.", d.groups.opener)
+          : `<div class="panel"><h3>Opener vs none</h3><p class="lead2" style="padding-bottom:14px">No first emails recorded with or without an opener in this period yet.</p></div>`}
+        ${d.groups.contact.length ? repTable("Named contact vs role address", "First emails to a decision-maker named on their website, against those to a role address such as sales@ or info@. Only emails sent since this was recorded.", d.groups.contact) : ""}
         ${d.has_scores ? repTable("By need score", "If the scoring works, higher bands should reply more. If they don't, the rules need changing.", d.groups.score) : `<div class="panel"><h3>By need score</h3><p class="lead2" style="padding-bottom:14px">No scores yet. They appear once the targeting step has scored your leads.</p></div>`}
         ${d.has_source ? repTable("By where the lead came from", "", d.groups.source) : ""}
       </div>`;

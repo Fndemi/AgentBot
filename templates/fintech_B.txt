@@ -1,5 +1,7 @@
 Subject: Free side-by-side SMS test for {company}
-Hello {company} team,
+{greeting}
+
+{opener}
 
 I'm {sender} from TalkSasa Communications in Nairobi. Most fintechs already have an SMS provider, so here's a low-effort way to compare: we'll give {company} {free_sms} free SMS to send OTPs or alerts through us alongside your current provider, and you compare delivery for yourself.
 

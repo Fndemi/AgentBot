@@ -1,5 +1,7 @@
 Subject: Free SMS credits for {company}
-Hello {company} team,
+{greeting}
+
+{opener}
 
 I'm {sender} from TalkSasa Communications in Nairobi. We'd like to give {company} {free_sms} free SMS to build and test with: OTPs, alerts or customer notifications through our API.
 

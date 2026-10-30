@@ -1,5 +1,7 @@
 Subject: SMS cost check for {company}
-Hello {company} team,
+{greeting}
+
+{opener}
 
 I'm {sender} from TalkSasa Communications in Nairobi. If {company} already sends payslip alerts or login codes by SMS, a small difference in price adds up across every pay run.
 

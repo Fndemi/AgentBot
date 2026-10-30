@@ -1,4 +1,4 @@
-Hello {company} team,
+{greeting}
 
 One last note from me. Whether it's reaching staff without email or a better price per SMS, I think a short conversation could be worth it for {company}.
 

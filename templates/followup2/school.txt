@@ -1,4 +1,4 @@
-Hello {company} team,
+{greeting}
 
 One last note from me. Before next term's fee reminders and closing notices, I'd be glad to show you how {company} could send them by SMS, and set up a free test while we're at it.
 

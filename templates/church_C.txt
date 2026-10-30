@@ -1,5 +1,7 @@
 Subject: Reaching every member of {company}
-Hello {company} team,
+{greeting}
+
+{opener}
 
 Older members and those without smartphones often miss WhatsApp announcements. An SMS reaches any phone, including basic ones.
 

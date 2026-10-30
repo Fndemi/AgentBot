@@ -1,4 +1,4 @@
-Hello {company} team,
+{greeting}
 
 One last note from me. If reaching members on time is on your list this year, I'd be glad to show you how {company} could send reminders and notices by SMS, and set up a free test while we're at it.
 

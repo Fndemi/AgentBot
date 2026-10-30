@@ -1,4 +1,4 @@
-Hello {company} team,
+{greeting}
 
 To give an idea of cost: a Sunday reminder to 500 members costs about KES 125, at {price_from} per SMS, and you can see who received it.
 

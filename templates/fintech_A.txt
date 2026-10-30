@@ -1,5 +1,7 @@
 Subject: When your SMS provider goes down
-Hello {company} team,
+{greeting}
+
+{opener}
 
 Quick question: what happens to your OTPs and transaction alerts if your SMS provider has an outage?
 

@@ -1,4 +1,4 @@
-Hello {company} team,
+{greeting}
 
 Your free test of {free_sms} SMS is still available, with our API docs. Registering your own sender name usually takes {setup_days}.
 

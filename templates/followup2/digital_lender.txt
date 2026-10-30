@@ -1,4 +1,4 @@
-Hello {company} team,
+{greeting}
 
 One last note from me. Whether it's a backup route for month-end peaks or a lower price on your reminders, I think a short conversation could be worth it for {company}.
 

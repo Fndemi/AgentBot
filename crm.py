@@ -671,6 +671,9 @@ def lead_detail(lead_id: int, user=Depends(current_user)):
                   ] if admin else []  # the history names colleagues and who a lead was assigned to
         can_reply = _can_email(c, row)
         has_response = _has_response(c, lead_id)
+        first = c.execute("SELECT with_opener, to_contact FROM sent WHERE lead_id = ? ORDER BY id LIMIT 1",
+                          (lead_id,)).fetchone()
+    lead["personal"] = _personal(row, first)
     # bot rows only have a date; put them at the start of that day so order stays sensible
     items.sort(key=lambda x: (x["at"] or "") if "T" in (x["at"] or "") else (x["at"] or "") + "T00:00:00Z")
     lead["owner"] = names.get(lead.get("claimed_by"))
@@ -681,6 +684,23 @@ def lead_detail(lead_id: int, user=Depends(current_user)):
             "can_act": user["role"] == "admin" or not lead.get("claimed_by") or lead["mine"],
             "can_download": user["role"] == "admin" or lead["mine"],
             "has_response": has_response}
+
+
+def _personal(row, first):
+    """Who LeadBot wrote to and the opener it used, for the lead page: the named contact found
+    on their website (contacts.py), the opener with the exact sentence and page it is based on
+    (or why there is none), and whether the first email had them."""
+    lead = dict(row)
+    contact = ({k: lead.get(f"contact_{k}") for k in ("name", "title", "email", "url")}
+               if lead.get("contact_name") else None)
+    usable = lead.get("opener") and lead.get("confidence") == 1 and lead.get("opener_source")
+    return {"contact": contact, "to_contact": bool(contact and contact["email"] == lead.get("email")),
+            "checked": bool(lead.get("contact_checked_at")), "previous_email": lead.get("source_email"),
+            "opener": lead["opener"] if usable else None,
+            "opener_source": lead.get("opener_source") if usable else None,
+            "opener_url": lead.get("opener_url") if usable else None,
+            "opener_note": None if usable else lead.get("opener_note"),
+            "first_email": {"with_opener": first["with_opener"], "to_contact": first["to_contact"]} if first else None}
 
 
 def _require_owner_or_free(lead, user):
@@ -1231,6 +1251,8 @@ def report(days: int = 0, user=Depends(admin_only)):
         since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d") if days else "0000"
         rows = c.execute(f"""
             SELECT l.id, COALESCE(NULLIF(l.industry, ''), 'default') AS industry, l.status, l.template_variant,
+                   (SELECT f.with_opener FROM sent f WHERE f.lead_id = l.id ORDER BY f.id LIMIT 1) AS with_opener,
+                   (SELECT f.to_contact FROM sent f WHERE f.lead_id = l.id ORDER BY f.id LIMIT 1) AS to_contact,
                    {('l.' + sc['score']) if sc['score'] else 'NULL'} AS score,
                    {("COALESCE(NULLIF(l." + sc['source'] + ", ''), 'Web search')") if sc['source'] else "'Web search'"} AS source,
                    MIN(s.sent_on) AS first_sent,
@@ -1249,7 +1271,9 @@ def report(days: int = 0, user=Depends(admin_only)):
     import rotation
     # template: niche x variant; technique: A vs B vs C across niches. Leads emailed before
     # the rotation (no variant) are in neither.
-    groups = {"segment": {}, "score": {}, "source": {}, "template": {}, "technique": {}}
+    # opener: first email with an AI opener vs without; contact: to a named contact vs a role
+    # address. Leads first emailed before these were recorded are in neither.
+    groups = {"segment": {}, "score": {}, "source": {}, "template": {}, "technique": {}, "opener": {}, "contact": {}}
     total = blank()
     for r in rows:
         bounced = r["status"] == "bounced" or bool(r["bounced_reply"])
@@ -1260,6 +1284,10 @@ def report(days: int = 0, user=Depends(admin_only)):
         if variant:
             keys["template"] = f"{r['industry']} · {variant}"
             keys["technique"] = f"{variant} · {rotation.TECHNIQUES.get(variant, '')}".rstrip(" ·")
+        if r["with_opener"] is not None:
+            keys["opener"] = "With an opener" if r["with_opener"] else "Without an opener"
+        if r["to_contact"] is not None:
+            keys["contact"] = "Named contact" if r["to_contact"] else "Role address"
         for g, key in keys.items():
             for bucket in (groups[g].setdefault(key, blank()),) + ((total,) if g == "segment" else ()):
                 bucket["emailed"] += 1
@@ -1277,7 +1305,8 @@ def report(days: int = 0, user=Depends(admin_only)):
         d["small_sample"] = reach < MIN_SAMPLE
         return d
 
-    order = {"score": ["80–100", "60–79", "50–59", "Below 50", "Not scored"]}
+    order = {"score": ["80–100", "60–79", "50–59", "Below 50", "Not scored"],
+             "opener": ["With an opener", "Without an opener"], "contact": ["Named contact", "Role address"]}
     out = {}
     for g, d in groups.items():
         items = [dict(finish(v), name=k) for k, v in d.items()]
@@ -1408,7 +1437,8 @@ VARIANT_NAME = re.compile(r"^([a-z0-9_]+)_([A-Z])$")  # sacco_A: one rotation va
 # The gaps sender.fill can fill; a follow-up also gets {offer} (sender.FOLLOWUP_OFFERS)
 TEMPLATE_FIELDS = ("company", "uses", "opener", "attachment_line", "sender", "our_company", "phone", "website",
                    "profile_line", "profile_url", "industry",
-                   "free_sms", "setup_days", "price_from", "slot1", "slot2", "booking_line", "meet_options")
+                   "free_sms", "setup_days", "price_from", "slot1", "slot2", "booking_line", "meet_options",
+                   "greeting")
 MAX_TEMPLATE_CHARS = 6000
 
 

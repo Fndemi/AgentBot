@@ -1,4 +1,4 @@
-Hello {company} team,
+{greeting}
 
 Getting started is simple: we send you an API key and {free_sms} free SMS to build and test with, and help you register your own sender name, which usually takes {setup_days}.
 

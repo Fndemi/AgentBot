@@ -1,5 +1,7 @@
 Subject: Fee reminders at {company}
-Hello {company} team,
+{greeting}
+
+{opener}
 
 Quick question: how do you remind parents about fee balances and closing dates today? Notes in school bags and WhatsApp groups are easy to miss.
 

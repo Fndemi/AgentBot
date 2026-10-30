@@ -1,4 +1,4 @@
-Hello {company} team,
+{greeting}
 
 If you already have an SMS provider, we can also sit behind it as a backup route, ready to take your OTPs if your main one slows down. All it needs is your sender name registered on our route and an API key ready.
 

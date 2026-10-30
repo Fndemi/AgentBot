@@ -1,5 +1,7 @@
 Subject: When your SMS provider goes down
-Hello {company} team,
+{greeting}
+
+{opener}
 
 Quick question: what happens to your disbursement messages and OTPs if your SMS provider has an outage at month end, when loan volumes peak?
 

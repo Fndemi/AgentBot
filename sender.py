@@ -15,6 +15,7 @@ from email.utils import formatdate, make_msgid, formataddr
 from pathlib import Path
 
 import config
+import contacts
 import db
 import notify
 import personalise
@@ -121,6 +122,19 @@ def first_subject(lead):
     return load_template(lead["industry"])[1]
 
 
+def to_contact(lead):
+    """Whether the lead's address is the named contact found on its website (contacts.py)."""
+    lead = dict(lead)
+    return bool(lead.get("contact_name") and lead.get("contact_email") and lead["contact_email"] == lead.get("email"))
+
+
+def greeting(lead):
+    """"Hello Jane," for a named contact, otherwise "Hello <company> team,"."""
+    if to_contact(lead):
+        return f"Hello {contacts.first_name(dict(lead)['contact_name'])},"
+    return f"Hello {dict(lead).get('company') or 'your organisation'} team,"
+
+
 def fill(text, lead, attached=False, for_html=False, extra=None):
     """The template with this lead's details in it. `extra` adds or replaces placeholders
     (the follow-ups' own {uses} and {offer}, and their meeting slots)."""
@@ -128,6 +142,7 @@ def fill(text, lead, attached=False, for_html=False, extra=None):
         opener=personalise.opener(lead),
         uses=personalise.uses(lead),
         company=lead["company"] or "your organisation",
+        greeting=greeting(lead),
         industry=lead["industry"] or "",
         sender=config.SENDER_NAME,
         our_company=config.COMPANY,
@@ -449,8 +464,10 @@ def deliver(smtp, lead, msg, tname, followup=0):
     sent_at = time.time()
     variant = ("followup" if followup == 1 else f"followup{followup:d}" if followup
                else "personal" if personalise.picked_uses(lead) else "template")
-    db.record_sent(lead["id"], msg["Message-ID"], tname, str(msg["Subject"]), plain_of(msg), variant,
-                   variant_of(tname) or dict(lead).get("template_variant"))
+    plain, opener = plain_of(msg), personalise.opener(lead)
+    db.record_sent(lead["id"], msg["Message-ID"], tname, str(msg["Subject"]), plain, variant,
+                   variant_of(tname) or dict(lead).get("template_variant"),
+                   with_opener=int(bool(opener) and opener in plain), to_contact=int(to_contact(lead)))
     save_to_sent(msg, sent_at)
 
 
@@ -463,8 +480,15 @@ def html_of(msg):
 
 
 def personal_lines(lead):
-    """What previews say about the opener and uses for one lead."""
-    return personalise.notes(lead)
+    """What previews say about the address, the opener and the uses for one lead."""
+    lead = dict(lead)
+    if to_contact(lead):
+        who = (f"Contact: {lead['contact_name']}, {lead['contact_title']} <{lead['contact_email']}> "
+               f"(named on {lead['contact_url']})")
+    else:
+        who = f"Contact: none named, so to {lead.get('email')}" + (
+            "" if lead.get("contact_checked_at") else " (website not read for contacts yet)")
+    return who + "\n" + personalise.notes(lead)
 
 
 def preview(industry=None, limit=1):
@@ -641,8 +665,10 @@ def plan(dry_run=False):
             ranking.fill_years()
             targeting.score_unscored()
         leads = spread(approved_waiting(), remaining - len(due))
-        # Write personal lines for any of today's leads that don't have them yet
-        if not dry_run and leads and (personalise.run(leads) or any(l["confidence"] is None for l in leads)):
+        # Read today's leads' websites for who to write to (contacts.py), and write personal
+        # lines for any of them that don't have them yet; then read the leads again
+        if not dry_run and leads and (contacts.run(leads) + personalise.run(leads)
+                                      or any(l["confidence"] is None for l in leads)):
             leads = spread(approved_waiting(quiet=True), remaining - len(due))
     return due + [(lead, 0) for lead in leads]
 

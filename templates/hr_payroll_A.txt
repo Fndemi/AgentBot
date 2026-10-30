@@ -1,5 +1,7 @@
 Subject: Payslip alerts for staff without email
-Hello {company} team,
+{greeting}
+
+{opener}
 
 Quick question: how do your clients' casual and field staff, who often have no work email or app, find out their payslip is ready?
 

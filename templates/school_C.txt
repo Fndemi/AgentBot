@@ -1,5 +1,7 @@
 Subject: Reaching every parent at {company}
-Hello {company} team,
+{greeting}
+
+{opener}
 
 When something urgent happens, such as an early closing or a delayed school bus, an SMS reaches every parent quickly, even on a basic phone and without data.
 

@@ -1,4 +1,4 @@
-Hello {company} team,
+{greeting}
 
 To give an idea of cost: an AGM notice to 2,000 members costs about KES 500, at {price_from} per SMS, and you can see who received it.
 

@@ -1,5 +1,7 @@
 Subject: Reaching every {company} member
-Hello {company} team,
+{greeting}
+
+{opener}
 
 WhatsApp groups and notice boards miss members who aren't online or can't come to the office. An SMS reaches any phone, including basic ones.
 

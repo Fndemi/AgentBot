@@ -1,5 +1,7 @@
 Subject: Free SMS test for {company}
-Hello {company} team,
+{greeting}
+
+{opener}
 
 I'm {sender} from TalkSasa Communications in Nairobi. We'd like to give {company} {free_sms} free SMS to try: payslip alerts, login codes or leave approvals, sent through our API.
 

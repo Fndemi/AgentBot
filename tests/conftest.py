@@ -67,6 +67,8 @@ def no_need_scores(monkeypatch):
     monkeypatch.setattr(config, "MIN_SCORE", 0)
     monkeypatch.setattr(targeting, "site_text", lambda website: None)
     monkeypatch.setattr(targeting, "site_emails", lambda website: [])
+    import contacts
+    monkeypatch.setattr(contacts, "fetch", lambda url: None)  # no site can be read for contacts
 
 
 @pytest.fixture(autouse=True)

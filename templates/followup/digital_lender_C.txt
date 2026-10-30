@@ -1,4 +1,4 @@
-Hello {company} team,
+{greeting}
 
 Following up on the cost check. If you'd rather not meet yet, a one-line reply is enough, for example "about 80,000 SMS a month at KES 0.60", and I'll come back with a straight answer.
 

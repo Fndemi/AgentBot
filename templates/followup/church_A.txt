@@ -1,4 +1,4 @@
-Hello {company} team,
+{greeting}
 
 Here's the kind of message I meant:
 
