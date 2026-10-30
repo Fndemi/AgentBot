@@ -1,0 +1,20 @@
+Subject: SMS cost check for {company}
+{greeting}
+
+{opener}
+
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider.
+
+Your order updates don't have to be expensive. If you handle 5,000 orders a month with three updates each, that's 15,000 SMS, about KES 3,750 at our rate of {price_from} per SMS. If you already send order SMS, a small difference in rate adds up as you grow.
+
+I'd welcome a 15-minute call to compare our rates with what you pay now. If we can't offer a better deal, I'll be upfront about it. Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

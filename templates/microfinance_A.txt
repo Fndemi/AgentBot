@@ -1,0 +1,20 @@
+Subject: Repayment reminders at {company}
+{greeting}
+
+{opener}
+
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider.
+
+A reminder a few days before an instalment is due is one of the simplest ways to keep your repayments on time, and an SMS reaches your borrowers on any phone. How do your borrowers and groups get repayment and meeting reminders today?
+
+I'd welcome a 15-minute call to show you how SMS could help you. If it's not a fit for you, I'll say so. Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

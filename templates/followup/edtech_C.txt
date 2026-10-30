@@ -1,0 +1,13 @@
+{greeting}
+
+Following up on the cost check. If you'd rather not meet yet, a one-line reply is enough, for example "about 15,000 SMS a month at KES 0.50", and I'll come back with a straight answer.
+
+Otherwise, would a 15-minute call on {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

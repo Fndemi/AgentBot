@@ -1,0 +1,20 @@
+Subject: Fewer missed appointments at {company}
+{greeting}
+
+{opener}
+
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider.
+
+Every missed appointment costs you a slot and leaves a patient without care on time. A short SMS reminder the day before, or a note that their results are ready, reaches your patients on any phone. How do your patients get reminders today?
+
+I'd welcome a 15-minute call to show you how SMS reminders could help you. If it's not a fit for you, I'll say so. Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

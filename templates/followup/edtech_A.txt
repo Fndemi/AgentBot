@@ -1,0 +1,15 @@
+{greeting}
+
+Here's the kind of reminder I meant, sent automatically through our API:
+
+"Hi Brian, your Maths class starts today at 4pm. Log in at [your link] to join. - {company}"
+
+I'd be glad to show you how it works in 15 minutes. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

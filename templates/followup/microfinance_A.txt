@@ -1,0 +1,15 @@
+{greeting}
+
+Here's the kind of reminder I meant:
+
+"Dear member, your loan instalment of KES 2,500 is due on 5 Nov. Pay via Paybill [your paybill], account [loan no]. - {company}"
+
+It can be scheduled a few days before each due date, and group meeting reminders work the same way. I'd be glad to walk you through it in 15 minutes. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

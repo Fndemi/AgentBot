@@ -34,8 +34,8 @@ coworking:
   approved: false
   uses: [booking confirmations, meeting room reminders, renewal alerts, payment alerts, event notices]
 delivery_app:
-  approved: false
-  uses: [order updates, delivery updates, rider arrival notices, payment alerts, OTPs]
+  approved: true
+  uses: [delivery codes, order and rider updates, OTPs]
 digital_lender:
   approved: true
   uses: [loan repayment reminders, disbursement confirmations, OTPs]
@@ -46,11 +46,11 @@ driving_school:
   approved: false
   uses: [lesson reminders, test date notices, fee reminders]
 ecommerce:
-  approved: false
-  uses: [order confirmations, delivery updates, payment alerts, OTPs]
+  approved: true
+  uses: [order confirmations, delivery updates, OTPs]
 edtech:
-  approved: false
-  uses: [class reminders, OTPs, fee alerts, results notices]
+  approved: true
+  uses: [class reminders, payment reminders, OTPs]
 events:
   approved: false
   uses: [invitations, ticket confirmations, event reminders, venue changes]
@@ -67,8 +67,8 @@ health:
   approved: false
   uses: [appointment reminders, results-ready notices, clinic day announcements, medicine collection notices]
 healthtech:
-  approved: false
-  uses: [appointment reminders, OTPs, payment alerts, results-ready notices]
+  approved: true
+  uses: [appointment reminders, results-ready alerts, OTPs]
 hospitality:
   approved: false
   uses: [booking confirmations, check-in details, offers, event invitations]
@@ -88,8 +88,8 @@ logistics_tech:
   approved: false
   uses: [dispatch updates, delivery updates, proof-of-delivery codes, payment alerts, driver notices]
 microfinance:
-  approved: false
-  uses: [repayment reminders, loan approval messages, disbursement messages, overdue notices]
+  approved: true
+  uses: [loan repayment reminders, disbursement confirmations, group meeting reminders]
 ngo:
   approved: false
   uses: [meeting invitations, training invitations, programme updates, feedback requests]

@@ -1,0 +1,13 @@
+{greeting}
+
+One last note from me. Whether you want a backup route for your delivery codes or a better rate per SMS, I think a short conversation could be worth your time.
+
+It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you, or is there another day that suits you better?
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

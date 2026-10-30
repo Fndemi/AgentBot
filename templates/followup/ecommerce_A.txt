@@ -1,0 +1,15 @@
+{greeting}
+
+Here's the kind of update I meant, sent automatically from your store through our API:
+
+"Hi Achieng, your order #4521 has been dispatched and will arrive today between 2pm and 5pm. - {company}"
+
+I'd be glad to show you how it plugs into your store in 15 minutes. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

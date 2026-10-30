@@ -1,0 +1,15 @@
+{greeting}
+
+Here's the kind of reminder I meant, sent automatically through our API, with no medical details in the message:
+
+"Hi Grace, this is a reminder of your appointment tomorrow at 10:30am. Reply or call [your number] to reschedule. - {company}"
+
+I'd be glad to show you how it works in 15 minutes. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

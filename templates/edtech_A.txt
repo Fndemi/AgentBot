@@ -1,0 +1,20 @@
+Subject: Reminders that reach every learner
+{greeting}
+
+{opener}
+
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider.
+
+Your hardest learners to reach are probably the ones who aren't online. An SMS reaches any phone, without data, so your class reminders, payment reminders and results get through. How do your learners and parents get reminders today?
+
+I'd welcome a 15-minute call to show you how SMS could help you keep more of your learners on track. If it's not a fit for you, I'll say so. Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

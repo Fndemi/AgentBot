@@ -1,0 +1,20 @@
+Subject: SMS cost check for {company}
+{greeting}
+
+{opener}
+
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider.
+
+Reaching all your learners by SMS probably costs less than you expect. If you send a weekly reminder to 5,000 learners, that's about 20,000 SMS a month, about KES 5,000 at our rate of {price_from} per SMS.
+
+I'd welcome a 15-minute call to compare our rates with what you pay now, or to price it for you if you don't use SMS yet. If we can't offer you a better deal, I'll be upfront about it. Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

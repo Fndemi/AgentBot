@@ -6,6 +6,11 @@ Nothing here sends email.
       in industry digital_lender. Without a path the September 2026 directory is downloaded.
       A lead whose email, company name or own email domain is already in leads is skipped. Each new address
       gets the same check as `main.py verify` (MX record), so it ends up verified or invalid.
+  python targeting.py import-microfinance [PDF path or URL]
+      every bank in the Central Bank of Kenya's latest directory of licensed microfinance banks
+      becomes a lead in industry microfinance, with its phone, address, website and licence
+      date. Without a path, the newest directory linked from CBK's bank supervision page is
+      downloaded. Duplicates are skipped and addresses checked as for import-lenders.
   python targeting.py swap-emails
       for imported leads whose address is a legal@, compliance@, report..@, accounts@ or
       finance@ inbox or a person's: looks on their website for info@, hello@, sales@ or
@@ -45,9 +50,14 @@ CBK_DCP_URL = ("https://www.centralbank.go.ke/wp-content/uploads/2026/09/"
                "Directory-of-Digital-Credit-Providers-September-2026.pdf")
 CBK_DCP_SOURCE = "CBK DCP directory Sep 2026"
 INDUSTRY = "digital_lender"
+# Where CBK links its directory of licensed microfinance banks (one PDF, replaced now and then)
+CBK_SUPERVISION_URL = "https://www.centralbank.go.ke/bank-supervision/"
+MFB_LINK = re.compile(r'href="(https?://[^"]*Directory-of-Licen[cs]ed-Microfinance-Banks[^"]*\.pdf)"', re.I)
+MICROFINANCE = "microfinance"
 
 # Page headers and footers repeated on every page of the directory, and bare page numbers
 PAGE_JUNK = re.compile(r"^(?:CENTRAL BANK OF KENYA|DIRECTORY OF DIGITAL CREDIT PROVIDERS|"
+                       r"(?:NO\. )?DIRECTORY OF LICEN[CS]ED MICROFINANCE BANKS|Page \d+ of \d+|"
                        r"UPDATED ON .*|C2: CBK - Official|\d+)$")
 ENTRY = re.compile(r"^(\d+)\.\s+(.+)$")
 # The label each line starts with. Spellings vary ("E-mail address:", "Telephone No:",
@@ -58,7 +68,10 @@ LABELS = [
     ("phone", re.compile(r"^Telephone(?:\s+No\.?|\s+Number)?\s*:?\s*-?", re.I)),
     ("email", re.compile(r"^(?:Official\s+)?E-?mail(?:\s+address)?\s*:", re.I)),
     ("address", re.compile(r"^Physical\s+(?:Address|Location)\s*:", re.I)),
-    ("licensed", re.compile(r"^(?:Date\s+)?Licensed\s*:", re.I)),
+    ("licensed", re.compile(r"^(?:Date\s+)?Licen[cs]ed\s*:", re.I)),
+    ("website", re.compile(r"^Website\s*:", re.I)),
+    ("fax", re.compile(r"^Fax\s*:", re.I)),
+    ("branches", re.compile(r"^Branches\s*:", re.I)),
     ("other", re.compile(r"^L\.R\s*NO\s*:", re.I)),
 ]
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
@@ -100,7 +113,7 @@ def parse_directory(text):
     for line in text.splitlines():
         line = " ".join(line.split())
         # a label run onto the end of the line before it ("Nairobi, KenyaDate Licensed: ...")
-        for part in re.split(r"(?=Date\s+Licensed\s*:)", line):
+        for part in re.split(r"(?=Date\s+Licen[cs]ed\s*:)", line):
             if not part or PAGE_JUNK.match(part):
                 continue
             m = ENTRY.match(part)
@@ -124,16 +137,18 @@ def parse_directory(text):
 def clean(entry):
     emails = list(dict.fromkeys(e.lower() for e in EMAIL.findall(entry.get("email", ""))))
     address = re.sub(r"^Physical\s+Address\s*[.:]\s*", "", entry.get("address", ""), flags=re.I)
-    phone = entry.get("phone", "").strip(" :-")
+    phone = entry.get("phone", "").strip(" :-–")
     if phone.startswith("254"):
         phone = "+" + phone
     email = pick_email(emails)
+    # the directory's own Website line if it has one, else the email's domain
+    listed = entry.get("website", "").strip(" ;,")
     return {
         "number": entry["number"],
         "name": entry["name"].strip(" .,"),
         "emails": emails,
         "email": email,
-        "website": website_of(email),
+        "website": ranking.urlparse_domain(listed) if listed else website_of(email),
         "phone": phone or None,
         "address": address.strip() or None,
         "licensed": iso_date(entry.get("licensed", "")),
@@ -167,7 +182,7 @@ def website_of(email):
 def iso_date(text):
     """'April 10, 2026' as '2026-04-10'. Text that isn't a date is kept as it is."""
     text = text.strip(" .")
-    for fmt in ("%B %d, %Y", "%B %d %Y", "%d %B %Y", "%d %B, %Y"):
+    for fmt in ("%B %d, %Y", "%B %d %Y", "%d %B %Y", "%d %B, %Y", "%d.%m.%Y"):
         try:
             return datetime.strptime(text, fmt).date().isoformat()
         except ValueError:
@@ -200,6 +215,39 @@ def fetch(src):
 
 
 def import_lenders(src=CBK_DCP_URL, source=CBK_DCP_SOURCE, source_url=CBK_DCP_URL):
+    import_directory(src, source, source_url, INDUSTRY)
+
+
+def latest_microfinance_url():
+    """The newest directory of licensed microfinance banks linked from CBK's bank supervision
+    page: the one uploaded last (wp-content/uploads/YYYY/MM/...)."""
+    r = requests.get(CBK_SUPERVISION_URL, timeout=60, headers=BROWSER_HEADERS)
+    r.raise_for_status()
+    links = set(MFB_LINK.findall(r.text))
+    if not links:
+        raise SystemExit(f"No microfinance bank directory linked from {CBK_SUPERVISION_URL}.")
+    return max(links, key=lambda u: (re.search(r"/uploads/(\d{4})/(\d{2})/", u).groups()
+                                     if re.search(r"/uploads/(\d{4})/(\d{2})/", u) else ("0", "0"), u))
+
+
+def microfinance_source(url):
+    """'CBK MFB directory Feb 2026' from the directory's file name."""
+    m = re.search(r"Microfinance-Banks-([A-Za-z]+)-(\d{4})", url)
+    return f"CBK MFB directory {m.group(1)} {m.group(2)}" if m else "CBK MFB directory"
+
+
+def import_microfinance(src=None, source=None, source_url=None):
+    """Every bank in CBK's directory of licensed microfinance banks, as microfinance leads.
+    src: a PDF path or URL; the newest directory on CBK's site when not given."""
+    src = src or latest_microfinance_url()
+    url = src if re.match(r"https?://", src) else source_url
+    import_directory(src, source or microfinance_source(src), url or src, MICROFINANCE)
+
+
+def import_directory(src, source, source_url, industry):
+    """Add every entry in a CBK directory PDF as a lead in `industry`, with its contact
+    details, source and source_url. Duplicates (same email, company name or domain as a lead
+    already there) are skipped; each new address is checked as `main.py verify` does."""
     entries = parse_directory(pdf_text(fetch(src)))
     if not entries:
         raise SystemExit(f"No entries found in {src}.")
@@ -238,7 +286,7 @@ def import_lenders(src=CBK_DCP_URL, source=CBK_DCP_SOURCE, source_url=CBK_DCP_UR
                 "INSERT INTO leads (company, website, industry, email, phone, physical_address,"
                 " date_licensed, source, source_url, discovered_at, imported_at)"
                 " VALUES (?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id",
-                (e["name"], e["website"], INDUSTRY, e["email"], e["phone"], e["address"],
+                (e["name"], e["website"], industry, e["email"], e["phone"], e["address"],
                  e["licensed"], source, source_url)).fetchone()[0]
             db.log_event(c, lead_id, "discovered", source=source, url=source_url)
             added.append(lead_id)
@@ -566,11 +614,12 @@ def unreadable_sites():
 
 
 # --- Need score ---
-# 0-100 from fixed rules. Digital lenders start at 50; every other industry at 40 and gains
-# 10 for each sign on its website that it messages many people. A website that can't be
-# read gives 10 instead of what reading it might have.
-SCORE_VERSION = 3  # 1 was ranking.py's old points; raise this when the rules below change
-LENDER_START, OTHER_START = 50, 40
+# 0-100 from fixed rules. Digital lenders and the five newer niches (ONLINE_NICHES) start at
+# 50, each with its own rules; every other industry at 40 and gains 10 for each sign on its
+# website that it messages many people. A website that can't be read gives 10 instead of
+# what reading it might have, except in ONLINE_NICHES, whose rules don't include that.
+SCORE_VERSION = 4  # 1 was ranking.py's old points; raise this when the rules below change
+LENDER_START, OTHER_START, ONLINE_START = 50, 40, 50
 SITE_WORKERS = 8  # websites read at the same time
 # A website that can't be read even as a browser: it may still be a busy lender's, so it
 # isn't held against the lead
@@ -580,6 +629,14 @@ PORTAL = re.compile(r"\bportal\b", re.I)
 MPESA = re.compile(r"\bm-?\s?pesa\b|\bpay\s?bill\b", re.I)
 SMS_ALERTS = re.compile(r"\bsms\s*(?:alerts?|notifications?)\b", re.I)
 BRANCHES = re.compile(r"\bbranches\b", re.I)
+ONLINE_NICHES = ("ecommerce", "delivery_app", "edtech", "healthtech", "microfinance")
+ONLINE = re.compile(r"\b(?:mobile app|apps?|api|google play|play\s?store|app\s?store|"
+                    r"(?:order|book|learn|shop|buy|pay)\s+online|online\s+(?:orders?|ordering|booking|"
+                    r"bookings|appointments?|learning|classes|courses|shopping|store|shop)|e-?learning)\b", re.I)
+PAYMENTS = re.compile(r"\bm-?\s?pesa\b|\bpay\s?bill\b|\bpayments?\b", re.I)
+# "10,000+ customers", "over 2 million learners", "500 patients": three digits or more
+PEOPLE_COUNT = re.compile(r"\b(?:\d{1,3}(?:,\d{3})+|\d{3,}|\d+(?:\.\d+)?\s*(?:million|thousand|k|m))\+?"
+                          r"\s+(?:[a-z]+\s+){0,2}?(?:customers|learners|students|patients|members|clients|borrowers)\b", re.I)
 # "10,000+ customers", "over 2 million members", "500 students": three digits or more
 COUNT = re.compile(r"\b(?:\d{1,3}(?:,\d{3})+|\d{3,}|\d+(?:\.\d+)?\s*(?:million|thousand|k|m))\+?"
                    r"\s+(?:[a-z]+\s+){0,2}?(?:members|students|customers)\b", re.I)
@@ -611,6 +668,20 @@ def need_score(lead, text):
             points.append((-20, f"email is free mail ({domain_of(email)})"))
         if lead.get("status") == "invalid":
             points.append((-30, "email invalid"))
+    elif lead.get("industry") in ONLINE_NICHES:
+        points.append((ONLINE_START, f"start ({lead['industry']})"))
+        if website and website not in FREE_MAIL:
+            points.append((15, f"own website domain ({website})"))
+        if (seen := _seen(ONLINE, text)):
+            points.append((15, "site mentions an app, API or online orders, booking or learning" + seen))
+        if (seen := _seen(PAYMENTS, text)):
+            points.append((10, "site mentions M-Pesa, paybill or payments" + seen))
+        if (seen := _seen(PEOPLE_COUNT, text)):
+            points.append((10, "site says how many customers, learners, patients or members" + seen))
+        if domain_of(email) in FREE_MAIL:
+            points.append((-20, f"email is free mail ({domain_of(email)})"))
+        if lead.get("status") == "invalid":
+            points.append((-30, "email invalid"))
     else:
         points.append((OTHER_START, f"start ({lead.get('industry') or 'no industry'})"))
         for pattern, why in ((SMS_ALERTS, "SMS alerts"), (MPESA, "M-Pesa or paybill"),
@@ -620,8 +691,10 @@ def need_score(lead, text):
                 continue  # app or portal: 10 points once
             if (seen := _seen(pattern, text)):
                 points.append((10, f"site mentions {why}{seen}"))
-    if text is None:
+    if text is None and lead.get("industry") not in ONLINE_NICHES:
         points.append((10, UNREADABLE) if website else (0, "no website to read"))
+    elif text is None:
+        points.append((0, "couldn't read website"))
     total = max(0, min(100, sum(n for n, _ in points)))
     return total, [f"{n:+d} {why}" if n else why for n, why in points]
 
@@ -696,6 +769,9 @@ if __name__ == "__main__":
         source = take_option(args, "--source") or CBK_DCP_SOURCE
         source_url = take_option(args, "--source-url") or CBK_DCP_URL
         import_lenders(args[0] if args else CBK_DCP_URL, source, source_url)
+    elif cmd == "import-microfinance":
+        source, source_url = take_option(args, "--source"), take_option(args, "--source-url")
+        import_microfinance(args[0] if args else None, source, source_url)
     elif cmd == "swap-emails":
         print(f"Swapped {swap_emails()} emails.")
     elif cmd == "score":

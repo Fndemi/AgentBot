@@ -1,0 +1,20 @@
+Subject: SMS cost check for {company}
+{greeting}
+
+{opener}
+
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider.
+
+If you send frequent repayment reminders and disbursement alerts, small differences in SMS rates add up for you. For example, a difference of KES 0.10 per SMS across 100,000 messages saves or costs you KES 10,000 every month.
+
+I'd welcome a 15-minute call to compare our rates with what you pay now and see whether we could save you money. If we can't offer you a better deal, I'll be upfront about it. Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

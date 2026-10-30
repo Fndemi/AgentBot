@@ -240,20 +240,26 @@ def test_current_wording_lead_keeps_the_uses_line(world, mail):
     assert "bulk SMS" not in text
 
 
-def test_every_follow_up_1_has_the_line_old_wording_leads_swap(world):
-    import personalise
-    for k, v in personalise.USES.items():
-        if v.get("approved"):
-            assert sender.FOLLOWUP1_LINE in sender.followup_template({"industry": k}).read_text(encoding="utf-8")
+def test_every_legacy_follow_up_1_has_the_line_old_wording_leads_swap(world):
+    for k in sender.FOLLOWUP_OFFERS:
+        assert sender.FOLLOWUP1_LINE in sender.followup_template({"industry": k}).read_text(encoding="utf-8")
 
 
-def test_every_approved_industry_has_a_follow_up():
+def test_every_approved_industry_has_its_follow_ups():
+    """An A/B/C industry: a follow-up 1 for each variant and a follow-up 2. Any other: the
+    legacy follow-ups and an {offer}. Every industry with an {offer} has a legacy follow-up 1."""
     import personalise
     approved = [k for k, v in personalise.USES.items() if v.get("approved")]
-    missing = [f"followup{n}/{k}" for n in (1, 2) for k in approved
-               if not sender.followup_template({"industry": k}, n)]
+    missing = []
+    for k in approved:
+        variants = sender.variants({"industry": k})
+        leads = [{"industry": k, "template_variant": v} for v in variants] or [{"industry": k}]
+        missing += [f"followup1/{k}_{l.get('template_variant', '')}" for l in leads if not sender.followup_template(l, 1)]
+        missing += [f"followup2/{k}" for l in leads[:1] if not sender.followup_template(l, 2)]
+        if not variants and k not in sender.FOLLOWUP_OFFERS:
+            missing.append(f"offer/{k}")
     assert missing == []
-    assert sorted(sender.FOLLOWUP_OFFERS) == sorted(approved)
+    assert all(sender.followup_template({"industry": k}) for k in sender.FOLLOWUP_OFFERS)
 
 
 @pytest.mark.parametrize("start, expected", [

@@ -1,0 +1,20 @@
+Subject: Fewer "where is my order?" calls
+{greeting}
+
+{opener}
+
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider.
+
+How many of the calls you get each day are customers asking where their order is? A short SMS when you confirm, dispatch and deliver an order answers that before your customers pick up the phone, and it reaches them even when they're offline. How do your customers get order updates today?
+
+I'd welcome a 15-minute call to show you how order SMS could save your team time. If it's not a fit for you, I'll say so. Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

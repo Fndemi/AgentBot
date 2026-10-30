@@ -237,8 +237,9 @@ MAX_FOLLOWUPS = 2
 # A lead whose out-of-office reply came in this recently is probably still away: its
 # follow-up waits until then
 OUT_OF_OFFICE_HOLD_DAYS = 7
-# {offer} in the follow-ups, by industry. An industry missing here can't get a follow-up
-# built, so it is never sent one by mistake.
+# {offer} in the legacy follow-ups (templates/followup/<industry>.txt), by industry. An industry
+# missing here can't get a legacy follow-up built, so it is never sent one by mistake. The
+# A/B/C follow-ups have no {offer}.
 VISIT_OFFER = "I'd be glad to visit or set up a quick call, whichever suits you."
 API_OFFER = "I can send over our rates and API docs."
 FOLLOWUP_OFFERS = {"church": VISIT_OFFER, "sacco": VISIT_OFFER, "school": VISIT_OFFER,
@@ -268,10 +269,13 @@ def followup_template(lead, n=1):
 
 
 def followup_values(lead):
-    """{uses} and {offer} for a follow-up, e.g. "loan reminders and deposit confirmations"."""
+    """{uses} and {offer} for a follow-up, e.g. "loan reminders and deposit confirmations".
+    {offer} only for an industry in FOLLOWUP_OFFERS (the legacy follow-ups use it)."""
     key = personalise.industry_key(lead)
-    return {"uses": " and ".join(personalise.USES[key]["uses"][:FOLLOWUP_USES]),
-            "offer": FOLLOWUP_OFFERS[key]}
+    values = {"uses": " and ".join(personalise.USES[key]["uses"][:FOLLOWUP_USES])}
+    if key in FOLLOWUP_OFFERS:
+        values["offer"] = FOLLOWUP_OFFERS[key]
+    return values
 
 
 def _same_subject(a, b):
