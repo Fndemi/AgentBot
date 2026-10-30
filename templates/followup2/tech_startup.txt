@@ -1,6 +1,6 @@
 {greeting}
 
-One last note from me. Whenever SMS comes up for {company}, whether it's sign-up codes, alerts or a better price, I'd be glad to help you get started with free credits.
+One last note from me. Whenever SMS comes up for you, whether it's sign-up codes, alerts or a better price, I'd be glad to help you get started with free credits.
 
 It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you, or is there another day that suits you better?
 

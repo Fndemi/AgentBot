@@ -3,7 +3,7 @@ Subject: SMS cost check for {company}
 
 {opener}
 
-I'm {sender} from TalkSasa Communications in Nairobi. As a product grows, SMS for OTPs and alerts becomes a real monthly cost: at 50,000 messages a month, every 10 cents per SMS is KES 5,000.
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider. As your product grows, your SMS for OTPs and alerts becomes a real monthly cost: if you send 50,000 messages a month, every 10 cents per SMS is KES 5,000 to you.
 
 In a 15-minute call I can compare our pricing with what you pay now and tell you honestly whether we can beat it. If we can't, I'll say so. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
 

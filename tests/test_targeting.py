@@ -152,7 +152,8 @@ def test_lenders_get_their_own_first_email(world):
     msg, tname = sender.build(lead)  # one of the lenders' A/B/C first emails, no PDF
     assert tname in ("digital_lender_A", "digital_lender_B", "digital_lender_C")
     text = msg.get_body(("plain",)).get_content()
-    assert text.startswith("Hello Amaze Credit Limited team,\n\n") and "lender" in text.lower()
+    assert text.startswith("Hello Amaze Credit Limited team,\n\n")
+    assert "TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider" in text
     assert "Kind regards,\nFlorence\nTalkSasa Communications Ltd\n+254 762 000 008\ntalksasa.com\n" in text
     assert 'just reply "unsubscribe"' in text
     assert list(msg.iter_attachments()) == []

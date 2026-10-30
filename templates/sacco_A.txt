@@ -3,11 +3,11 @@ Subject: Loan reminders at {company}
 
 {opener}
 
-Quick question: how do members find out a loan instalment is due before it becomes late?
+Quick question: how do your members find out a loan instalment is due before it becomes late?
 
-I'm {sender} from TalkSasa Communications in Nairobi. We help SACCOs send instalment reminders, deposit confirmations and AGM notices by SMS, and we can help you register {company}'s own sender name so members know who it's from.
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider. We can help you send instalment reminders, deposit confirmations and AGM notices by SMS, and help you register your own sender name so your members know who it's from.
 
-I'd like to show you how it could work for {company}, using one of your real reminders as an example. It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
+I'd like to show you how it could work for you, using one of your real reminders as an example. It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
 
 {booking_line}
 

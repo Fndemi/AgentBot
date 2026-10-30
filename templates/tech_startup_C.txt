@@ -3,7 +3,7 @@ Subject: SMS cost check for {company}
 
 {opener}
 
-I'm {sender} from TalkSasa Communications in Nairobi. If {company} already sends SMS, it's worth checking the price as you grow: at 20,000 messages a month, every 10 cents per SMS is KES 2,000.
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider. If you already send SMS, it's worth checking your price as you grow: if you send 20,000 messages a month, every 10 cents per SMS is KES 2,000 to you.
 
 In a 15-minute call I can compare our pricing with what you pay now and tell you honestly whether we can beat it. If we can't, I'll say so. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
 

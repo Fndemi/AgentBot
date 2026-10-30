@@ -3,7 +3,7 @@ Subject: Free side-by-side SMS test for {company}
 
 {opener}
 
-I'm {sender} from TalkSasa Communications in Nairobi. Most lenders already have an SMS provider, so here's a low-effort way to compare: we'll give {company} {free_sms} free SMS to send repayment reminders or OTPs through us alongside your current provider, and you compare delivery for yourself.
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider. You probably already have an SMS provider, so here's a low-effort way for you to compare: we'll give you {free_sms} free SMS to send repayment reminders or OTPs through us alongside your current provider, and you compare delivery for yourself.
 
 We can plan the test in a 15-minute call with your tech lead, {meet_options}. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
 

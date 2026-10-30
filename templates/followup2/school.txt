@@ -1,6 +1,6 @@
 {greeting}
 
-One last note from me. Before next term's fee reminders and closing notices, I'd be glad to show you how {company} could send them by SMS, and set up a free test while we're at it.
+One last note from me. Before next term's fee reminders and closing notices, I'd be glad to show you how you could send them by SMS, and set up a free test while we're at it.
 
 It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you, or is there another day that suits you better?
 

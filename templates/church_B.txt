@@ -3,7 +3,7 @@ Subject: Free SMS test for {company}
 
 {opener}
 
-I'm {sender} from TalkSasa Communications in Nairobi. We'd like to give {company} {free_sms} free SMS to try with your members: a Sunday reminder, an event invitation or a thank-you for contributions.
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider. We'd like to give you {free_sms} free SMS to try with your members: a Sunday reminder, an event invitation or a thank-you for contributions.
 
 There's no contract, and after the test you only pay for what you send, from {price_from} per SMS.
 

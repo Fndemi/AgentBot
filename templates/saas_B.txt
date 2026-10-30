@@ -3,7 +3,7 @@ Subject: Free SMS credits for {company}
 
 {opener}
 
-I'm {sender} from TalkSasa Communications in Nairobi. We'd like to give {company} {free_sms} free SMS to test our API with your OTPs or notifications.
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider. We'd like to give you {free_sms} free SMS to test our API with your OTPs or notifications.
 
 There's no contract and no minimum, and after the test you only pay for what you send, from {price_from} per SMS.
 

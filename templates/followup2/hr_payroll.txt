@@ -1,6 +1,6 @@
 {greeting}
 
-One last note from me. Whether it's reaching staff without email or a better price per SMS, I think a short conversation could be worth it for {company}.
+One last note from me. Whether it's reaching staff without email or a better price per SMS, I think a short conversation could be worth your time.
 
 It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you, or is there another day that suits you better?
 

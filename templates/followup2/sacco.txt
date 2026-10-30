@@ -1,6 +1,6 @@
 {greeting}
 
-One last note from me. If reaching members on time is on your list this year, I'd be glad to show you how {company} could send reminders and notices by SMS, and set up a free test while we're at it.
+One last note from me. If reaching members on time is on your list this year, I'd be glad to show you how you could send reminders and notices by SMS, and set up a free test while we're at it.
 
 It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you, or is there another day that suits you better?
 

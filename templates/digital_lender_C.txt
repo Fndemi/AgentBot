@@ -3,9 +3,13 @@ Subject: SMS cost check for {company}
 
 {opener}
 
-I'm {sender} from TalkSasa Communications in Nairobi. Lenders send a lot of reminders, so price per SMS adds up: at 100,000 reminders a month, every 10 cents per SMS is KES 10,000.
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider.
 
-In a 15-minute call I can compare our pricing with what you pay now and tell you honestly whether we can beat it. If we can't, I'll say so. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
+For lenders sending frequent repayment reminders and transaction alerts, small differences in SMS rates can add up. For example, a difference of KES 0.10 per SMS across 100,000 messages equals KES 10,000 per month.
+
+I'd welcome a 15-minute call to compare our rates with your current provider and see whether TalkSasa could offer a more cost-effective option. If we can't offer a better deal, I'll be upfront about it.
+
+Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
 
 {booking_line}
 

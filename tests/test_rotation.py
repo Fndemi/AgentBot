@@ -103,7 +103,7 @@ def test_facts_come_from_the_settings(world, monkeypatch):
     monkeypatch.setattr(config, "SETUP_TIME", "1 day")
     lead = {"id": 1, "company": "Umoja SACCO", "industry": "sacco", "email": "a@umoja.co.ke", "template_variant": "B"}
     text = plain(sender.build(lead)[0])
-    assert "give Umoja SACCO 50 free SMS" in text and "from KES 0.25 per SMS" in text
+    assert "give you 50 free SMS" in text and "from KES 0.25 per SMS" in text
     assert "which usually takes 1 day" in plain(sender.build_followup(lead, 1)[0])
 
 
@@ -356,7 +356,7 @@ def test_crm_lists_and_edits_the_variants(world, tmp_path, monkeypatch):
     t = crm.get_template("first", "sacco_B", admin)
     assert t["subject"] == "Free SMS test for {company}" and "slot1" in t["fields"]
     prev = crm.preview_template("first", "sacco_B", crm.TemplateIn(subject=t["subject"], body=t["body"]), admin)
-    assert prev["problem"] is None and prev["attachments"] == [] and "Example Company 500 free SMS" in prev["text"]
+    assert prev["problem"] is None and prev["attachments"] == [] and "give you 500 free SMS" in prev["text"]
     f1 = crm.preview_template("followup", "sacco_B", crm.TemplateIn(body="Hi {company}, {slot1}?"), admin)
     assert f1["problem"] is None and f1["subject"] == "Re: Free SMS test for Example Company"
     legacy = crm.get_template("followup", "sacco", admin)

@@ -3,11 +3,11 @@ Subject: Fee reminders at {company}
 
 {opener}
 
-Quick question: how do you remind parents about fee balances and closing dates today? Notes in school bags and WhatsApp groups are easy to miss.
+Quick question: how do you remind parents about fee balances and closing dates today? Notes in school bags and WhatsApp groups are easy for your parents to miss.
 
-I'm {sender} from TalkSasa Communications in Nairobi. We help schools send fee reminders, closing dates and exam result alerts by SMS, and we can help you register the school's own sender name so parents know who it's from.
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider. We can help you send fee reminders, closing dates and exam result alerts by SMS, and help you register your school's own sender name so your parents know who it's from.
 
-I'd like to show you how it could work for {company}, using one of your real notices as an example. It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
+I'd like to show you how it could work for you, using one of your real notices as an example. It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
 
 {booking_line}
 

@@ -3,9 +3,9 @@ Subject: Verification codes that arrive on time
 
 {opener}
 
-Quick question: when a customer's verification code arrives late, how many of them give up on signing in or signing up?
+Quick question: when one of your customers gets a verification code late, how often do they give up on signing in or signing up?
 
-I'm {sender} from TalkSasa Communications in Nairobi. We send OTPs, account alerts and customer notifications by SMS through a simple API, and we can help you register your product's own sender name.
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider. We send OTPs, account alerts and customer notifications by SMS through a simple API, and we can help you register your product's own sender name.
 
 Could we take 15 minutes to compare our delivery with what you use now, {meet_options}? Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
 

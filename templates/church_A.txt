@@ -3,11 +3,11 @@ Subject: Announcements at {company}
 
 {opener}
 
-Quick question: how do members who missed Sunday service hear about events, contributions or bereavement notices?
+Quick question: how do your members who missed Sunday service hear about events, contributions or bereavement notices?
 
-I'm {sender} from TalkSasa Communications in Nairobi. We help churches send service updates, event reminders and contribution thank-you messages by SMS, and we can help you register the church's own sender name so members know who it's from.
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider. We can help you send service updates, event reminders and contribution thank-you messages by SMS, and help you register your church's own sender name so your members know who it's from.
 
-I'd like to show you how it could work for {company}, using one of your real announcements as an example. It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
+I'd like to show you how it could work for you, using one of your real announcements as an example. It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
 
 {booking_line}
 

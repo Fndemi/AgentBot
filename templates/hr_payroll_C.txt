@@ -3,7 +3,7 @@ Subject: SMS cost check for {company}
 
 {opener}
 
-I'm {sender} from TalkSasa Communications in Nairobi. If {company} already sends payslip alerts or login codes by SMS, a small difference in price adds up across every pay run.
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider. If you already send payslip alerts or login codes by SMS, a small difference in price adds up for you across every pay run.
 
 In a 15-minute call I can compare our pricing with what you pay now and tell you honestly whether we can beat it. If we can't, I'll say so. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
 

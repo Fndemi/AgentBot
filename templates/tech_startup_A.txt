@@ -5,7 +5,7 @@ Subject: SMS for {company}'s product
 
 Quick question: is SMS part of your product yet, for sign-up codes, alerts or customer updates, or is it on the roadmap?
 
-I'm {sender} from TalkSasa Communications in Nairobi. We give startups a simple SMS API with pay-as-you-go pricing and no minimum, so you only pay for what you send.
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider. We give startups a simple SMS API with pay-as-you-go pricing and no minimum, so you only pay for what you send.
 
 If SMS is coming up, could we take 15 minutes to see how it would fit, {meet_options}? Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
 
