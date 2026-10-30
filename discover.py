@@ -306,8 +306,16 @@ ISP_NAMES = ("safaricom", "airtel", "telkom", "zuku", "faiba", "liquid.tech", "l
              "wananchi", "poainternet", "mawingu", "starlink", "vilcom")
 ISP_TITLE = re.compile(r"internet service provider|\bISP\b|fibre internet|fiber internet|"
                        r"home internet|broadband", re.I)
-# Other bulk SMS companies are competitors, not leads
-RIVAL_TITLE = re.compile(r"bulk sms", re.I)
+# Other bulk SMS companies are competitors, not leads. A site is one if its title, description
+# or main headings sell SMS (RIVAL_HEADLINE), if its address is a known one or a name ending in
+# "sms" ("advantasms", "bongasms"; not "tourisms"), or if the email it gives is on such a site: a product
+# site whose address is an SMS company's belongs to that company.
+RIVAL_HEADLINE = re.compile(r"bulk\s*sms|sms\s+gateway|sms\s+(?:service\s+)?provider|sms\s+marketing", re.I)
+# Sites that hide their headings from a plain fetch, and our own
+RIVAL_DOMAINS = ("africastalking", "advantasms", "celcomafrica", "onfonmedia", "bongasms", "bongatech",
+                 "mobitechtechnologies", "movesms", "blessedtexts", "sematime", "tiaraconnect",
+                 "hostpinnacle", "infobip", "twilio", "vonage", "smsleopard", "textsms", "talksasa")
+FREE_MAIL = ("gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "live.com", "icloud.com", "me.com", "ymail.com")
 RESULTS_PER_QUERY = 10
 DEFAULT_MAX = 30
 CSV_PATH = Path(__file__).parent / "discovered.csv"
@@ -336,9 +344,18 @@ def skip_title(title, category):
     # The utility category searches for internet providers on purpose
     if category != "utility" and ISP_TITLE.search(title or ""):
         return "internet provider"
-    if RIVAL_TITLE.search(title or ""):
-        return "another bulk SMS company"
     return None
+
+
+def rival_reason(domain, headline):
+    """Why this site is another bulk SMS company, or None. `headline` is its title,
+    description and main headings (look_at)."""
+    labels = re.split(r"[.-]", domain or "")
+    if any(r in (domain or "") for r in RIVAL_DOMAINS) or any(
+            l.endswith("sms") and not l.endswith("isms") for l in labels):
+        return f"another bulk SMS company ({domain})"
+    m = RIVAL_HEADLINE.search(headline or "")
+    return f'another bulk SMS company ("{m.group(0)}" on {domain})' if m else None
 
 
 def known_domains():
@@ -356,7 +373,8 @@ def company_name(title, domain):
 
 
 def look_at(url):
-    """Fetch the homepage. Returns (title, mentions_kenya) or None if unreachable."""
+    """Fetch the homepage. Returns (title, mentions_kenya, headline) or None if unreachable.
+    headline is the title, the description and the main headings, joined."""
     try:
         r = requests.get(url, headers=scraper.HEADERS, timeout=10)
     except requests.RequestException:
@@ -365,7 +383,21 @@ def look_at(url):
         return None
     soup = BeautifulSoup(r.content, "html.parser")  # bytes: lets bs4 detect the encoding
     title = soup.title.get_text(" ", strip=True) if soup.title else ""
-    return title, "kenya" in soup.get_text(" ").lower()
+    headline = " | ".join([title] + [m.get("content", "") for m in soup.select(
+        'meta[name="description"], meta[property="og:description"]')] +
+        [h.get_text(" ", strip=True) for h in soup.select("h1, h2")])
+    return title, "kenya" in soup.get_text(" ").lower(), headline
+
+
+def email_rival(email, domain):
+    """Why the site's email address belongs to another bulk SMS company, or None. Only an
+    address on another business's domain is looked at (its homepage is read once)."""
+    mail_domain = email.rsplit("@", 1)[-1].lower()
+    if mail_domain in FREE_MAIL or mail_domain == domain or mail_domain.endswith("." + domain) \
+            or domain.endswith("." + mail_domain):
+        return None
+    page = look_at(f"https://{mail_domain}")
+    return rival_reason(mail_domain, page[2] if page else "")
 
 
 def search(query):
@@ -392,16 +424,20 @@ def consider(url, category, query, seen):
     page = look_at(home)
     if not page:
         return None
-    title, mentions_kenya = page
+    title, mentions_kenya, headline = page
     if not (domain.endswith(".ke") or mentions_kenya):
         return None
-    reason = skip_title(title, category)
+    reason = skip_title(title, category) or rival_reason(domain, headline)
     if reason:
         print(f"    {domain}: skipped ({reason})")
         return None
     email = scraper.pick_best(scraper.scrape_site(home))
     if not email:
         print(f"    {domain}: no email found")
+        return None
+    reason = email_rival(email, domain)
+    if reason:
+        print(f"    {domain}: skipped ({email}: {reason})")
         return None
     if db.is_suppressed(email):
         print(f"    {domain}: {email} is on the suppression list")
