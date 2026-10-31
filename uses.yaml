@@ -118,9 +118,11 @@ saas:
 software_agency:
   approved: true
   uses: [OTPs, reminders, alerts]
+  variants: [A, B]
 software_vendor:
   approved: true
   uses: [OTPs, reminders, alerts]
+  variants: [A, B]
 sacco:
   approved: true
   uses: [loan reminders, deposit confirmations, AGM notices]
