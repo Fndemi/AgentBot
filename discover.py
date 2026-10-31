@@ -316,6 +316,11 @@ RIVAL_DOMAINS = ("africastalking", "advantasms", "celcomafrica", "onfonmedia", "
                  "mobitechtechnologies", "movesms", "blessedtexts", "sematime", "tiaraconnect",
                  "hostpinnacle", "infobip", "twilio", "vonage", "smsleopard", "textsms", "talksasa")
 FREE_MAIL = ("gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "live.com", "icloud.com", "me.com", "ymail.com")
+# Law firms come up in searches for other niches ("payment service provider Kenya"). Only the
+# professional category looks for them on purpose. Read from the page title and the address.
+LAW_FIRM_TITLE = re.compile(r"\badvocates?\b|\blaw\s+(?:firm|offices?|chambers)\b|\bLLP\b|"
+                            r"\battorneys?\b|\bsolicitors?\b|\blegal\s+(?:advisory|practice|consultants?)\b", re.I)
+LAW_FIRM_DOMAIN = re.compile(r"advocates|lawfirm|lawyers|attorneys|(?:^|[.-])llp(?:$|[.-])")
 RESULTS_PER_QUERY = 10
 DEFAULT_MAX = 30
 CSV_PATH = Path(__file__).parent / "discovered.csv"
@@ -345,6 +350,14 @@ def skip_title(title, category):
     if category != "utility" and ISP_TITLE.search(title or ""):
         return "internet provider"
     return None
+
+
+def law_firm_reason(domain, title, category):
+    """A reason to skip a law firm found for any category but professional, or None."""
+    if category == "professional":
+        return None
+    m = LAW_FIRM_TITLE.search(title or "") or LAW_FIRM_DOMAIN.search(domain or "")
+    return f'a law firm ("{m.group(0)}")' if m else None
 
 
 def rival_reason(domain, headline):
@@ -427,7 +440,8 @@ def consider(url, category, query, seen):
     title, mentions_kenya, headline = page
     if not (domain.endswith(".ke") or mentions_kenya):
         return None
-    reason = skip_title(title, category) or rival_reason(domain, headline)
+    reason = (skip_title(title, category) or law_firm_reason(domain, title, category)
+              or rival_reason(domain, headline))
     if reason:
         print(f"    {domain}: skipped ({reason})")
         return None

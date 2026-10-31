@@ -1,5 +1,6 @@
 """Discovery never adds another bulk SMS company as a lead: not by its page title alone, but by
-its description and headings, its address, and the address of the email its site gives.
+its description and headings, its address, and the address of the email its site gives. Law
+firms are left out too, unless the search was for them (the professional category).
 Websites are fakes: nothing is fetched."""
 import pytest
 
@@ -80,3 +81,31 @@ def test_free_mail_and_own_domain_need_no_second_look(world):
 @pytest.mark.parametrize("domain", ["tourisms.co.ke", "smsacco.co.ke"])
 def test_names_that_only_contain_sms_are_not_rivals(domain):
     assert discover.rival_reason(domain, "Welcome") is None
+
+
+def add_for(world, category, domain, title, email):
+    sites, emails, _ = world
+    sites[domain], emails[domain] = (title, "Welcome"), email
+    return discover.consider(f"https://{domain}/", category, "payment service provider Kenya", set())
+
+
+@pytest.mark.parametrize("domain, title", [
+    ("kdsadvocates.com", "KDS Advocates and Legal Advisory"),
+    ("mwangi.co.ke", "Mwangi & Co | Law Firm in Nairobi"),
+    ("ab-llp.co.ke", "A&B | Home"),
+    ("otieno.co.ke", "Otieno Attorneys"),
+])
+def test_law_firms_are_skipped_outside_professional(world, capsys, domain, title):
+    assert add_for(world, "payment_provider", domain, title, f"info@{domain}") is None
+    assert "a law firm" in capsys.readouterr().out
+
+
+def test_law_firms_are_kept_when_the_search_was_for_them(world):
+    assert add_for(world, "professional", "kdsadvocates.com", "KDS Advocates and Legal Advisory",
+                   "info@kdsadvocates.com")
+
+
+@pytest.mark.parametrize("title", ["Pesapal | Payments for businesses", "Legal notice | Paykit",
+                                   "LegalTech Africa | Software"])
+def test_other_titles_are_not_law_firms(world, title):
+    assert discover.law_firm_reason("pesa.co.ke", title, "payment_provider") is None
