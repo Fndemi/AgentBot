@@ -4,6 +4,7 @@
   python main.py scrape companies.csv    find emails on company websites
   python main.py discover [category] [--max N]   search the web for new leads (DISCOVER_PER_DAY)
   python main.py discover-log [days]     what discovery did per niche each day (default 7)
+  python main.py clean-leads [--apply]   leads to rename (site's own name) or exclude (directories, events...)
   python main.py verify                  check email domains
   python main.py personalise [--limit N] write a personal opening for verified leads from their websites
   python main.py rank                    top 20 waiting leads in sending order, with start year and score
@@ -53,6 +54,9 @@ def main():
         import discover
         max_new = take_number(args, "--max")
         discover.run(args[0] if args else None, max_new)
+    elif cmd == "clean-leads":
+        import quality
+        quality.run(apply="--apply" in args)
     elif cmd == "discover-log":
         import discover
         discover.show_log(int(args[0]) if args and args[0].isdigit() else 7)

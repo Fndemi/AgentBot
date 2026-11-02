@@ -96,6 +96,14 @@ def template_facts(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def niche_fits(monkeypatch):
+    """The niche check (nichefit.py) reads no website and asks no AI: every lead fits the
+    niche it is in. Tests of the check put the real site_niche back."""
+    import nichefit
+    monkeypatch.setattr(nichefit, "site_niche", lambda lead: (dict(lead)["industry"], "test"))
+
+
+@pytest.fixture(autouse=True)
 def no_paused_industries(monkeypatch):
     """No industry is paused (paused_until in uses.yaml) unless a test pauses one, so tests
     don't change with the date they run on."""

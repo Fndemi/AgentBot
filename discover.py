@@ -15,6 +15,10 @@ sites are visited. Then its QUERIES, each run with a random town from TOWNS in p
 Searches stop for the day when today's share of the month's Tavily calls is used
 (websearch.daily_allowance). What each niche did is kept in discovery_log by day: searches,
 results, leads added and why the other sites visited were dropped.
+A lead's name is the organisation's own name on its site, never its page title
+(quality.org_name). Directories, marketplaces, events, associations, communities,
+accelerators, media and government sites are never added (quality.excluded_reason), but the
+company sites they link to are visited.
 Every lead found is also appended to discovered.csv so you can review it in Excel.
 """
 import csv
@@ -22,7 +26,7 @@ import json
 import random
 import re
 import time
-from collections import Counter
+from collections import Counter, namedtuple
 from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
@@ -33,6 +37,7 @@ from bs4 import BeautifulSoup
 import config
 import db
 import personalise
+import quality
 import rotation
 import scraper
 import websearch
@@ -420,17 +425,15 @@ def known_domains():
     return {domain_of(r["website"]) for r in rows if r["website"]}
 
 
-def company_name(title, domain):
-    """Pick the company name out of a page <title> like 'Home | Acme SACCO Ltd'."""
-    parts = [p.strip() for p in re.split(r"\s*[|–—·»]\s*|\s+-\s+|:\s+", title or "")]
-    parts = [p for p in parts
-             if p and not re.fullmatch(r"(home|homepage|welcome|index|contact( us)?|about( us)?)", p, re.I)]
-    return (parts[0] if parts else domain)[:120]
+# A homepage as look_at reads it. headline: the title, descriptions and main headings;
+# name: the organisation's own name (quality.org_name); intro: the title and descriptions
+Page = namedtuple("Page", "title kenya headline name intro")
+# A site that is never a lead but lists companies (quality.excluded_reason)
+Listing = namedtuple("Listing", "home why")
 
 
 def look_at(url):
-    """Fetch the homepage. Returns (title, mentions_kenya, headline) or None if unreachable.
-    headline is the title, the description and the main headings, joined."""
+    """Fetch the homepage. Returns a Page, or None if unreachable."""
     try:
         r = requests.get(url, headers=scraper.HEADERS, timeout=10)
     except requests.RequestException:
@@ -439,10 +442,10 @@ def look_at(url):
         return None
     soup = BeautifulSoup(r.content, "html.parser")  # bytes: lets bs4 detect the encoding
     title = soup.title.get_text(" ", strip=True) if soup.title else ""
-    headline = " | ".join([title] + [m.get("content", "") for m in soup.select(
-        'meta[name="description"], meta[property="og:description"]')] +
-        [h.get_text(" ", strip=True) for h in soup.select("h1, h2")])
-    return title, "kenya" in soup.get_text(" ").lower(), headline
+    intro = quality.page_intro(soup)
+    headline = " | ".join([intro] + [h.get_text(" ", strip=True) for h in soup.select("h1, h2")])
+    return Page(title, "kenya" in soup.get_text(" ").lower(), headline,
+                quality.org_name(soup, domain_of(url)), intro)
 
 
 def email_rival(email, domain):
@@ -471,7 +474,8 @@ def save_csv(row):
 
 def consider(url, category, query, seen, tally=None):
     """Visit one company site and add it as a lead if it qualifies.
-    Returns the new lead's row, or None. Counts the outcome in `tally`."""
+    Returns the new lead's row, None, or a Listing for a directory, event, association...
+    (whose companies visit() goes on to). Counts the outcome in `tally`."""
     domain = domain_of(url)
     if domain in seen:
         return dropped(tally, "already known")
@@ -482,9 +486,14 @@ def consider(url, category, query, seen, tally=None):
     page = look_at(home)
     if not page:
         return dropped(tally, "site unreachable")
-    title, mentions_kenya, headline = page
+    title, mentions_kenya, headline, org, intro = page
     if not (domain.endswith(".ke") or mentions_kenya):
         return dropped(tally, "not in Kenya")
+    why = quality.excluded_reason(domain, intro or title)
+    if why:
+        print(f"    {domain}: skipped ({why}); visiting the companies it lists")
+        dropped(tally, why)
+        return Listing(home, why)
     for why, reason in (("internet provider", lambda: skip_title(title, category)),
                         ("law firm", lambda: law_firm_reason(domain, title, category)),
                         ("bulk SMS company", lambda: rival_reason(domain, headline))):
@@ -502,7 +511,7 @@ def consider(url, category, query, seen, tally=None):
     if db.is_suppressed(email):
         print(f"    {domain}: {email} is on the suppression list")
         return dropped(tally, "on the suppression list")
-    name = company_name(title, domain)
+    name = org or quality.domain_brand(domain)
     if not db.add_lead(name, domain, category, email, "search", query, url):
         print(f"    {domain}: {email} already a lead")
         return dropped(tally, "email already a lead")
@@ -513,6 +522,31 @@ def consider(url, category, query, seen, tally=None):
     if tally:
         tally.added += 1
     return row
+
+
+def visit(url, category, query, seen, tally, limit):
+    """consider() one site and return the leads added (at most `limit`). A site that is never
+    a lead but lists companies (a directory, event, association, accelerator...) has the
+    companies it links to visited instead; their own links are not followed."""
+    got = consider(url, category, query, seen, tally)
+    if not isinstance(got, Listing):
+        return [got] if got else []
+    added = []
+    for target in listed_companies(got.home, seen):
+        row = consider(target, category, f"listed on {got.home}", seen, tally)
+        if isinstance(row, dict):
+            added.append(row)
+            if len(added) >= limit:
+                break
+    return added
+
+
+def listed_companies(home, seen):
+    """The company sites a listing site links to, from its homepage and portfolio pages."""
+    out = []
+    for page in [home] + portfolio_pages(home):
+        out += [u for u in listed_sites(page) if domain_of(u) not in seen and u not in out]
+    return out
 
 
 def listed_sites(page_url):
@@ -566,7 +600,7 @@ def from_list_pages(results, category, limit, seen, tally):
                 print(f"    {domain_of(url)}: has a portfolio page, visiting {len(targets)} companies listed there")
             for target, source in targets:
                 row = consider(target, category, f"listed on {source}", seen, tally)
-                if row:
+                if isinstance(row, dict):
                     added.append(row)
                     if len(added) >= limit:
                         return added
@@ -593,11 +627,9 @@ def run_search(kind, query, category, limit, seen, tally):
         return from_list_pages(results, category, limit, seen, tally)
     added = []
     for res in results:
-        row = consider(res.get("href") or "", category, query, seen, tally)
-        if row:
-            added.append(row)
-            if len(added) >= limit:
-                break
+        added += visit(res.get("href") or "", category, query, seen, tally, limit - len(added))
+        if len(added) >= limit:
+            break
     return added
 
 

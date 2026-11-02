@@ -29,6 +29,7 @@ python main.py init
 python main.py scrape companies.csv   # add leads from your own list
 python main.py discover sacco --max 5 # or find leads by web search (see discover.py)
 python main.py discover-log            # what discovery did per niche each day
+python main.py clean-leads             # leads to rename or exclude (add --apply to do it)
 python main.py verify                 # drop dead domains
 python main.py send --dry-run         # read 3 sample emails first
 python main.py preview                # one email, plain and HTML versions

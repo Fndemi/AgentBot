@@ -17,6 +17,7 @@ from pathlib import Path
 import config
 import contacts
 import db
+import nichefit
 import notify
 import personalise
 import ranking
@@ -443,8 +444,9 @@ def deliver(smtp, lead, msg, tname, followup=0):
     Every send goes through here, so this is also where the limits are kept: a first email
     only to a lead never emailed, follow-up n only after exactly n emails, at most
     MAX_FOLLOWUPS of them, only when follow-ups are approved, never to an industry paused in
-    uses.yaml (paused_until), and never while a fact the templates quote is missing
-    (rotation.refusal).
+    uses.yaml (paused_until), never to an excluded lead (quality.py) or a first email to one
+    that fits no approved niche (nichefit.py), and never while a fact the templates quote is
+    missing (rotation.refusal).
     The lead's rotation variant is saved on the sent row, and on the lead with its first email."""
     refused = rotation.refusal()
     if refused:
@@ -454,6 +456,10 @@ def deliver(smtp, lead, msg, tname, followup=0):
     if personalise.paused(lead, rotation.today()):
         raise RuntimeError(f"{lead['email']}: {personalise.industry_key(lead)} is paused until "
                            f"{personalise.paused_until(lead)} in uses.yaml")
+    if dict(lead).get("status") == "excluded":
+        raise RuntimeError(f"{lead['email']} is excluded ({dict(lead).get('excluded_reason')})")
+    if not followup and dict(lead).get("niche_fit") == nichefit.NONE:
+        raise RuntimeError(f"{lead['email']} fits no approved niche ({dict(lead).get('niche_reason')})")
     emailed = db.sent_count(lead["id"])
     if followup and not config.FOLLOWUPS_APPROVED:
         raise RuntimeError(f"{lead['email']}: follow-ups are not approved (FOLLOWUPS_APPROVED in .env)")
@@ -550,8 +556,9 @@ def approved_waiting(quiet=False):
     """Waiting leads whose industry is approved in uses.yaml and whose need score is at
     least MIN_SCORE, in sending order (highest score first). The rest are skipped and left
     exactly as they are, so they go out once their industry is approved or their score
-    rises. A lead not scored yet counts as 0."""
-    waiting = ranking.waiting()
+    rises. A lead not scored yet counts as 0. A lead the niche check found fits no approved
+    niche (nichefit.py) is left out."""
+    waiting = [l for l in ranking.waiting() if l["niche_fit"] != nichefit.NONE]
     leads = [l for l in waiting if personalise.approved(l)]
     if len(leads) < len(waiting) and not quiet:
         skipped = sorted({personalise.industry_key(l) for l in waiting if not personalise.approved(l)})
@@ -669,11 +676,20 @@ def plan(dry_run=False):
             ranking.fill_years()
             targeting.score_unscored()
         leads = spread(approved_waiting(), remaining - len(due))
+        # Check today's leads belong to the niche whose email they would get (nichefit.py),
+        # then pick again: a lead that fits none drops out, one that fits another niche
+        # moves there and is scored again; one that couldn't be checked waits for next time
+        later = set()
+        while not dry_run and (todo := [l for l in leads if nichefit.needs_check(l) and l["id"] not in later]):
+            later |= nichefit.check(todo)
+            targeting.score_unscored()
+            leads = spread([l for l in approved_waiting(quiet=True) if l["id"] not in later], remaining - len(due))
         # Read today's leads' websites for who to write to (contacts.py), and write personal
         # lines for any of them that don't have them yet; then read the leads again
         if not dry_run and leads and (contacts.run(leads) + personalise.run(leads)
                                       or any(l["confidence"] is None for l in leads)):
-            leads = spread(approved_waiting(quiet=True), remaining - len(due))
+            leads = spread([l for l in approved_waiting(quiet=True) if l["id"] not in later],
+                           remaining - len(due))
     return due + [(lead, 0) for lead in leads]
 
 

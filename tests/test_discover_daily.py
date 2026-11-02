@@ -31,7 +31,7 @@ def world(tmp_path, monkeypatch):
         return [{"href": f"https://{slug}{i}.co.ke/"} for i in range(3)]
 
     monkeypatch.setattr(discover, "search", search)
-    monkeypatch.setattr(discover, "look_at", lambda url: (discover.domain_of(url), True, ""))
+    monkeypatch.setattr(discover, "look_at", lambda url: discover.Page(discover.domain_of(url), True, "", None, ""))
     monkeypatch.setattr(discover.scraper, "scrape_site", lambda home: (
         set() if discover.domain_of(home).startswith("noemail") else {f"info@{discover.domain_of(home)}"}))
     monkeypatch.setattr(discover, "listed_sites", lambda page: [

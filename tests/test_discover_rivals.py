@@ -22,7 +22,7 @@ def world(tmp_path, monkeypatch):
         if domain not in sites:
             return None
         title, headline = sites[domain]
-        return title, True, f"{title} | {headline}"
+        return discover.Page(title, True, f"{title} | {headline}", None, title)
 
     monkeypatch.setattr(discover, "look_at", look_at)
     monkeypatch.setattr(discover.scraper, "scrape_site", lambda home: {emails[discover.domain_of(home)]})

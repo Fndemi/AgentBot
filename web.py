@@ -27,7 +27,7 @@ HERE = Path(__file__).parent
 PAGE = HERE / "static" / "index.html"
 HEARTBEAT = HERE / "last_check.txt"
 ALLOWED_STATUSES = {"new", "verified", "invalid", "sent", "replied", "meeting", "client",
-                    "bounced", "unsubscribed", "lost"}
+                    "bounced", "unsubscribed", "lost", "excluded"}
 
 
 def conn():

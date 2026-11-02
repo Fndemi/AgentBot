@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS leads (
     email TEXT UNIQUE,
     status TEXT DEFAULT 'new',
     -- new -> verified / invalid -> sent -> replied / bounced / unsubscribed
+    -- excluded: a directory, event, association, media site, government body... (quality.py);
+    -- excluded_reason says which. It gets no first email and no follow-ups.
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     -- the AI's two slots in the email (see personalise.py): opener is its sentence about
     -- the lead's website, uses is a JSON list picked from uses.yaml. confidence is NULL
@@ -85,7 +87,13 @@ CREATE TABLE IF NOT EXISTS leads (
     -- based on and that page's address; opener_note says why there is no opener, if none
     opener_source TEXT,
     opener_url TEXT,
-    opener_note TEXT
+    opener_note TEXT,
+    excluded_reason TEXT,
+    -- which approved niche the AI says the lead's website belongs to (nichefit.py): a niche
+    -- in uses.yaml, or 'none' when none fits (no email then); niche_reason is the AI's why
+    niche_fit TEXT,
+    niche_reason TEXT,
+    niche_checked_at TEXT
 );
 CREATE TABLE IF NOT EXISTS sent (
     id INTEGER PRIMARY KEY,
@@ -349,7 +357,9 @@ def init():
                                  ("leads", "contact_email", "TEXT"), ("leads", "contact_url", "TEXT"),
                                  ("leads", "contact_checked_at", "TEXT"), ("leads", "opener_source", "TEXT"),
                                  ("leads", "opener_url", "TEXT"), ("leads", "opener_note", "TEXT"),
-                                 ("sent", "with_opener", "INTEGER"), ("sent", "to_contact", "INTEGER")):
+                                 ("sent", "with_opener", "INTEGER"), ("sent", "to_contact", "INTEGER"),
+                                 ("leads", "excluded_reason", "TEXT"), ("leads", "niche_fit", "TEXT"),
+                                 ("leads", "niche_reason", "TEXT"), ("leads", "niche_checked_at", "TEXT")):
             if col not in columns(c, table):
                 c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {kind}")
         # Leads from before these existed
@@ -448,6 +458,31 @@ def set_status(lead_id, status, by=None):
         if status in ("bounced", "unsubscribed"):
             _suppress(c, lead["email"], status)
     return True
+
+def exclude(lead_id, reason, by=None):
+    """Never email this lead again (no first email, no follow-ups): status 'excluded'."""
+    with conn() as c:
+        c.execute("UPDATE leads SET excluded_reason=? WHERE id=?", (reason, lead_id))
+        log_event(c, lead_id, "excluded", reason=reason, by=by)
+    return set_status(lead_id, "excluded", by)
+
+def rename(lead_id, company, by=None):
+    with conn() as c:
+        old = c.execute("SELECT company FROM leads WHERE id=?", (lead_id,)).fetchone()
+        if not old or old["company"] == company:
+            return
+        c.execute("UPDATE leads SET company=? WHERE id=?", (company, lead_id))
+        log_event(c, lead_id, "company_renamed", old=old["company"], new=company, by=by)
+
+def save_niche_fit(lead_id, niche, reason, industry=None):
+    """Save the niche check; with `industry`, the lead moves to that niche (and is scored again)."""
+    with conn() as c:
+        c.execute("UPDATE leads SET niche_fit=?, niche_reason=?, niche_checked_at=CURRENT_TIMESTAMP"
+                  " WHERE id=?", (niche, reason, lead_id))
+        if industry:
+            old = c.execute("SELECT industry FROM leads WHERE id=?", (lead_id,)).fetchone()["industry"]
+            c.execute("UPDATE leads SET industry=?, scored_at=NULL WHERE id=?", (industry, lead_id))
+            log_event(c, lead_id, "industry_changed", old=old, new=industry, by="niche check", why=reason)
 
 def find_lead_by_email(email):
     with conn() as c:
