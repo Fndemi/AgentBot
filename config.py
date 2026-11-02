@@ -86,7 +86,11 @@ BOOKING_URL = env("BOOKING_URL", "").strip()
 MEETING_TIMES = env("MEETING_TIMES", "10am,11:30am,2pm,3:30pm")
 
 # Web search for discover.py (websearch.py): Tavily basic search, falling back to DuckDuckGo
-# when the key is missing, Tavily fails or this month's TAVILY_MONTHLY_CAP calls are used
+# when the key is missing, Tavily fails or this month's TAVILY_MONTHLY_CAP calls are used.
+# The cap is shared out by day: once today's share is used, discovery stops until tomorrow.
 SEARCH_PROVIDER = env("SEARCH_PROVIDER", "duckduckgo").strip().lower()
 TAVILY_API_KEY = env("TAVILY_API_KEY", "")
 TAVILY_MONTHLY_CAP = int(env("TAVILY_MONTHLY_CAP", "900"))
+# New leads discover.py looks for in one run (python main.py discover, and the daily auto run),
+# shared evenly across the niches approved and not paused in uses.yaml
+DISCOVER_PER_DAY = int(env("DISCOVER_PER_DAY", "50"))

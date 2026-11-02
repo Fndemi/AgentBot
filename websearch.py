@@ -5,10 +5,15 @@
   TAVILY_MONTHLY_CAP         Tavily calls allowed per calendar month (UTC); after that
                              DuckDuckGo answers until the next month
 
-Every call is counted in search_usage by month and provider. A Tavily call counts even
-when it fails, so the cap is never passed. Results come back as DuckDuckGo gives them:
-[{"title", "href", "body"}].
+The month's cap is shared out by day (daily_allowance). When today's share of Tavily calls
+is used, search() raises DailyAllowanceUsed instead of asking DuckDuckGo, so discovery
+stops for the day and the rest of the month's calls are kept for the days after.
+
+Every call is counted in search_usage by month and provider, and in search_days by day
+and provider. A Tavily call counts even when it fails, so the cap is never passed.
+Results come back as DuckDuckGo gives them: [{"title", "href", "body"}].
 """
+from calendar import monthrange
 from datetime import datetime, timezone
 
 import config
@@ -20,10 +25,28 @@ SCHEMA = """CREATE TABLE IF NOT EXISTS search_usage (
     calls INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (month, provider)
 )"""
+DAY_SCHEMA = """CREATE TABLE IF NOT EXISTS search_days (
+    day TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    calls INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, provider)
+)"""
+
+
+class DailyAllowanceUsed(Exception):
+    """Today's share of the month's Tavily calls is used: no more searches today."""
+
+
+def now():
+    return datetime.now(timezone.utc)
 
 
 def this_month():
-    return datetime.now(timezone.utc).strftime("%Y-%m")
+    return now().strftime("%Y-%m")
+
+
+def today():
+    return now().date().isoformat()
 
 
 def calls(provider, month=None):
@@ -34,12 +57,34 @@ def calls(provider, month=None):
     return row[0] if row else 0
 
 
+def calls_today(provider):
+    with db.conn() as c:
+        c.execute(DAY_SCHEMA)
+        row = c.execute("SELECT calls FROM search_days WHERE day=? AND provider=?",
+                        (today(), provider)).fetchone()
+    return row[0] if row else 0
+
+
 def count(provider):
     with db.conn() as c:
         c.execute(SCHEMA)
+        c.execute(DAY_SCHEMA)
         c.execute("INSERT INTO search_usage (month, provider, calls) VALUES (?, ?, 1)"
                   " ON CONFLICT (month, provider) DO UPDATE SET calls = search_usage.calls + 1",
                   (this_month(), provider))
+        c.execute("INSERT INTO search_days (day, provider, calls) VALUES (?, ?, 1)"
+                  " ON CONFLICT (day, provider) DO UPDATE SET calls = search_days.calls + 1",
+                  (today(), provider))
+
+
+def daily_allowance():
+    """Tavily calls allowed today: what was left of the month's cap this morning, shared
+    evenly over the days left in the month, today included. Calls a day doesn't use (a
+    weekend, a quiet day) are shared out over the days after it."""
+    t = now()
+    days_left = monthrange(t.year, t.month)[1] - t.day + 1
+    left = config.TAVILY_MONTHLY_CAP - (calls("tavily") - calls_today("tavily"))
+    return max(0, left) // days_left
 
 
 def why_not_tavily():
@@ -69,9 +114,14 @@ def duckduckgo(query, max_results):
 
 
 def search(query, max_results=10):
-    """[{"title", "href", "body"}] for the query, or [] if no provider could answer."""
+    """[{"title", "href", "body"}] for the query, or [] if no provider could answer.
+    Raises DailyAllowanceUsed when Tavily would answer but today's share of it is used."""
     reason = why_not_tavily()
     if reason is None:
+        allowance = daily_allowance()
+        if calls_today("tavily") >= allowance:
+            raise DailyAllowanceUsed(f"today's {allowance} Tavily calls are used "
+                                     f"(TAVILY_MONTHLY_CAP {config.TAVILY_MONTHLY_CAP} shared by day)")
         try:
             results = tavily(query, max_results)
             print(f"    (tavily answered: {len(results)} results)")

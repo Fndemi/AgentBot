@@ -1,24 +1,39 @@
 """Finds new companies with a web search (websearch.py: Tavily, or DuckDuckGo) and adds them as leads.
 
-  python main.py discover                  go through PRIORITY order
+  python main.py discover                  up to DISCOVER_PER_DAY new leads, shared across niches
   python main.py discover sacco --max 5    one category, stop after 5 new leads
+  python main.py discover-log [days]       what discovery did per niche each day (default 7)
 
-Each query is run with a random town from TOWNS in place of {town}.
-Some categories also have LIST_QUERIES: searches for pages that list many companies
-(accelerator and incubator portfolios). The company sites linked from those are visited too.
+Only niches approved and not paused in uses.yaml are searched (a category named on the
+command line is searched whatever uses.yaml says). DISCOVER_PER_DAY is shared evenly across
+them, and they take turns, one search each, in PRIORITY order. A niche that has its share
+stops; once every niche has its share or is out of searches, the ones with searches left go
+on until the day's total is reached. Each niche's LIST_QUERIES come first: searches for
+pages that list many companies (accelerator and incubator portfolios), whose linked company
+sites are visited. Then its QUERIES, each run with a random town from TOWNS in place of {town}.
+
+Searches stop for the day when today's share of the month's Tavily calls is used
+(websearch.daily_allowance). What each niche did is kept in discovery_log by day: searches,
+results, leads added and why the other sites visited were dropped.
 Every lead found is also appended to discovered.csv so you can review it in Excel.
 """
 import csv
+import json
 import random
 import re
 import time
+from collections import Counter
+from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
 
+import config
 import db
+import personalise
+import rotation
 import scraper
 import websearch
 
@@ -322,9 +337,37 @@ LAW_FIRM_TITLE = re.compile(r"\badvocates?\b|\blaw\s+(?:firm|offices?|chambers)\
                             r"\battorneys?\b|\bsolicitors?\b|\blegal\s+(?:advisory|practice|consultants?)\b", re.I)
 LAW_FIRM_DOMAIN = re.compile(r"advocates|lawfirm|lawyers|attorneys|(?:^|[.-])llp(?:$|[.-])")
 RESULTS_PER_QUERY = 10
-DEFAULT_MAX = 30
 CSV_PATH = Path(__file__).parent / "discovered.csv"
 CSV_COLUMNS = ["company", "website", "industry", "email", "query"]
+LOG_SCHEMA = """CREATE TABLE IF NOT EXISTS discovery_log (
+    day TEXT NOT NULL,
+    niche TEXT NOT NULL,
+    searches INTEGER NOT NULL DEFAULT 0,
+    results INTEGER NOT NULL DEFAULT 0,
+    added INTEGER NOT NULL DEFAULT 0,
+    -- JSON {reason: sites}: why the sites visited weren't added
+    dropped TEXT,
+    PRIMARY KEY (day, niche)
+)"""
+
+
+class Tally:
+    """One niche's discovery in one run: searches made, results they gave, leads added and
+    why the other sites visited were dropped."""
+    def __init__(self):
+        self.searches = self.results = self.added = 0
+        self.dropped = Counter()
+
+    def __str__(self):
+        drops = ", ".join(f"{n} {why}" for why, n in self.dropped.most_common())
+        return (f"{self.searches} searches, {self.results} results, {self.added} added"
+                + (f"; dropped: {drops}" if drops else ""))
+
+
+def dropped(tally, why):
+    if tally:
+        tally.dropped[why] += 1
+    return None
 
 
 def domain_of(url):
@@ -426,44 +469,49 @@ def save_csv(row):
         w.writerow(row)
 
 
-def consider(url, category, query, seen):
+def consider(url, category, query, seen, tally=None):
     """Visit one company site and add it as a lead if it qualifies.
-    Returns the new lead's row, or None."""
+    Returns the new lead's row, or None. Counts the outcome in `tally`."""
     domain = domain_of(url)
-    if domain in seen or skip_domain(domain):
-        return None
+    if domain in seen:
+        return dropped(tally, "already known")
+    if skip_domain(domain):
+        return dropped(tally, "social, directory, news or bank site")
     seen.add(domain)
     home = f"{urlparse(url).scheme or 'https'}://{urlparse(url).netloc}"
     page = look_at(home)
     if not page:
-        return None
+        return dropped(tally, "site unreachable")
     title, mentions_kenya, headline = page
     if not (domain.endswith(".ke") or mentions_kenya):
-        return None
-    reason = (skip_title(title, category) or law_firm_reason(domain, title, category)
-              or rival_reason(domain, headline))
-    if reason:
-        print(f"    {domain}: skipped ({reason})")
-        return None
+        return dropped(tally, "not in Kenya")
+    for why, reason in (("internet provider", lambda: skip_title(title, category)),
+                        ("law firm", lambda: law_firm_reason(domain, title, category)),
+                        ("bulk SMS company", lambda: rival_reason(domain, headline))):
+        if (reason := reason()):
+            print(f"    {domain}: skipped ({reason})")
+            return dropped(tally, why)
     email = scraper.pick_best(scraper.scrape_site(home))
     if not email:
         print(f"    {domain}: no email found")
-        return None
+        return dropped(tally, "no email found")
     reason = email_rival(email, domain)
     if reason:
         print(f"    {domain}: skipped ({email}: {reason})")
-        return None
+        return dropped(tally, "bulk SMS company's email")
     if db.is_suppressed(email):
         print(f"    {domain}: {email} is on the suppression list")
-        return None
+        return dropped(tally, "on the suppression list")
     name = company_name(title, domain)
     if not db.add_lead(name, domain, category, email, "search", query, url):
         print(f"    {domain}: {email} already a lead")
-        return None
+        return dropped(tally, "email already a lead")
     row = {"company": name, "website": domain, "industry": category,
            "email": email, "query": query}
     save_csv(row)
     print(f"    + {name}  <{email}>")
+    if tally:
+        tally.added += 1
     return row
 
 
@@ -497,68 +545,151 @@ def portfolio_pages(home):
     return out[:PORTFOLIO_PAGES_PER_SITE]
 
 
-def discover_from_lists(category, limit, seen):
-    """Find list pages for this category and visit the companies they link to."""
+def from_list_pages(results, category, limit, seen, tally):
+    """Visit the companies the list pages in these search results link to."""
     added, pages = [], set()
-    queries = LIST_QUERIES.get(category, [])
-    for query in random.sample(queries, min(LIST_QUERIES_PER_RUN, len(queries))):
-        print(f"  list search: {query}")
-        results = search(query)
-        time.sleep(random.uniform(2, 4))
-        for res in results[:LIST_PAGES_PER_QUERY]:
-            page_url = res.get("href") or ""
-            if not page_url or page_url in pages:
-                continue
-            pages.add(page_url)
-            sites = [u for u in listed_sites(page_url) if domain_of(u) not in seen]
-            print(f"   list page: {page_url} ({len(sites)} sites to visit)")
-            for url in sites:
-                home = f"{urlparse(url).scheme}://{urlparse(url).netloc}"
-                hub_pages = portfolio_pages(home)
-                if not hub_pages:  # an ordinary company
-                    targets = [(url, page_url)]
-                else:              # an accelerator or investor: go to the companies it lists
-                    seen.add(domain_of(url))
-                    targets = [(u, hp) for hp in hub_pages for u in listed_sites(hp) if domain_of(u) not in seen]
-                    print(f"    {domain_of(url)}: has a portfolio page, visiting {len(targets)} companies listed there")
-                for target, source in targets:
-                    row = consider(target, category, f"listed on {source}", seen)
-                    if row:
-                        added.append(row)
-                        if len(added) >= limit:
-                            return added
+    for res in results[:LIST_PAGES_PER_QUERY]:
+        page_url = res.get("href") or ""
+        if not page_url or page_url in pages:
+            continue
+        pages.add(page_url)
+        sites = [u for u in listed_sites(page_url) if domain_of(u) not in seen]
+        print(f"   list page: {page_url} ({len(sites)} sites to visit)")
+        for url in sites:
+            home = f"{urlparse(url).scheme}://{urlparse(url).netloc}"
+            hub_pages = portfolio_pages(home)
+            if not hub_pages:  # an ordinary company
+                targets = [(url, page_url)]
+            else:              # an accelerator or investor: go to the companies it lists
+                seen.add(domain_of(url))
+                targets = [(u, hp) for hp in hub_pages for u in listed_sites(hp) if domain_of(u) not in seen]
+                print(f"    {domain_of(url)}: has a portfolio page, visiting {len(targets)} companies listed there")
+            for target, source in targets:
+                row = consider(target, category, f"listed on {source}", seen, tally)
+                if row:
+                    added.append(row)
+                    if len(added) >= limit:
+                        return added
     return added
 
 
-def discover_category(category, limit, seen):
-    """Returns the leads added for this category (at most `limit`)."""
-    added = discover_from_lists(category, limit, seen)
-    if len(added) >= limit:
-        return added
-    for template in QUERIES[category]:
-        query = template.format(town=random.choice(TOWNS))
-        print(f"  search: {query}")
-        results = search(query)
-        time.sleep(random.uniform(2, 4))
-        for res in results:
-            row = consider(res.get("href") or "", category, query, seen)
-            if row:
-                added.append(row)
-                if len(added) >= limit:
-                    return added
+def searches(category):
+    """One niche's searches in the order they are made, as (kind, query): its list searches
+    first, since one of those finds many companies, then its ordinary ones."""
+    lists = LIST_QUERIES.get(category, [])
+    return ([("list", q) for q in random.sample(lists, min(LIST_QUERIES_PER_RUN, len(lists)))]
+            + [("search", t.format(town=random.choice(TOWNS))) for t in QUERIES[category]])
+
+
+def run_search(kind, query, category, limit, seen, tally):
+    """Make one search and visit what it finds. Returns the leads added (at most `limit`).
+    Raises websearch.DailyAllowanceUsed when today's searches are used."""
+    print(f"  {'list search' if kind == 'list' else 'search'}: {query}")
+    results = search(query)
+    tally.searches += 1
+    tally.results += len(results)
+    time.sleep(random.uniform(2, 4))
+    if kind == "list":
+        return from_list_pages(results, category, limit, seen, tally)
+    added = []
+    for res in results:
+        row = consider(res.get("href") or "", category, query, seen, tally)
+        if row:
+            added.append(row)
+            if len(added) >= limit:
+                break
     return added
 
 
-def run(category=None, max_new=DEFAULT_MAX):
+def niches(on=None):
+    """The niches searched when none is named: those in PRIORITY that are approved in
+    uses.yaml and not paused on the day `on` (today in Nairobi)."""
+    on = on or rotation.today()
+    return [n for n in PRIORITY
+            if personalise.approved({"industry": n}) and not personalise.paused({"industry": n}, on)]
+
+
+def shares(names, total):
+    """{niche: leads it may add before the others have theirs}: total split evenly, the
+    remainder going one each to the first niches."""
+    base, extra = divmod(total, len(names))
+    return {n: base + (i < extra) for i, n in enumerate(names)}
+
+
+def run(category=None, max_new=None):
+    max_new = config.DISCOVER_PER_DAY if max_new is None else max_new
     if category and category not in QUERIES:
         print(f"Unknown category '{category}'. Choose from: {', '.join(PRIORITY)}")
         return []
+    names = [category] if category else niches()
+    if not names:
+        print("No niche is approved and unpaused in uses.yaml: nothing to search.")
+        return []
+    share = shares(names, max_new)
+    plans = {n: searches(n) for n in names}
+    tallies = {n: Tally() for n in names}
     seen = known_domains()
     added = []
-    for cat in ([category] if category else PRIORITY):
-        if len(added) >= max_new:
-            break
-        print(f"[{cat}]")
-        added += discover_category(cat, max_new - len(added), seen)
+    try:
+        while len(added) < max_new:
+            left = [n for n in names if plans[n]]
+            if not left:
+                break
+            # Niches short of their share take turns; once none is, the day's total is open to all
+            short = [n for n in left if tallies[n].added < share[n]]
+            for n in short or left:
+                room = max_new - len(added)
+                if room <= 0:
+                    break
+                kind, query = plans[n].pop(0)
+                print(f"[{n}]")
+                added += run_search(kind, query, n, min(room, share[n] - tallies[n].added) if short else room,
+                                    seen, tallies[n])
+    except websearch.DailyAllowanceUsed as e:
+        print(f"Stopped for today: {e}.")
+    finally:
+        save_log(tallies)
+    for n, t in tallies.items():
+        if t.searches:
+            print(f"  {n}: {t}")
     print(f"Added {len(added)} new leads. Review them in {CSV_PATH.name}.")
     return added
+
+
+def save_log(tallies, day=None):
+    """Add this run's tallies to discovery_log for the day (UTC, as websearch counts searches)."""
+    day = day or websearch.today()
+    with db.conn() as c:
+        c.execute(LOG_SCHEMA)
+        for niche, t in tallies.items():
+            if not t.searches:
+                continue
+            row = c.execute("SELECT * FROM discovery_log WHERE day=? AND niche=?", (day, niche)).fetchone()
+            drops = Counter(json.loads(row["dropped"] or "{}") if row else {}) + t.dropped
+            c.execute("INSERT INTO discovery_log (day, niche, searches, results, added, dropped)"
+                      " VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (day, niche) DO UPDATE SET"
+                      " searches = discovery_log.searches + excluded.searches,"
+                      " results = discovery_log.results + excluded.results,"
+                      " added = discovery_log.added + excluded.added, dropped = excluded.dropped",
+                      (day, niche, t.searches, t.results, t.added, json.dumps(dict(drops))))
+
+
+def log_rows(days=7):
+    """discovery_log rows for the last `days` days, newest day first, as dicts."""
+    since = (websearch.now().date() - timedelta(days=days - 1)).isoformat()
+    with db.conn() as c:
+        c.execute(LOG_SCHEMA)
+        rows = c.execute("SELECT * FROM discovery_log WHERE day >= ? ORDER BY day DESC, niche",
+                         (since,)).fetchall()
+    return [dict(r, dropped=json.loads(r["dropped"] or "{}")) for r in rows]
+
+
+def show_log(days=7):
+    rows = log_rows(days)
+    if not rows:
+        print(f"No discovery in the last {days} days.")
+        return
+    print(f"{'DAY':10}  {'NICHE':20}  {'SEARCHES':>8}  {'RESULTS':>7}  {'ADDED':>5}  DROPPED")
+    for r in rows:
+        drops = ", ".join(f"{n} {why}" for why, n in sorted(r["dropped"].items(), key=lambda x: -x[1]))
+        print(f"{r['day']:10}  {r['niche']:20}  {r['searches']:>8}  {r['results']:>7}  {r['added']:>5}  {drops}")

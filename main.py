@@ -2,7 +2,8 @@
 
   python main.py init                    create the database
   python main.py scrape companies.csv    find emails on company websites
-  python main.py discover [category] [--max N]   search the web for new leads
+  python main.py discover [category] [--max N]   search the web for new leads (DISCOVER_PER_DAY)
+  python main.py discover-log [days]     what discovery did per niche each day (default 7)
   python main.py verify                  check email domains
   python main.py personalise [--limit N] write a personal opening for verified leads from their websites
   python main.py rank                    top 20 waiting leads in sending order, with start year and score
@@ -50,12 +51,11 @@ def main():
         scraper.run(args[0] if args else "companies.csv")
     elif cmd == "discover":
         import discover
-        max_new = discover.DEFAULT_MAX
-        if "--max" in args:
-            i = args.index("--max")
-            max_new = int(args[i + 1])
-            del args[i:i + 2]
+        max_new = take_number(args, "--max")
         discover.run(args[0] if args else None, max_new)
+    elif cmd == "discover-log":
+        import discover
+        discover.show_log(int(args[0]) if args and args[0].isdigit() else 7)
     elif cmd == "auto":
         import auto
         auto.run()
