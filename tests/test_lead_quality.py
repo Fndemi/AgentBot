@@ -1,5 +1,4 @@
-"""Lead quality. A lead's name is the organisation's own name on its site (never a page title or
-tagline), else the brand in its domain. Directories, marketplaces, events, associations,
+"""Lead quality (names: test_names.py). Directories, marketplaces, events, associations,
 communities, accelerators, media and government sites are never leads: discovery skips them
 (and visits the companies they list), and existing ones are excluded with no more emails.
 Before a first email the AI says which approved niche the lead's site belongs to: one that fits
@@ -14,6 +13,7 @@ import classifier
 import config
 import db
 import discover
+import names
 import nichefit
 import personalise
 import quality
@@ -26,35 +26,6 @@ REAL_SITE_NICHE = nichefit.site_niche
 
 def soup(html):
     return BeautifulSoup(html, "html.parser")
-
-
-# --- Names ---
-
-def test_the_domain_brand_is_used_when_the_site_gives_only_a_tagline():
-    page = soup("<title>Credit Reference Bureau Services in Kenya | Home</title>"
-                '<meta property="og:site_name" content="Your Trusted Partner for Credit Reports">')
-    assert quality.org_name(page, "cragroup.co.ke") == "CRA Group"
-
-
-def test_the_sites_own_name_comes_first_title_never():
-    page = soup('<title>Welcome to the best SACCO in Eldoret</title>'
-                '<meta property="og:site_name" content="Noble Sacco Society Ltd">')
-    assert quality.org_name(page, "noblesacco.co.ke") == "Noble Sacco Society"
-    logo = soup('<title>Home</title><header><a class="logo"><img src="/l.png" alt="Pay Hero logo"></a></header>')
-    assert quality.org_name(logo, "payhero.co.ke") == "Pay Hero"
-    footer = soup("<title>Fast loans</title><footer>© 2025 Zidi Capital Limited. All rights reserved.</footer>")
-    assert quality.org_name(footer, "zidicapital.com") == "Zidi Capital"
-
-
-def test_names_too_long_sloganlike_or_not_this_sites_are_not_used():
-    assert quality.good_name("Acme Systems Kenya Limited Group Holdings Africa", "acme.co.ke") is None  # > 5 words
-    assert quality.good_name("Empowering Businesses Across Africa", "acme.co.ke") is None
-    assert quality.good_name("Safaricom", "acme.co.ke") is None              # a client's logo
-    assert quality.good_name("Sacco Societies Regulatory Authority (SASRA)", "kenversitysacco.co.ke") is None
-    assert quality.good_name("maseno-uni", "maseno.ac.ke") is None           # written like an address
-    assert quality.good_name("SOVEREIGN GRACE CHURCH", "sovereigngrace.org") == "Sovereign Grace Church"
-    assert quality.domain_brand("powerup.works") == "Powerup"
-    assert quality.org_name(None, "noblesaccosociety.co.ke") == "Noble Sacco Society"
 
 
 # --- What is never a lead ---
@@ -96,14 +67,17 @@ def web(tmp_path, monkeypatch):
 
 def test_discovery_skips_an_event_but_adds_the_companies_it_lists(web):
     pages, links = web
-    pages["fintechsummit.co.ke"] = discover.Page("Africa Fintech Summit", True, "", "Africa Fintech Summit",
+    pages["fintechsummit.co.ke"] = discover.Page("Africa Fintech Summit", True, "", None,
                                                  "Africa Fintech Summit | Nairobi, May 2026")
-    pages["zidicapital.com"] = discover.Page("Fast loans in minutes", True, "", "Zidi Capital", "Fast loans")
-    pages["kra.go.ke"] = discover.Page("KRA", True, "", "KRA", "Kenya Revenue Authority")
+    pages["zidicapital.com"] = discover.Page("Fast loans in minutes", True, "",
+                                             names.Name("Zidi Capital Ltd", "Zidi Capital", "footer"), "Fast loans")
+    pages["kra.go.ke"] = discover.Page("KRA", True, "", None, "Kenya Revenue Authority")
     links["fintechsummit.co.ke"] = ["https://zidicapital.com/", "https://kra.go.ke/"]
     tally = discover.Tally()
     added = discover.visit("https://fintechsummit.co.ke/", "fintech", "fintech Kenya", set(), tally, 10)
-    assert [(r["company"], r["website"]) for r in added] == [("Zidi Capital", "zidicapital.com")]
+    assert [(r["company"], r["website"]) for r in added] == [("Zidi Capital Ltd", "zidicapital.com")]
+    lead = db.find_lead_by_email("info@zidicapital.com")
+    assert (lead["display_name"], lead["name_source"]) == ("Zidi Capital", "footer")
     assert tally.dropped == {"event": 1, "government body": 1}
     assert db.find_lead_by_email("info@fintechsummit.co.ke") is None
 
@@ -113,6 +87,7 @@ def test_a_discovered_lead_without_a_good_name_gets_the_domain_brand(web):
     pages["cragroup.co.ke"] = discover.Page("Credit Reports | Best in Kenya", True, "", None, "Credit Reports")
     row = discover.consider("https://cragroup.co.ke/", "fintech", "q", set())
     assert row["company"] == "CRA Group"
+    assert db.find_lead_by_email("info@cragroup.co.ke")["name_source"] == "domain"
 
 
 # --- Existing leads ---
@@ -124,7 +99,7 @@ def add(email, company, industry="fintech", status="verified", source="search", 
     return lead_id
 
 
-def test_clean_leads_shows_then_renames_and_excludes(tmp_path, monkeypatch, capsys):
+def test_clean_leads_shows_then_excludes(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "test.db"))
     db.init()
     sites = {"https://cragroup.co.ke": "<title>Credit Reports | Best in Kenya</title>",
@@ -132,27 +107,24 @@ def test_clean_leads_shows_then_renames_and_excludes(tmp_path, monkeypatch, caps
              "https://zidi.co.ke": '<meta property="og:site_name" content="Zidi">'}
     monkeypatch.setattr(quality.scraper, "fetch", lambda url: soup(sites[url]) if url in sites else None)
     tagline = add("info@cragroup.co.ke", "Credit Reports | Best Credit Bureau in Kenya")
-    plain = add("info@pointofsale.co.ke", "POS Kenya")         # a name, though not the address's: kept
     event = add("info@fintechweek.co.ke", "Nairobi Fintech Week 2026", status="sent")
     good = add("info@zidi.co.ke", "Zidi")
     gov = add("info@ict.go.ke", "Ministry of ICT", source="csv")
     lender = add("loans@gmail.com", "Quick Cash Credit Ltd", "digital_lender", source="CBK DCP directory", website="")
     db.record_sent(event, "<e@talksasa.co.ke>", "fintech")
 
-    excluded, renamed = quality.run()                     # shows only
+    excluded = quality.run()                              # shows only
     assert {l["id"]: why for l, why in excluded} == {event: "event", gov: "government body"}
-    assert [(l["id"], name) for l, name in renamed] == [(tagline, "CRA Group")]
     assert "Nothing was changed" in capsys.readouterr().out
-    assert db.find_lead_by_email("info@cragroup.co.ke")["company"] == "Credit Reports | Best Credit Bureau in Kenya"
+    assert db.find_lead_by_email("info@fintechweek.co.ke")["status"] == "sent"
 
     quality.run(apply=True)
     with db.conn() as c:
         leads = {r["id"]: dict(r) for r in c.execute("SELECT * FROM leads")}
-    assert leads[tagline]["company"] == "CRA Group" and leads[tagline]["status"] == "verified"
+    assert leads[tagline]["status"] == "verified"           # names are names.py's job
     assert (leads[event]["status"], leads[event]["excluded_reason"]) == ("excluded", "event")
     assert leads[gov]["status"] == "excluded" and leads[good]["status"] == "verified"
-    assert leads[lender]["company"] == "Quick Cash Credit Ltd"   # a directory's name is kept
-    assert leads[plain]["company"] == "POS Kenya"
+    assert leads[lender]["status"] == "verified"
     # no first email and no follow-ups for an excluded lead
     assert event not in [l["id"] for l in db.awaiting_followup(1)]
     assert gov not in [l["id"] for l in ranking.waiting()]

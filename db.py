@@ -93,7 +93,12 @@ CREATE TABLE IF NOT EXISTS leads (
     -- in uses.yaml, or 'none' when none fits (no email then); niche_reason is the AI's why
     niche_fit TEXT,
     niche_reason TEXT,
-    niche_checked_at TEXT
+    niche_checked_at TEXT,
+    -- names.py: display_name is the short name greetings and subjects use (no Ltd, Limited,
+    -- Society...); name_source is where the name came from (an official list, schema.org,
+    -- og:site_name, footer, logo, title, headline, domain) or 'none' (greeted "Hello,")
+    display_name TEXT,
+    name_source TEXT
 );
 CREATE TABLE IF NOT EXISTS sent (
     id INTEGER PRIMARY KEY,
@@ -359,7 +364,8 @@ def init():
                                  ("leads", "opener_url", "TEXT"), ("leads", "opener_note", "TEXT"),
                                  ("sent", "with_opener", "INTEGER"), ("sent", "to_contact", "INTEGER"),
                                  ("leads", "excluded_reason", "TEXT"), ("leads", "niche_fit", "TEXT"),
-                                 ("leads", "niche_reason", "TEXT"), ("leads", "niche_checked_at", "TEXT")):
+                                 ("leads", "niche_reason", "TEXT"), ("leads", "niche_checked_at", "TEXT"),
+                                 ("leads", "display_name", "TEXT"), ("leads", "name_source", "TEXT")):
             if col not in columns(c, table):
                 c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {kind}")
         # Leads from before these existed
@@ -473,6 +479,14 @@ def rename(lead_id, company, by=None):
             return
         c.execute("UPDATE leads SET company=? WHERE id=?", (company, lead_id))
         log_event(c, lead_id, "company_renamed", old=old["company"], new=company, by=by)
+
+def save_name(lead_id, full, display_name, source, keep_company=False, by="names"):
+    """Save a lead's name: the full name (unless keep_company: an official list's name is never
+    replaced), the short display name and where it came from."""
+    if full and not keep_company:
+        rename(lead_id, full, by)
+    with conn() as c:
+        c.execute("UPDATE leads SET display_name=?, name_source=? WHERE id=?", (display_name, source, lead_id))
 
 def save_niche_fit(lead_id, niche, reason, industry=None):
     """Save the niche check; with `industry`, the lead moves to that niche (and is scored again)."""

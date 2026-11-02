@@ -4,7 +4,8 @@
   python main.py scrape companies.csv    find emails on company websites
   python main.py discover [category] [--max N]   search the web for new leads (DISCOVER_PER_DAY)
   python main.py discover-log [days]     what discovery did per niche each day (default 7)
-  python main.py clean-leads [--apply]   leads to rename (site's own name) or exclude (directories, events...)
+  python main.py clean-leads [--apply]   leads to exclude (directories, events, associations, media...)
+  python main.py names [--sent DAY] [--apply]   company names, before/after (waiting leads; sent ones report only)
   python main.py verify                  check email domains
   python main.py personalise [--limit N] write a personal opening for verified leads from their websites
   python main.py rank                    top 20 waiting leads in sending order, with start year and score
@@ -54,6 +55,13 @@ def main():
         import discover
         max_new = take_number(args, "--max")
         discover.run(args[0] if args else None, max_new)
+    elif cmd == "names":
+        import names
+        day = None
+        if "--sent" in args:
+            i = args.index("--sent")
+            day = args[i + 1] if i + 1 < len(args) else sys.exit("--sent needs a day, e.g. --sent 2026-11-02")
+        names.run(apply="--apply" in args, day=day)
     elif cmd == "clean-leads":
         import quality
         quality.run(apply="--apply" in args)

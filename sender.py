@@ -17,6 +17,7 @@ from pathlib import Path
 import config
 import contacts
 import db
+import names
 import nichefit
 import notify
 import personalise
@@ -130,10 +131,28 @@ def to_contact(lead):
 
 
 def greeting(lead):
-    """"Hello Jane," for a named contact, otherwise "Hello <company> team,"."""
+    """"Hello Jane," for a named contact, otherwise "Hello <short name> team,", or "Hello,"
+    when the lead has no name (names.py)."""
     if to_contact(lead):
         return f"Hello {contacts.first_name(dict(lead)['contact_name'])},"
-    return f"Hello {dict(lead).get('company') or 'your organisation'} team,"
+    name = names.short_name(lead)
+    return f"Hello {name} team," if name else "Hello,"
+
+
+# A subject template's {company} when the lead has no name: "for {company}'s next project"
+# -> "for your next project", "Fee reminders at {company}" -> "Fee reminders",
+# "Reaching every {company} member" -> "Reaching every member"
+NO_NAME_SUBJECT = ((re.compile(r"\{company\}'s\b"), "your"),
+                   (re.compile(r"\s+(?:for|at|of|in|inside)\s+\{company\}"), ""),
+                   (re.compile(r"\{company\}\s*"), ""))
+
+
+def fill_subject(text, lead):
+    """A subject template filled in for this lead; without a name, the name is left out."""
+    if not names.short_name(lead):
+        for pattern, new in NO_NAME_SUBJECT:
+            text = pattern.sub(new, text)
+    return fill(text, lead)
 
 
 def fill(text, lead, attached=False, for_html=False, extra=None):
@@ -142,7 +161,7 @@ def fill(text, lead, attached=False, for_html=False, extra=None):
     values = dict(
         opener=personalise.opener(lead),
         uses=personalise.uses(lead),
-        company=lead["company"] or "your organisation",
+        company=names.short_name(lead) or "your organisation",
         greeting=greeting(lead),
         industry=lead["industry"] or "",
         sender=config.SENDER_NAME,
@@ -191,9 +210,9 @@ def build(lead):
     variant = first_variant(lead)
     if variant:
         tname, subject, body = load_template(lead["industry"], variant)
-        return compose(lead, fill(subject, lead), body), tname
+        return compose(lead, fill_subject(subject, lead), body), tname
     tname, subject, body = load_template(lead["industry"])
-    return compose(lead, fill(subject, lead), body, attachment()), tname
+    return compose(lead, fill_subject(subject, lead), body, attachment()), tname
 
 
 def variant_of(tname):
@@ -291,7 +310,7 @@ def old_wording(lead, thread):
     if not thread:
         return False
     saved = thread[0]["sent_subject"]
-    return not saved or not _same_subject(saved, fill(load_template(lead["industry"])[1], lead))
+    return not saved or not _same_subject(saved, fill_subject(load_template(lead["industry"])[1], lead))
 
 
 def followup_body(lead, n, body, thread):
@@ -331,7 +350,7 @@ def build_followup(lead, n=1):
     thread = db.sent_thread(lead["id"]) if lead.get("id") else []
     body = followup_body(lead, n, path.read_text(encoding="utf-8").strip(), thread)
     first = ((thread[0]["sent_subject"] if thread else lead.get("sent_subject"))
-             or fill(first_subject(lead), lead))
+             or fill_subject(first_subject(lead), lead))
     subject = first if first.lower().startswith("re:") else f"Re: {first}"
     ids = [r["message_id"] for r in thread if r["message_id"]] or [lead.get("message_id")]
     ids = [i for i in ids if i]

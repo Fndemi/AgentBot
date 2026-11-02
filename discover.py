@@ -15,8 +15,8 @@ sites are visited. Then its QUERIES, each run with a random town from TOWNS in p
 Searches stop for the day when today's share of the month's Tavily calls is used
 (websearch.daily_allowance). What each niche did is kept in discovery_log by day: searches,
 results, leads added and why the other sites visited were dropped.
-A lead's name is the organisation's own name on its site, never its page title
-(quality.org_name). Directories, marketplaces, events, associations, communities,
+A lead's name is the organisation's own name on its site, never a long page title
+(names.pick: schema.org, og:site_name, footer, logo, else the domain brand). Directories, marketplaces, events, associations, communities,
 accelerators, media and government sites are never added (quality.excluded_reason), but the
 company sites they link to are visited.
 Every lead found is also appended to discovered.csv so you can review it in Excel.
@@ -36,6 +36,7 @@ from bs4 import BeautifulSoup
 
 import config
 import db
+import names
 import personalise
 import quality
 import rotation
@@ -426,7 +427,7 @@ def known_domains():
 
 
 # A homepage as look_at reads it. headline: the title, descriptions and main headings;
-# name: the organisation's own name (quality.org_name); intro: the title and descriptions
+# name: the organisation's names.Name (names.pick); intro: the title and descriptions
 Page = namedtuple("Page", "title kenya headline name intro")
 # A site that is never a lead but lists companies (quality.excluded_reason)
 Listing = namedtuple("Listing", "home why")
@@ -445,7 +446,7 @@ def look_at(url):
     intro = quality.page_intro(soup)
     headline = " | ".join([intro] + [h.get_text(" ", strip=True) for h in soup.select("h1, h2")])
     return Page(title, "kenya" in soup.get_text(" ").lower(), headline,
-                quality.org_name(soup, domain_of(url)), intro)
+                names.pick(soup, domain_of(url)), intro)
 
 
 def email_rival(email, domain):
@@ -511,10 +512,12 @@ def consider(url, category, query, seen, tally=None):
     if db.is_suppressed(email):
         print(f"    {domain}: {email} is on the suppression list")
         return dropped(tally, "on the suppression list")
-    name = org or quality.domain_brand(domain)
+    picked = org or names.pick(None, domain)
+    name = picked.full or domain        # no name: greeted "Hello," (names.short_name)
     if not db.add_lead(name, domain, category, email, "search", query, url):
         print(f"    {domain}: {email} already a lead")
         return dropped(tally, "email already a lead")
+    db.save_name(db.find_lead_by_email(email)["id"], picked.full, picked.display, picked.source, keep_company=True)
     row = {"company": name, "website": domain, "industry": category,
            "email": email, "query": query}
     save_csv(row)
