@@ -4,28 +4,35 @@ A name from an official list (CBK, SASRA or any other directory importer in targ
 is never replaced, nor is one from a list you gave (csv, manual). For a lead found on the
 web, the name is picked from what its website calls itself:
 
-  schema.org     the name of an Organization (or kind of one) in the page's JSON-LD
   og:site_name   the og:site_name meta tag
-  footer         the footer's copyright line ("© 2026 Zidi Capital Ltd")
   logo           the logo's alt or title text
-  title          the page <title>, only if it has at most 4 words and matches the address
-  headline       the first <h1>, the same way
-  domain         the brand in the address ("cragroup.co.ke" -> "CRA Group")
+  copyright      the footer's copyright line ("© 2025 Gara Consultancy Ltd")
+  footer         other short footer headings or bold text
+  schema.org     the name of an Organization (or kind of one) in the page's JSON-LD
+  domain         the brand in the address, split into words from WORDS
+                 ("garaconsultancy.co.ke" -> "Gara Consultancy")
 
-A candidate is dropped if its short form has more than MAX_WORDS words, reads like a slogan
-or a description, or (except the domain's) doesn't match the address. The one most like the
-domain brand is picked. When the site's candidates disagree (neither contains the other),
-the AI (GROQ_MODEL) chooses one of them from the page text; it can't add one. With no
-candidate from the site, the domain brand is used if it is clear; if not, there is no name:
-the greeting is "Hello," and subjects leave the name out.
+The page <title> and headings are never used. A candidate is dropped if it reads like a
+search phrase or SEO title (SEARCH_PHRASE: "in Nairobi", "Kenya", "best", "top", "services",
+"near me", a "|" or " - "...), has more than MAX_WORDS words, reads like a slogan, or (except
+the domain's) shares no word with the address. The one most like the domain brand is
+picked; when the site's candidates disagree, the AI (GROQ_MODEL) chooses one of them from
+the page text and can't add one. With no candidate from the site, the lead's current name is
+kept if it passes the same checks, else the domain brand if it is clear; if not, there is
+no name: the greeting is "Hello," and subjects leave the name out.
+
+Names are checked at discovery, by the bot's prepare step in small batches (prepare), and
+again just before every email, first or follow-up (ensure). A follow-up keeps its thread's
+subject; only its text uses the corrected name.
 
 Every lead keeps its full name (company), a short display name without legal endings
-(display_name: "Zidi Capital Ltd" -> "Zidi Capital", used in greetings and subjects) and
-where the name came from (name_source).
+(display_name: "Zidi Capital Ltd" -> "Zidi Capital", used in greetings and subjects), where
+the name came from (name_source) and the rules it was checked under (name_version).
 
-  python main.py names                         before/after for waiting leads and today's sends
-  python main.py names --sent 2026-11-02       ... and that day's sends
-  python main.py names --apply                 save the names of waiting leads (sent ones never)
+  python main.py names                      before/after: waiting leads, the 30 emailed last
+  python main.py names --recent 50          ... the 50 emailed last
+  python main.py names --sent 2026-11-02    ... and that day's emails
+  python main.py names --apply              check and save one batch (the bot does this itself)
 """
 import difflib
 import json
@@ -41,8 +48,10 @@ import ranking
 import scraper
 
 MAX_WORDS = 5          # in the short form
-MAX_PAGE_WORDS = 4     # a title or headline is a candidate only this short
 SITE_WORKERS = 8
+BATCH = 20             # web leads whose names prepare() checks at a time (well under 2 minutes)
+# Raised when the rules change, so every lead's name is checked again (prepare, ensure)
+NAME_VERSION = 2
 MAX_TEXT = 3000        # page text the AI reads
 NONE = "none"
 Name = namedtuple("Name", "full display source")
@@ -60,6 +69,25 @@ BRAND_WORDS = sorted((
     "apps", "cloud", "data", "learning", "education", "hr", "payroll",
     "fintech", "edtech", "healthtech", "agritech", "proptech", "insurtech", "hospital", "university",
     "pharmacy", "brokers", "shuttle", "travel", "tours"), key=len, reverse=True)
+# More words a domain is split into ("garaconsultancy" -> "gara consultancy"), with BRAND_WORDS
+WORDS = set(BRAND_WORDS) | {
+    "consultancy", "consultants", "consultant", "consult", "advisory", "partners", "associates",
+    "marketing", "ecommerce", "commerce", "design", "designs", "creative", "creatives", "web", "net",
+    "network", "networks", "link", "connect", "smart", "green", "life", "plus", "prime", "royal",
+    "united", "star", "first", "home", "house", "estate", "estates", "properties", "property",
+    "builders", "construction", "engineering", "motors", "auto", "autos", "trading", "traders",
+    "supplies", "suppliers", "distributors", "enterprises", "industries", "company", "services",
+    "service", "events", "foundation", "trust", "centre", "center", "clinics", "dental", "hospitals",
+    "pharmaceuticals", "diagnostics", "wellness", "fitness", "beauty", "salon", "spa", "hotel",
+    "hotels", "resort", "safaris", "safari", "logistic", "courier", "cargo", "freight", "transport",
+    "energies", "electric", "electrical", "water", "agri", "agro", "farmers", "dairy", "foods",
+    "credit", "loan", "wallet", "pesa", "cash", "bima", "biashara", "jamii", "kazi", "soko", "duka",
+    "nairobi", "mombasa", "kisumu", "nakuru", "eldoret", "thika", "nyeri", "machakos", "east",
+    "academy", "institute", "training", "schools", "kids", "junior", "high", "international",
+    "church", "chapel", "ministry", "fellowship", "cathedral", "parish", "mission", "gospel",
+    "systems", "labs", "lab", "studio", "solution", "tech", "technologies", "innovations", "innovation",
+    "ventures", "capital", "investment", "investments", "holdings", "group", "africa", "kenya"}
+SHORT_WORDS = {"pay", "app", "hub", "net", "web", "sms", "lab", "ict", "hr", "it"}  # under 3 letters or kept lower
 # Two-part endings; any other domain loses only its last part ("powerup.works" -> "powerup")
 SUFFIXES = (".co.ke", ".or.ke", ".ac.ke", ".go.ke", ".ne.ke", ".sc.ke", ".me.ke", ".info.ke",
             ".co.uk", ".co.za", ".co.tz", ".co.ug")
@@ -70,6 +98,11 @@ SLOGAN = re.compile(
     r"reliable|simple|smart|easy|fast|better|grow|powering|helping|built|designed|solutions? for|"
     r"services? in|company in|provider (?:of|in)|in kenya|in nairobi|for (?:you|your|business|businesses)|"
     r"management systems?)\b", re.I)
+# A name that reads like a search phrase or an SEO page title ("Ecommerce Agency in Nairobi
+# Kenya"), not an organisation's name. The domain-built name may say Kenya or Nairobi.
+SEARCH_PHRASE = re.compile(r"\bin nairobi\b|\bin kenya\b|\bagency in\b|\bcompany in\b|\bnear me\b|"
+                           r"\bbest\b|\btop\b|\bservices\b|\||\s[-–—]\s")
+PLACE_WORDS = re.compile(r"\b(?:kenya|nairobi)\b", re.I)
 # Words that don't make a name this site's: "Sacco Societies Regulatory Authority" in a
 # SACCO's footer shares only "sacco" with its address
 STOP_WORDS = {"the", "and", "of", "ltd", "limited", "company", "co", "plc", "inc"} | set(BRAND_WORDS)
@@ -93,28 +126,45 @@ def domain_label(domain):
     return domain.rsplit(".", 1)[-1]
 
 
+def segment(part):
+    """A run-together label split into words from WORDS: as few letters left over as
+    possible, then as few pieces. A left-over piece has at least 3 letters (or is the whole
+    label), so a brand is never chopped into stray letters ("sendy" stays "sendy")."""
+    n = len(part)
+    best = [None] * (n + 1)   # best[i]: (letters not in WORDS, pieces, words) for part[:i]
+    best[0] = (0, 0, [])
+    for i in range(1, n + 1):
+        for j in range(i):
+            if best[j] is None:
+                continue
+            piece = part[j:i]
+            if piece in WORDS and (len(piece) >= 3 or piece in SHORT_WORDS):
+                unknown = 0
+            elif len(piece) >= 3 or (j == 0 and i == n):
+                unknown = len(piece)
+            else:
+                continue
+            cand = (best[j][0] + unknown, best[j][1] + 1, best[j][2] + [piece])
+            if best[i] is None or cand[:2] < best[i][:2]:
+                best[i] = cand
+    return best[n][2] if best[n] else [part]
+
+
 def _brand_words(domain):
     words = []
     for part in re.split(r"[-_]+", domain_label(domain)):
-        tail = []
-        while part:
-            w = next((w for w in BRAND_WORDS if part.endswith(w) and len(part) > len(w)), None)
-            if not w:
-                break
-            tail.insert(0, w)
-            part = part[:-len(w)]
-        words += ([part] if part else []) + tail
+        words += segment(part) if part else []
     return [w for w in words if w]
 
 
 def _word(w):
-    return w.upper() if len(w) <= 3 and w not in ("pay", "app", "hub") or not w.isalpha() and len(w) <= 4 \
-        else w.capitalize()
+    return w.upper() if (len(w) <= 3 and w not in SHORT_WORDS - {"sms", "ict", "hr", "it"}) \
+        or not w.isalpha() and len(w) <= 4 else w.capitalize()
 
 
 def domain_brand(domain):
     """The brand in a domain as a name, in title case: "cragroup.co.ke" -> "CRA Group",
-    "noblesaccosociety.co.ke" -> "Noble Sacco Society", "pay-hero.co.ke" -> "Pay Hero"."""
+    "garaconsultancy.co.ke" -> "Gara Consultancy", "pay-hero.co.ke" -> "Pay Hero"."""
     return " ".join(_word(w) for w in _brand_words(domain))[:120] or domain
 
 
@@ -159,26 +209,25 @@ def _squash(text):
 
 
 def matches_domain(name, domain):
-    """Whether a name belongs to this address: it spells the address, one of its own words
-    (not a generic one like "sacco") is in it, or its initials start it."""
+    """Whether a name shares a word with its address: it spells the address, or one of its
+    own words (not a generic one like "sacco") is in it."""
     label = _squash(domain_label(domain))
     whole = _squash(name)
     if len(label) >= 4 and (whole == label or label in whole):   # "Fintech Group", "Payroll.ke"
         return True
     words = [w for w in re.findall(r"[a-z0-9]+", name.lower()) if w not in STOP_WORDS]
-    if any(len(w) >= 3 and w in label for w in words):
-        return True
-    initials = "".join(w[0] for w in re.findall(r"[a-z0-9]+", name.lower()) if w not in ("the", "of", "and"))
-    return len(initials) >= 3 and label.startswith(initials)
+    return any(len(w) >= 3 and w in label for w in words)
 
 
 def problem(name, domain, source):
     """Why a candidate can't be a name, or None."""
-    short = display(name)
+    full, short = clean(name), display(name)
     if not short or not re.search(r"[A-Za-z]", short):
         return "empty"
     if len(short.split()) > MAX_WORDS:
         return f"more than {MAX_WORDS} words"
+    if SEARCH_PHRASE.search(full.lower()) or (source != "domain" and PLACE_WORDS.search(short)):
+        return "reads like a search phrase or page title"
     if SLOGAN.search(short):
         return "reads like a slogan or description"
     if short == short.lower():
@@ -221,11 +270,20 @@ def _logo_texts(soup):
             yield from (t for t in (img.get("alt"), img.get("title")) if t)
 
 
-def _footer_names(soup):
+def _copyright_names(soup):
     for el in soup.select("footer") or [soup]:
         for m in re.finditer(r"(?:©|\(c\)|copyright)\s*(?:\d{4}(?:\s*[-–]\s*\d{4})?)?\s*([^©\n|]{2,80})",
                              el.get_text("\n"), re.I):
             yield m.group(1)
+
+
+def _footer_texts(soup):
+    """Short headings and bold text in the footer, where a site often repeats its name."""
+    for el in soup.select("footer"):
+        for tag in el.select("h1, h2, h3, h4, h5, strong, b, .footer-title, .widget-title"):
+            text = tag.get_text(" ", strip=True)
+            if text and len(text.split()) <= MAX_WORDS:
+                yield text
 
 
 def spelled_on_page(domain, text):
@@ -245,19 +303,18 @@ def spelled_on_page(domain, text):
 
 
 def candidates(soup, domain):
-    """[Name] the page and address give, each usable (see problem), best source first; the
-    domain brand last, when it is clear and the site doesn't already give it. The domain
-    brand is spelled as on the page when the page writes it."""
+    """[Name] the page and address give, each usable (see problem), in this order:
+    og:site_name, the logo's alt or title text, the copyright line, other footer text, the
+    schema.org Organization name; the domain brand last, when it is clear and the site
+    doesn't already give it (spelled as on the page when the page writes it). The page
+    <title> and headings are never used: they are often an SEO phrase."""
     found = []
     if soup is not None:
-        title = soup.title.get_text(" ", strip=True) if soup.title else ""
-        h1 = soup.find("h1")
-        raw = ([("schema.org", n) for n in _jsonld_names(soup)]
-               + [("og:site_name", m.get("content", "")) for m in soup.select('meta[property="og:site_name"]')]
-               + [("footer", n) for n in _footer_names(soup)]
+        raw = ([("og:site_name", m.get("content", "")) for m in soup.select('meta[property="og:site_name"]')]
                + [("logo", n) for n in _logo_texts(soup)]
-               + [(src, t) for src, t in (("title", title), ("headline", h1.get_text(" ", strip=True) if h1 else ""))
-                  if t and len(t.split()) <= MAX_PAGE_WORDS])
+               + [("copyright", n) for n in _copyright_names(soup)]
+               + [("footer", n) for n in _footer_texts(soup)]
+               + [("schema.org", n) for n in _jsonld_names(soup)])
         for source, text in raw:
             full = clean(text)
             if not problem(full, domain, source) and display(full) not in [c.display for c in found]:
@@ -341,24 +398,88 @@ def domain_of(website):
 
 
 def name_for(lead, soup):
-    """The Name this lead should have."""
+    """The Name this lead should have: a list's name as it is; for a web lead, the name its
+    site gives; if none, its current name when that passes every check; else the domain brand."""
     lead = dict(lead)
     if official(lead):
         return Name(lead["company"], display(lead["company"]), lead.get("source") or "list")
-    name = pick(soup, domain_of(lead.get("website")))
+    domain = domain_of(lead.get("website"))
+    name = pick(soup, domain)
     old = clean(lead.get("company"))
-    if name.source == "domain" and old and _squash(old) == _squash(name.full):
-        return Name(old, display(old), "domain")      # its spelling: "SeamlessIT", not "Seamlessit"
+    if name.source in ("domain", NONE) and old and not problem(old, domain, "current"):
+        return Name(old, display(old), "current name, checked")   # "SeamlessIT", "Paywave Express"
     return name
+
+
+def still_good(lead):
+    """Whether a lead's saved name passes today's rules without reading its site again."""
+    lead = dict(lead)
+    if lead.get("name_version") != NAME_VERSION:
+        return False
+    if official(lead) or lead.get("name_source") == NONE:
+        return True
+    name = lead.get("display_name") or lead.get("company")
+    return not problem(
+        name, domain_of(lead.get("website")), lead.get("name_source") or "current")
+
+
+def fetch_home(lead):
+    lead = dict(lead)
+    return scraper.fetch(home_of(lead["website"])) if lead.get("website") and not official(lead) else None
+
+
+def save(lead, name):
+    """Save a Name on a lead (an official list's full name is never replaced); returns the
+    lead as a dict with its name fields as saved."""
+    lead = dict(lead)
+    db.save_name(lead["id"], name.full, name.display, name.source, keep_company=official(lead),
+                 version=NAME_VERSION)
+    if name.full and not official(lead):
+        lead["company"] = name.full
+    lead.update(display_name=name.display, name_source=name.source, name_version=NAME_VERSION)
+    return lead
+
+
+def ensure(lead):
+    """Check a lead's name just before an email to it (first email or follow-up): kept if it
+    passes today's rules, otherwise worked out again from its site. Returns the lead, as a
+    dict, with its name fields as they are now. A follow-up's subject stays the thread's."""
+    if still_good(lead):
+        return dict(lead)
+    return save(lead, name_for(lead, fetch_home(lead)))
+
+
+# Statuses whose leads may still get an email, or have had one: their names are checked
+PREPARE_STATUSES = ("new", "verified", "sent", "replied", "meeting", "client")
+
+
+def needing_check():
+    with db.conn() as c:
+        return c.execute(f"SELECT * FROM leads WHERE status IN ({','.join('?' * len(PREPARE_STATUSES))})"
+                         " AND (name_version IS NULL OR name_version < ?) ORDER BY id",
+                         (*PREPARE_STATUSES, NAME_VERSION)).fetchall()
+
+
+def prepare(batch=BATCH):
+    """Check and save the names of leads not checked under today's rules: every list lead at
+    once (no site is read), then at most `batch` web leads, their sites read in parallel.
+    Returns (checked, still to check). Run again until nothing is left; the bot does this in
+    its prepare step and between inbox checks."""
+    leads = needing_check()
+    lists = [l for l in leads if official(l)]
+    web = [l for l in leads if not official(l)][:batch]
+    for lead in lists:
+        save(lead, name_for(lead, None))
+    for lead, name in review(web):
+        save(lead, name)
+    return len(lists) + len(web), len(leads) - len(lists) - len(web)
 
 
 def review(leads):
     """[(lead, Name)] for each lead, reading the websites of those found on the web."""
     leads = [dict(l) for l in leads]
-    def soup_of(l):
-        return scraper.fetch(home_of(l["website"])) if l.get("website") and not official(l) else None
     with ThreadPoolExecutor(SITE_WORKERS) as pool:
-        soups = list(pool.map(soup_of, leads))
+        soups = list(pool.map(fetch_home, leads))
     return [(lead, name_for(lead, soup)) for lead, soup in zip(leads, soups)]
 
 
@@ -369,35 +490,61 @@ def sent_on(day):
                          " ORDER BY l.id", (day,)).fetchall()
 
 
+def recently_emailed(n=30):
+    """The n leads emailed most recently, newest first."""
+    with db.conn() as c:
+        return c.execute("SELECT l.* FROM leads l JOIN (SELECT lead_id, MAX(id) AS last FROM sent GROUP BY lead_id) s"
+                         " ON s.lead_id = l.id ORDER BY s.last DESC LIMIT ?", (n,)).fetchall()
+
+
+def greeted_as(lead):
+    """The name the last email to this lead greeted it by ("Hello <name> team,"), from the
+    text that went out; the name emails use now if none was recorded."""
+    with db.conn() as c:
+        sent = c.execute("SELECT sent_body FROM sent WHERE lead_id=? AND sent_body IS NOT NULL"
+                         " ORDER BY id DESC LIMIT 1", (dict(lead)["id"],)).fetchone()
+    m = re.match(r"\s*Hello (.+?) team,", sent["sent_body"]) if sent else None
+    if m:
+        return m.group(1)
+    if sent and re.match(r"\s*Hello,", sent["sent_body"]):
+        return "(no name: Hello,)"
+    return short_name(lead) or "(no name: Hello,)"
+
+
 def _cut(text, n):
     text = text or "-"
     return text if len(text) <= n else text[:n - 1] + "…"
 
 
 def table(rows, title):
+    """Before (the name the last email used, or would use) and after, for each (lead, Name)."""
     print(f"\n{title}: {len(rows)}")
     if not rows:
         return
     print(f"  {'#':>5}  {'BEFORE (greeted as)':36}  {'AFTER: FULL NAME':36}  {'SHORT NAME':26}  SOURCE")
     for lead, name in rows:
-        before = lead["company"]
-        changed = "*" if name.display != before else " "
-        print(f" {changed}{lead['id']:>5}  {_cut(before, 36):36}  {_cut(name.full or '(no name: Hello,)', 36):36}  "
-              f"{_cut(name.display, 26):26}  {name.source}")
+        before = greeted_as(lead)
+        after = name.display or "(no name: Hello,)"
+        print(f" {'*' if after != before else ' '}{lead['id']:>5}  {_cut(before, 36):36}  "
+              f"{_cut(name.full or '(no name: Hello,)', 36):36}  {_cut(after, 26):26}  {name.source}")
 
 
-def run(apply=False, day=None):
-    day = day or date.today().isoformat()
-    waiting = ranking.waiting()
-    sent = sent_on(day)
-    print(f"Reading the websites of {len(waiting)} waiting leads and {len(sent)} sent on {day}...")
-    waiting_rows, sent_rows = review(waiting), review(sent)
-    table(waiting_rows, "Waiting leads (* = the greeting changes)")
-    table(sent_rows, f"Sent on {day} (report only: never changed)")
+def run(apply=False, day=None, recent=30, batch=BATCH):
+    """Without apply: before/after for the waiting leads and the `recent` leads emailed last
+    (and those emailed on `day`), changing nothing. With apply: one batch of prepare()."""
     if apply:
-        for lead, name in waiting_rows:
-            db.save_name(lead["id"], name.full, name.display, name.source, keep_company=official(lead))
-        print(f"\nSaved the names of {len(waiting_rows)} waiting leads. Sent leads were not changed.")
-    else:
-        print("\nNothing was changed. Run with --apply to save the waiting leads' names.")
-    return waiting_rows, sent_rows
+        done, left = prepare(batch)
+        print(f"Checked the names of {done} leads; {left} still to check"
+              + (" (run again, or leave it to the bot)." if left else "."))
+        return done, left
+    groups = [(ranking.waiting(), "Waiting leads"), (recently_emailed(recent), f"The {recent} leads emailed last")]
+    if day:
+        groups.append((sent_on(day), f"Emailed on {day}"))
+    print(f"Reading the websites of {sum(len(g) for g, _ in groups)} leads...")
+    out = []
+    for leads, title in groups:
+        rows = review(leads)
+        table(rows, f"{title} (* = the name in emails changes)")
+        out.append(rows)
+    print("\nNothing was changed. The bot saves these names itself (prepare step), or run with --apply.")
+    return out

@@ -517,7 +517,8 @@ def consider(url, category, query, seen, tally=None):
     if not db.add_lead(name, domain, category, email, "search", query, url):
         print(f"    {domain}: {email} already a lead")
         return dropped(tally, "email already a lead")
-    db.save_name(db.find_lead_by_email(email)["id"], picked.full, picked.display, picked.source, keep_company=True)
+    db.save_name(db.find_lead_by_email(email)["id"], picked.full, picked.display, picked.source, keep_company=True,
+                 version=names.NAME_VERSION)
     row = {"company": name, "website": domain, "industry": category,
            "email": email, "query": query}
     save_csv(row)

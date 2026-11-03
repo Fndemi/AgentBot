@@ -5,7 +5,8 @@
   python main.py discover [category] [--max N]   search the web for new leads (DISCOVER_PER_DAY)
   python main.py discover-log [days]     what discovery did per niche each day (default 7)
   python main.py clean-leads [--apply]   leads to exclude (directories, events, associations, media...)
-  python main.py names [--sent DAY] [--apply]   company names, before/after (waiting leads; sent ones report only)
+  python main.py names [--recent N] [--sent DAY]   company names before/after (waiting, N emailed last)
+  python main.py names --apply [--batch N]   check and save one batch of names (the bot does this itself)
   python main.py verify                  check email domains
   python main.py personalise [--limit N] write a personal opening for verified leads from their websites
   python main.py rank                    top 20 waiting leads in sending order, with start year and score
@@ -61,7 +62,9 @@ def main():
         if "--sent" in args:
             i = args.index("--sent")
             day = args[i + 1] if i + 1 < len(args) else sys.exit("--sent needs a day, e.g. --sent 2026-11-02")
-        names.run(apply="--apply" in args, day=day)
+        recent = take_number(args, "--recent") or 30
+        batch = take_number(args, "--batch") or names.BATCH
+        names.run(apply="--apply" in args, day=day, recent=recent, batch=batch)
     elif cmd == "clean-leads":
         import quality
         quality.run(apply="--apply" in args)

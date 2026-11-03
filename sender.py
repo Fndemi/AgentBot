@@ -844,6 +844,9 @@ def send_one(s, lead, followup=0, owner=None):
         print(f"  skipped {lead['email']}: {why_not}")
         return "limit" if why_not.startswith("daily limit") else "skipped"
     try:
+        # The name is checked again just before every email (names.ensure); a follow-up
+        # keeps its thread's subject and uses the corrected name in its text
+        lead = names.ensure(lead)
         msg, tname = build_followup(lead, followup) if followup else build(lead)
     except Exception as e:  # e.g. a template with a broken {placeholder}
         db.release_claim(lead["id"])

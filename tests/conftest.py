@@ -104,6 +104,15 @@ def niche_fits(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def names_as_they_are(monkeypatch):
+    """The name check before each email (names.ensure) reads no website and changes nothing.
+    Tests of the check put the real one back (names.REAL_ENSURE)."""
+    import names
+    names.REAL_ENSURE = getattr(names, "REAL_ENSURE", names.ensure)
+    monkeypatch.setattr(names, "ensure", lambda lead: dict(lead))
+
+
+@pytest.fixture(autouse=True)
 def no_paused_industries(monkeypatch):
     """No industry is paused (paused_until in uses.yaml) unless a test pauses one, so tests
     don't change with the date they run on."""

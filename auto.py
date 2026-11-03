@@ -1,7 +1,8 @@
 """Runs LeadBot unattended. Leave `python main.py auto` running.
 
-Weekdays at 9am Nairobi time: discover, verify, personalise, then send (up to DAILY_LIMIT).
-The rest of the time: check the inbox every POLL_MINUTES.
+Weekdays at 9am Nairobi time: discover, verify, personalise, prepare (check company names,
+names.py), then send (up to DAILY_LIMIT). The rest of the time: check the inbox every
+POLL_MINUTES, and check one small batch of company names after each inbox check.
 """
 import time
 from datetime import datetime, timedelta, timezone
@@ -50,6 +51,35 @@ def _personalise():
     return f"{personalise.run()} leads given a personal opening"
 
 
+# The prepare step checks names in batches for at most this long; the rest wait for the
+# batches between inbox checks (names.prepare reads at most names.BATCH sites at a time)
+PREPARE_SECONDS = 600
+
+
+def _prepare():
+    import names
+    done = left = 0
+    start = time.monotonic()
+    while time.monotonic() - start < PREPARE_SECONDS:
+        checked, left = names.prepare()
+        done += checked
+        if not left:
+            break
+    return f"checked the names of {done} leads, {left} still to check"
+
+
+def _prepare_batch():
+    """One batch of names between inbox checks; logged only when there was something to do."""
+    import names
+    try:
+        checked, left = names.prepare()
+    except Exception as e:
+        log(f"names: FAILED - {e}")
+        return
+    if checked:
+        log(f"names: checked {checked} leads, {left} still to check")
+
+
 def _send():
     import sender
     sender.run()
@@ -66,6 +96,7 @@ def daily_run(now):
     step("discover", _discover)
     step("verify", _verify)
     step("personalise", _personalise)
+    step("prepare", _prepare)
     step("send", _send)
 
 
@@ -77,4 +108,5 @@ def run():
         if daily_due(now):
             daily_run(now)
         step("inbox", _inbox)
+        _prepare_batch()
         time.sleep(config.POLL_MINUTES * 60)
