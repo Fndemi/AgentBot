@@ -277,7 +277,7 @@ def test_prepare_checks_waiting_and_emailed_leads_in_batches(sites):
     assert row(bounced)["name_version"] is None
 
 
-def test_the_bot_prepares_names_in_batches(monkeypatch):
+def test_the_bot_checks_names_in_batches(monkeypatch):
     calls, left = [], [45]
 
     def prepare(batch=names.BATCH):
@@ -286,9 +286,10 @@ def test_the_bot_prepares_names_in_batches(monkeypatch):
         return batch, left[0]
 
     monkeypatch.setattr(names, "prepare", prepare)
-    assert auto._prepare() == "checked the names of 60 leads, 0 still to check"
+    assert auto._names() == "checked the names of 60 leads, 0 still to check"
     assert len(calls) == 3
-    assert [name for name, _ in auto.STEPS].index("prepare") < [name for name, _ in auto.STEPS].index("send")
+    morning = [name for name, _ in auto.MORNING]
+    assert morning.index("send") < morning.index("names")
 
 
 def test_report_of_the_most_recently_emailed(sites, capsys):

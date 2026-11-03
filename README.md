@@ -32,13 +32,14 @@ python main.py discover-log            # what discovery did per niche each day
 python main.py clean-leads             # leads to exclude: directories, events... (add --apply to do it)
 python main.py names                  # company names before/after (the bot saves them itself)
 python main.py verify                 # drop dead domains
+python main.py prepare                # get leads ready for first emails (the bot does this after 5pm)
 python main.py send --dry-run         # read 3 sample emails first
 python main.py preview                # one email, plain and HTML versions
 python main.py send                   # send today's batch (DAILY_LIMIT)
 python main.py watch                  # leave running; alerts you on replies
 python main.py stats
 python main.py export                 # leads.csv, events.csv, replies.csv (join on lead_id)
-python main.py auto                   # or leave this running: does all of the above on weekdays from 9am (resumes after a restart)
+python main.py auto                   # or leave this running: sends at 9am, tops up until 5pm, prepares leads after 5pm (resumes after a restart)
 streamlit run dashboard.py            # optional dashboard
 ```
 

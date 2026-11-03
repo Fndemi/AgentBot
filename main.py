@@ -18,7 +18,8 @@
   python main.py inbox                   check replies once
   python main.py inbox --catch-up        re-read mail earlier checks skipped; matches are held for you
   python main.py watch                   check replies every few minutes (leave running)
-  python main.py auto                    weekdays from 9am: send first, then discover, verify, score; inbox in between
+  python main.py auto                    weekdays: send at 9am (topped up until 5pm), then discover; prepare from 5pm
+  python main.py prepare                 get waiting leads ready for their first email (score, niche, contact, opener)
   python main.py stats                   counts by status and reply label
   python main.py unsubscribe a@b.com     manually opt someone out
   python main.py export [folder]         write leads.csv, events.csv and replies.csv (joined on lead_id)
@@ -56,6 +57,9 @@ def main():
         import discover
         max_new = take_number(args, "--max")
         discover.run(args[0] if args else None, max_new)
+    elif cmd == "prepare":
+        import prepare
+        print(prepare.run())
     elif cmd == "names":
         import names
         day = None

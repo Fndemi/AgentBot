@@ -16,6 +16,7 @@ import discover
 import names
 import nichefit
 import personalise
+import prepare
 import quality
 import ranking
 import sender
@@ -141,6 +142,7 @@ def sending(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "USE_AI_OPENER", False)
     monkeypatch.setattr(ranking, "fill_years", lambda *a, **k: 0)
     monkeypatch.setattr(nichefit, "site_niche", REAL_SITE_NICHE)
+    monkeypatch.setattr(sender, "prepared", sender.REAL_PREPARED)
     db.init()
     texts, asked = {}, []
     monkeypatch.setattr(targeting, "site_text", lambda website: texts.get(website))
@@ -158,6 +160,8 @@ def sending(tmp_path, monkeypatch):
 
 
 def planned():
+    """What a send would pick after an evening's prepare job (the niche check runs there)."""
+    prepare.run()
     return {l["email"]: l["industry"] for l, followup in sender.plan() if not followup}
 
 

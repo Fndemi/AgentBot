@@ -7,8 +7,10 @@ import re
 import smtplib
 import socket
 import sys
+import threading
 import time
 import uuid
+from contextlib import contextmanager
 from datetime import date, timedelta
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid, formataddr
@@ -673,7 +675,67 @@ def _refused(reason):
 
 
 SEND_LOCK = "send"
-LOCK_SECONDS = 3600  # renewed after every email; a run that crashes frees it after this
+LOCK_SECONDS = 600         # a run that crashes frees the lock after this...
+LOCK_REFRESH_SECONDS = 120  # ...since a running one renews it this often, whatever it is doing
+
+
+def lock_owner():
+    """Who holds the send lock: "<host>:<process id>:<random>", so a later run on the same
+    host can tell whether the holder still exists."""
+    return f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
+
+
+def holder_gone(owner):
+    """Whether the process that holds the lock no longer exists: it ran on this host and
+    there is no process with its id. A holder on another host is never judged gone (its
+    lock expires instead)."""
+    host, _, rest = (owner or "").partition(":")
+    pid = rest.split(":", 1)[0]
+    if os.name != "posix" or host != socket.gethostname() or not pid.isdigit() or int(pid) == os.getpid():
+        return False
+    try:
+        os.kill(int(pid), 0)   # signal 0: only asks whether the process exists
+    except ProcessLookupError:
+        return True
+    except OSError:            # it exists but belongs to someone else
+        return False
+    return False
+
+
+def take_lock(owner):
+    """Take the send lock: free, expired, or held by a process on this host that no longer
+    exists (a run killed mid-send, e.g. by a restart). Returns True if `owner` holds it."""
+    if db.acquire_lock(SEND_LOCK, owner, LOCK_SECONDS):
+        return True
+    held = db.lock_holder(SEND_LOCK)
+    if held and holder_gone(held["owner"]):
+        print(f"Took over the send lock from a run that no longer exists ({held['owner']}, "
+              f"since {held['acquired_at']} UTC).")
+        db.release_lock(SEND_LOCK, held["owner"])
+        return db.acquire_lock(SEND_LOCK, owner, LOCK_SECONDS)
+    return False
+
+
+@contextmanager
+def keep_lock(owner):
+    """Renew the send lock every LOCK_REFRESH_SECONDS while the block runs (a thread), so a
+    slow mail server or a long wait between emails never lets it expire under a live run."""
+    stop = threading.Event()
+
+    def renew():
+        while not stop.wait(LOCK_REFRESH_SECONDS):
+            try:
+                db.refresh_lock(SEND_LOCK, owner, LOCK_SECONDS)
+            except Exception as e:  # the next renewal tries again
+                print(f"WARNING: could not renew the send lock ({e})")
+
+    thread = threading.Thread(target=renew, name="send-lock", daemon=True)
+    thread.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        thread.join(timeout=5)
 
 
 def leftover_claims():
@@ -688,12 +750,23 @@ def leftover_claims():
     return rows
 
 
-def plan(dry_run=False):
+def prepared(lead):
+    """Whether a waiting lead is ready for its first email: scored under today's rules, its
+    niche checked (nichefit.py), its site read for a contact (contacts.py; nothing to read
+    without a website) and, with USE_AI_OPENER, its opening line tried (personalise.py).
+    The prepare job (prepare.py) does all that, never the send."""
+    lead = dict(lead)
+    return (targeting.scored(lead) and not nichefit.needs_check(lead)
+            and bool(lead.get("contact_checked_at") or not lead.get("website"))
+            and (not config.USE_AI_OPENER or lead.get("confidence") is not None))
+
+
+def plan(dry_run=False, quiet=False):
     """Today's batch as [(lead, followup)], follow-ups first (followup = 0 for a first email,
-    else the follow-up's number). A dry run reads only: no
-    start years are looked up (WHOIS, websites), no scores saved and no AI asked, so leads
-    not ranked yet are shown in the order they would have without those, and leads not
-    scored yet are left out as below MIN_SCORE."""
+    else the follow-up's number). First emails go only to leads the prepare job has got
+    ready (prepared): nothing here reads a website, asks the AI or scores a lead, so a send
+    starts at once. The only lookup is the start year of a lead picked without one (a dry
+    run skips even that)."""
     remaining = config.DAILY_LIMIT - db.sent_today()
     if remaining <= 0:
         return []
@@ -702,26 +775,17 @@ def plan(dry_run=False):
     due = followups_due()[:remaining]
     leads = []
     if remaining > len(due):
-        # Highest-scoring leads first (younger companies, busy niches, own-domain email),
-        # then oldest-found first. Start years are needed for every waiting lead to rank them.
-        if not dry_run:
-            ranking.fill_years()
-            targeting.score_unscored()
-        leads = batch(approved_waiting(), remaining - len(due))
-        # Check today's leads belong to the niche whose email they would get (nichefit.py),
-        # then pick again: a lead that fits none drops out, one that fits another niche
-        # moves there and is scored again; one that couldn't be checked waits for next time
-        later = set()
-        while not dry_run and (todo := [l for l in leads if nichefit.needs_check(l) and l["id"] not in later]):
-            later |= nichefit.check(todo)
-            targeting.score_unscored()
-            leads = batch([l for l in approved_waiting(quiet=True) if l["id"] not in later], remaining - len(due))
-        # Read today's leads' websites for who to write to (contacts.py), and write personal
-        # lines for any of them that don't have them yet; then read the leads again
-        if not dry_run and leads and (contacts.run(leads) + personalise.run(leads)
-                                      or any(l["confidence"] is None for l in leads)):
-            leads = batch([l for l in approved_waiting(quiet=True) if l["id"] not in later],
-                          remaining - len(due))
+        waiting = approved_waiting(quiet=quiet)
+        ready = [l for l in waiting if prepared(l)]
+        if len(ready) < len(waiting) and not quiet:
+            print(f"{len(waiting) - len(ready)} waiting leads aren't prepared yet (python main.py prepare, "
+                  "or the bot's prepare job after 5pm)")
+        leads = batch(ready, remaining - len(due))
+        missing = [l for l in leads if l["est_year_source"] is None]
+        if missing and not dry_run:
+            ranking.fill_years(missing)
+            ids = {l["id"] for l in leads}
+            leads = [l for l in approved_waiting(quiet=True) if l["id"] in ids]
     return due + [(lead, 0) for lead in leads]
 
 
@@ -747,18 +811,19 @@ def run(dry_run=False):
     # One send run at a time, across processes (auto, cron, a manual send): a second one
     # stops here. Each email is also claimed on its own (send_one), so even two runs that
     # both got past this could never send the same email twice or go over the daily limit.
-    owner = f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
-    if not db.acquire_lock(SEND_LOCK, owner, LOCK_SECONDS):
+    owner = lock_owner()
+    if not take_lock(owner):
         held = db.lock_holder(SEND_LOCK)
         print(f"Another send run is in progress (since {held['acquired_at'] if held else '?'} UTC). Not sending.")
         return
     try:
-        leftover_claims()
-        batch = plan()
-        if not batch:
-            print("Nothing to send: no follow-ups due and no verified leads waiting in an approved industry.")
-            return
-        _send_batch(batch, owner)
+        with keep_lock(owner):
+            leftover_claims()
+            todays = plan()
+            if not todays:
+                print("Nothing to send: no follow-ups due and no prepared leads waiting in an approved industry.")
+                return
+            _send_batch(todays, owner)
     finally:
         db.release_lock(SEND_LOCK, owner)
 
@@ -804,7 +869,6 @@ def _send_batch(batch, owner):
             counts[outcome] += 1
             in_a_row = in_a_row + 1 if outcome == "failed" else 0
             print(f"[{i}/{len(batch)}] {outcome}{f' follow-up {followup:d}' if followup else ''} {lead['email']}")
-            db.refresh_lock(SEND_LOCK, owner, LOCK_SECONDS)
             if outcome == "bounced" and bounce_gate():
                 _paused(bounce_gate())
                 break

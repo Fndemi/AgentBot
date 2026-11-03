@@ -291,6 +291,9 @@ def test_each_email_records_opener_and_contact(world, monkeypatch, smtp, ai):
     with db.conn() as c:
         c.execute("UPDATE leads SET website=?, opener=?, confidence=1, opener_source=?, opener_url=? WHERE id=?",
                   (SITE, GOOD, SOURCE, f"{SITE}/about", lead_id))
+    import prepare
+    monkeypatch.setattr(sender, "prepared", sender.REAL_PREPARED)
+    prepare.run()               # the evening's prepare job reads the site for the contact
     sender.run()
     assert smtp["delivered"] == ["jane@umojacredit.co.ke"]
     with db.conn() as c:

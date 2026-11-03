@@ -887,11 +887,22 @@ def score_all():
     print(f"Scored {len(leads)} leads.")
 
 
+def scored(lead):
+    """Whether a lead has a need score worked out under today's rules (SCORE_VERSION)."""
+    lead = dict(lead)
+    return bool(lead.get("scored_at")) and lead.get("score_version") == SCORE_VERSION
+
+
+def unscored():
+    """Leads waiting for a first email in an approved industry without a need score under
+    today's rules."""
+    return [l for l in ranking.waiting() if personalise.approved(l) and not scored(l)]
+
+
 def score_unscored():
-    """Score the leads waiting for a first email in an approved industry that have no
-    need score yet, or one from older rules. The sender runs this before choosing leads."""
-    leads = [l for l in ranking.waiting() if personalise.approved(l)
-             and not (l["scored_at"] and l["score_version"] == SCORE_VERSION)]
+    """Score every lead unscored() returns. The prepare job (prepare.py) does this in
+    batches, away from the send."""
+    leads = unscored()
     if leads:
         print(f"Scoring {len(leads)} waiting leads (reading their websites)...")
         score_leads(leads, quiet=True)

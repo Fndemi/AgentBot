@@ -28,12 +28,14 @@ from fakemail import SENT_ID  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
-def database(monkeypatch):
-    """Never the real database from .env: SQLite (each test sets its own DB_PATH), or a
-    fresh PostgreSQL schema per test when TEST_DATABASE_URL is set."""
+def database(monkeypatch, tmp_path):
+    """Never the real database from .env: SQLite (a throwaway file unless the test sets its
+    own DB_PATH, so a test that forgets can't touch leads.db), or a fresh PostgreSQL schema
+    per test when TEST_DATABASE_URL is set."""
     url = os.environ.get("TEST_DATABASE_URL", "")
     if not url:
         monkeypatch.setattr(config, "DATABASE_URL", "")
+        monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "unset.db"))
         yield
         return
     schema = "test_" + uuid.uuid4().hex[:12]
@@ -110,6 +112,14 @@ def names_as_they_are(monkeypatch):
     import names
     names.REAL_ENSURE = getattr(names, "REAL_ENSURE", names.ensure)
     monkeypatch.setattr(names, "ensure", lambda lead: dict(lead))
+
+
+@pytest.fixture(autouse=True)
+def leads_count_as_prepared(monkeypatch):
+    """Every waiting lead counts as ready for its first email (sender.prepared), so sending
+    tests don't need the prepare job. Tests of it put the real check back (sender.REAL_PREPARED)."""
+    sender.REAL_PREPARED = getattr(sender, "REAL_PREPARED", sender.prepared)
+    monkeypatch.setattr(sender, "prepared", lambda lead: True)
 
 
 @pytest.fixture(autouse=True)
