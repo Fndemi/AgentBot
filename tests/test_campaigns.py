@@ -94,7 +94,12 @@ def test_the_committed_group_a_file_loads_and_nothing_incomplete_is_sent(world):
     assert [e["to"] for e in entries] == ["stephen@groundworkpm.com", "info@boxleocourier.com",
                                           "pmunyua@kilimoafya.com", "newton@bomahut.com"]
     outcome = send(world, "campaigns/group_a.yaml")
-    assert all(o.startswith("incomplete") for o in outcome.values()) and world["smtp"].sent == []
+    # only complete entries go out (here to a fake mail server); the others wait for their text
+    complete = [e["to"] for e in entries if not campaigns.missing(e)]
+    assert [m["To"] for m in world["smtp"].sent] == complete
+    assert all(outcome[e["to"]].startswith("incomplete") for e in entries if e["to"] not in complete)
+    bomahut = {e["to"]: e for e in entries}["newton@bomahut.com"]
+    assert bomahut["subject"] == "A second SMS route for Bomahut" and bomahut["body"].startswith("Hi Newton,\n\n")
 
 
 # --- Sending ---

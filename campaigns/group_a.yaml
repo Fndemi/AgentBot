@@ -35,6 +35,38 @@
   contact_name: ""
   company: Bomahut
   website: bomahut.com
-  subject: ""
-  body: ""
-  followup_body: ""
+  subject: "A second SMS route for Bomahut"
+  body: |
+    Hi Newton,
+
+    I came across Bomahut and noticed that bulk SMS is already one of your platform's features, alongside rent collection and tenant management.
+
+    I'm reaching out from TalkSasa, a Kenyan Bulk SMS provider. We work with platforms that send SMS on behalf of their users, through our API.
+
+    Since your landlords and property managers rely on those messages for rent reminders, payment confirmations and invoices, I thought it might be worth having a second SMS route in place, one that can take your traffic if your current provider slows down or goes down, or simply compare on rates and delivery.
+
+    I'd welcome a brief conversation to understand how you currently send SMS on Bomahut and see whether TalkSasa could work alongside your existing provider.
+
+    Would you be open to a 15-minute call?
+
+    Kind regards,
+
+    Mary
+
+    TalkSasa | Bulk SMS & Communication Solutions
+  followup_body: |
+    Hi Newton,
+
+    Just following up on my earlier email.
+
+    Since bulk SMS is already part of Bomahut, I wanted to ask: do you currently send through a single SMS provider, and has delivery ever slowed at busy times such as the start of the month, when rent reminders go out?
+
+    I'd be happy to have a short conversation and explore whether TalkSasa could work alongside your current provider as a second route.
+
+    Would a quick call next week work for you?
+
+    Best regards,
+
+    Mary
+
+    TalkSasa
