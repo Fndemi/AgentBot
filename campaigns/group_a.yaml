@@ -2,34 +2,136 @@
 # Each entry is sent once, word for word, at most GROUP_DAILY_LIMIT a day; its followup_body goes
 # out once, in the same thread, 4 working days later if there is no reply. Add new entries at
 # the end: the same command sends only the ones not sent yet.
-#
-# contact_name, subject, body and followup_body come from campaigns/named_emails_2026-11-03.txt,
-# word for word. That file wasn't in the repository when this was set up, so they are still
-# empty: an entry without a subject, body or followup_body is reported as incomplete and never sent.
 
 - to: stephen@groundworkpm.com
   contact_name: Stephen
   company: GroundWork PM
   website: groundworkpm.com
-  subject: ""
-  body: ""
-  followup_body: ""
+  subject: "SMS notifications for GroundWork PM tenants"
+  body: |
+    Hi Stephen,
+
+    I came across GroundWork PM and was interested in what you're building to simplify property management, particularly how you're bringing rent tracking, payments and maintenance operations into one platform.
+
+    I'm reaching out from TalkSasa, a Kenyan Bulk SMS provider. We help businesses automate customer communication through reliable SMS delivery and API integrations.
+
+    I see a potential opportunity to complement GroundWork PM by enabling automated SMS notifications for tenants, such as rent reminders, payment confirmations, maintenance updates and important property announcements.
+
+    Rather than having property managers manually follow up with tenants, these notifications could be triggered directly from the platform.
+
+    I'd be interested in having a brief 15-minute conversation to understand how you're currently handling tenant notifications and explore whether a TalkSasa integration could add value to GroundWork PM.
+
+    Would you be available for a short call sometime this week?
+
+    Best regards,
+    Mary
+    TalkSasa | Bulk SMS & Communication Solutions
+  followup_body: |
+    Hi Stephen,
+
+    Just following up on my earlier email.
+
+    I believe there could be a useful opportunity to integrate automated SMS notifications into GroundWork PM, particularly around tenant reminders, payment confirmations and property updates.
+
+    I'm curious whether you're currently handling these notifications through an existing SMS provider or another communication channel.
+
+    I'd be happy to have a short conversation and explore whether TalkSasa could complement what you're already doing.
+
+    Would a quick call next week work for you?
+
+    Best regards,
+    Mary
+    TalkSasa
 
 - to: info@boxleocourier.com
   contact_name: ""
   company: Boxleo
   website: boxleocourier.com
-  subject: ""
-  body: ""
-  followup_body: ""
+  subject: "SMS delivery updates for Boxleo customers"
+  body: |
+    Hello Boxleo Team,
+
+    I've been looking into Boxleo's fulfilment and last-mile delivery operations, and I was particularly interested in your API-driven approach to connecting merchants with delivery services.
+
+    I'm reaching out from TalkSasa, a Kenyan Bulk SMS provider supporting businesses with automated customer notifications and SMS API integrations.
+
+    With the number of deliveries your platform handles, I believe there may be an opportunity to support customer communication through automated SMS notifications, including:
+    - Order dispatch and delivery updates.
+    - Customer notifications when a rider is approaching.
+    - Successful delivery confirmations.
+    - Cash-on-delivery payment confirmations.
+    - Failed delivery and rescheduling alerts.
+
+    We would be interested in exploring how TalkSasa could support your existing communication infrastructure or complement your current SMS solution.
+
+    Would you be open to a 15-minute discussion with the person responsible for technology partnerships or operations?
+
+    Kind regards,
+    Mary
+    TalkSasa | Bulk SMS & Communication Solutions
+  followup_body: |
+    Hello Boxleo Team,
+
+    Just following up on my earlier email.
+
+    I believe there could be a useful opportunity to support Boxleo's delivery notifications by SMS, particularly around dispatch updates, delivery confirmations and cash-on-delivery payments.
+
+    I'm curious whether you're currently handling these notifications through an existing SMS provider or another communication channel.
+
+    I'd be happy to have a short conversation and explore whether TalkSasa could complement what you're already doing.
+
+    Would a quick call next week work for you?
+
+    Best regards,
+    Mary
+    TalkSasa
 
 - to: pmunyua@kilimoafya.com
-  contact_name: ""
+  contact_name: Philip
   company: Kilimo Afya
   website: kilimoafya.com
-  subject: ""
-  body: ""
-  followup_body: ""
+  subject: "Reaching Kilimo Afya farmers by SMS"
+  body: |
+    Hi Philip,
+
+    I came across Kilimo Afya and was impressed by the work you're doing to connect farmers with agricultural intelligence, advisory services and digital farming solutions.
+
+    I'm reaching out from TalkSasa, a Kenyan Bulk SMS provider.
+
+    Given the scale of your farmer network, I see an opportunity to complement your platform with automated SMS communication, particularly for farmers who may not always be actively using a mobile application or have consistent internet access.
+
+    Some potential use cases include:
+    - Weather and crop advisory alerts.
+    - Farmer training and programme announcements.
+    - Produce collection schedules.
+    - Payment and transaction confirmations.
+    - Important agricultural updates.
+
+    TalkSasa provides SMS API integration, which could allow these notifications to be triggered directly from your existing systems.
+
+    I'd appreciate the opportunity to understand how you currently communicate with farmers and explore whether SMS could strengthen your existing engagement channels.
+
+    Would you be available for a brief 15-minute conversation next week?
+
+    Best regards,
+    Mary
+    TalkSasa | Bulk SMS & Communication Solutions
+  followup_body: |
+    Hi Philip,
+
+    Just following up on my earlier email.
+
+    I believe there could be a useful opportunity to reach Kilimo Afya's farmers by SMS, particularly around weather and advisory alerts, training announcements and payment confirmations.
+
+    I'm curious whether you're currently reaching farmers through an existing SMS provider or another communication channel.
+
+    I'd be happy to have a short conversation and explore whether TalkSasa could complement what you're already doing.
+
+    Would a quick call next week work for you?
+
+    Best regards,
+    Mary
+    TalkSasa
 
 - to: newton@bomahut.com
   contact_name: Newton
@@ -50,9 +152,7 @@
     Would you be open to a 15-minute call?
 
     Kind regards,
-
     Mary
-
     TalkSasa | Bulk SMS & Communication Solutions
   followup_body: |
     Hi Newton,
@@ -66,7 +166,5 @@
     Would a quick call next week work for you?
 
     Best regards,
-
     Mary
-
     TalkSasa
