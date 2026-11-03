@@ -7,7 +7,7 @@ I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider
 
 The simplest way for you to judge an SMS provider is to test it on your own traffic. We'll give you {free_sms} free SMS to send OTPs or payment confirmations through us alongside your current provider, so you can compare delivery for yourself.
 
-I'd welcome a 15-minute call with your tech lead to plan the test. Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
+I'd welcome a 15-minute call with you to plan the test (bring your developer along if that helps). Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
 
 {booking_line}
 

@@ -1,9 +1,9 @@
 Subject: SMS notices for your customers — can we meet?
-Hello {company} team,
+{greeting}
 
 {opener}
 
-I'm {sender} from TalkSasa Communications in Nairobi. Water, power and internet providers use our bulk SMS for {uses}.
+I'm {sender} from TalkSasa Communications in Nairobi, writing to you at {company}. We can help you send {uses} by SMS.
 
 I'd like to understand how you reach your customers today and whether we could support you.
 

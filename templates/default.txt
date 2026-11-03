@@ -1,9 +1,9 @@
 Subject: Quick chat about reaching your customers by SMS?
-Hello {company} team,
+{greeting}
 
 {opener}
 
-I'm {sender} from TalkSasa Communications in Nairobi. Organisations across Kenya use our bulk SMS for {uses}.
+I'm {sender} from TalkSasa Communications in Nairobi, writing to you at {company}. We can help you send {uses} by SMS.
 
 I'd like to understand how you currently communicate with your customers and see whether we can work together.
 

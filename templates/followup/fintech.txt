@@ -1,6 +1,6 @@
-Hello {company} team,
+{greeting}
 
-Just following up on my email about sending {uses} by SMS. If that's something you're looking at, {offer}
+Just following up on my email to {company} about sending {uses} by SMS. If that's something you're looking at, {offer}
 
 Kind regards,
 {sender}

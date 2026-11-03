@@ -1,8 +1,8 @@
 {greeting}
 
-A backup route only needs two things prepared in advance: your sender name registered on our route and an API key ready. Then delivery codes and order updates can move to us quickly if you ever need it, and you only pay for what you send through us.
+A backup route for {company} only needs two things prepared in advance: your sender name registered on our route and an API key ready. Then delivery codes and order updates can move to us quickly if you ever need it, and you only pay for what you send through us.
 
-In 15 minutes we can agree the set-up with whoever handles your SMS integration. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+In 15 minutes we can agree the set-up with you (bring your developer along if that helps). Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
 
 {booking_line}
 

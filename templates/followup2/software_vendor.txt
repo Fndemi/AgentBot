@@ -1,6 +1,6 @@
 {greeting}
 
-One last note from me. If built-in SMS would help your clients, I'd be glad to show you how simple the integration can be, with free credits to test it.
+One last note from me{at_company}. If built-in SMS would help your clients, I'd be glad to show you how simple the integration can be, with free credits to test it.
 
 It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you, or is there another day that suits you better?
 

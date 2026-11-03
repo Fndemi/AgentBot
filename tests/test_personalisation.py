@@ -173,9 +173,9 @@ def test_an_unreadable_site_leaves_the_lead_as_it_is(world):
     assert lead["email"] == "info@umojacredit.co.ke" and lead["contact_name"] is None
 
 
-def test_greeting_without_a_contact_is_the_team(world):
+def test_greeting_without_a_contact_is_hello(world):
     msg, _ = sender.build(row(add()))
-    assert sender.plain_of(msg).startswith("Hello Umoja Credit team,\n\n")
+    assert sender.plain_of(msg).startswith("Hello,\n\n")
 
 
 # --- The opener ---
@@ -250,7 +250,7 @@ def test_a_failed_check_sends_the_normal_template(world, ai, monkeypatch):
     lead = row(lead_id)
     assert lead["opener"] is None and lead["confidence"] == 0 and "AI check failed" in lead["opener_note"]
     text = sender.plain_of(sender.build(row(lead_id))[0])
-    assert text.startswith("Hello Umoja Credit team,\n\n") and GOOD not in text
+    assert text.startswith("Hello,\n\n") and GOOD not in text
 
 
 def test_opener_is_the_first_line_after_the_greeting_and_only_in_the_first_email(world, ai):
@@ -262,7 +262,7 @@ def test_opener_is_the_first_line_after_the_greeting_and_only_in_the_first_email
     assert (lead["opener"], lead["opener_source"], lead["opener_url"]) == (GOOD, SOURCE, f"{SITE}/about")
     for v in "ABC":
         text = sender.plain_of(sender.build(dict(lead, template_variant=v))[0])
-        assert text.startswith(f"Hello Umoja Credit team,\n\n{GOOD}\n\n")
+        assert text.startswith(f"Hello,\n\n{GOOD}\n\n")
         for n in (1, 2):
             assert GOOD not in sender.plain_of(sender.build_followup(dict(lead, template_variant=v), n)[0])
 

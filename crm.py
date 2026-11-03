@@ -1443,7 +1443,8 @@ MAX_TEMPLATE_CHARS = 6000
 
 
 def _fields(kind):
-    return set(TEMPLATE_FIELDS) | ({"offer"} if kind != "first" else set())
+    return (set(TEMPLATE_FIELDS) | ({"offer"} if kind != "first" else set())
+            | ({"at_company"} if kind == "followup2" else set()))
 
 
 def _template_path(kind, name):
@@ -1495,7 +1496,7 @@ def _render(kind, name, subject, body):
             lead["template_variant"] = sender.variants(lead)[0]
         first = sender.fill(sender.first_subject(lead), lead)
         msg = sender.compose(lead, first if first.lower().startswith("re:") else "Re: " + first,
-                             sender.followup_body(lead, n, body, []), extra=sender.followup_extra(lead, n))
+                             sender.followup_body(lead, n, body, []), extra=sender.followup_extra(lead, n, first))
     return {"subject": str(msg["Subject"]), "text": sender.plain_of(msg),
             "attachments": [p.get_filename() for p in msg.iter_attachments()]}
 

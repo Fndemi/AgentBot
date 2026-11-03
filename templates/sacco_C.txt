@@ -7,7 +7,7 @@ Your WhatsApp groups and notice boards probably miss members who aren't online o
 
 I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider. You can send one message to all your members from a simple web page or an Excel list, from {price_from} per SMS.
 
-I'd like to show whoever sends member notices how it works. It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
+I'd be glad to show you how it works. It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
 
 {booking_line}
 

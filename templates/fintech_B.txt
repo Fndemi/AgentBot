@@ -5,7 +5,7 @@ Subject: Free side-by-side SMS test for {company}
 
 I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider. You probably already have an SMS provider, so here's a low-effort way for you to compare: we'll give you {free_sms} free SMS to send OTPs or alerts through us alongside your current provider, and you compare delivery for yourself.
 
-We can plan the test in a 15-minute call with your tech lead, {meet_options}. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
+We can plan the test with you in 15 minutes, {meet_options} (bring your developer along if that helps). Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
 
 {booking_line}
 

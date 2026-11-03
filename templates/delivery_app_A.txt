@@ -3,7 +3,7 @@ Subject: Delivery codes that arrive on time
 
 {opener}
 
-I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider.
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider, writing to you at {company}.
 
 When one of your delivery codes arrives late, your rider waits at the door and your customer can't confirm the delivery. You probably already work with an SMS provider, and we're happy to work alongside yours as a second route, ready to take your traffic if your main one slows down.
 

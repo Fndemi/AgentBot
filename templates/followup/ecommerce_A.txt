@@ -1,6 +1,6 @@
 {greeting}
 
-Here's the kind of update I meant, sent automatically from your store through our API:
+Here's the kind of update I meant for {company}, sent automatically from your store through our API:
 
 "Hi Achieng, your order #4521 has been dispatched and will arrive today between 2pm and 5pm. - {company}"
 

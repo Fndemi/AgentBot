@@ -1,6 +1,6 @@
 {greeting}
 
-One last note from me. Whenever a client project needs SMS, I'd be glad to help you get it working quickly, with free credits to build and test.
+One last note from me{at_company}. Whenever a client project needs SMS, I'd be glad to help you get it working quickly, with free credits to build and test.
 
 It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you, or is there another day that suits you better?
 

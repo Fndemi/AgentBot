@@ -57,7 +57,7 @@ def test_three_variants_with_follow_ups_signature_and_footer(world, niche):
         assert f1["Subject"] == f2["Subject"] == "Re: " + first["Subject"]
         for msg in (first, f1, f2):
             text = sender.plain_of(msg)
-            assert text.startswith("Hello Duka team,\n\n") and SIGNATURE in text
+            assert text.startswith("Hello,\n\n") and SIGNATURE in text
             assert 'just reply "unsubscribe"' in text and "{" not in text
             assert len(re.findall(r"(?:Mon|Tues|Wednes|Thurs|Fri)day \d+ \w{3} at \d", text)) == 2  # two times
 

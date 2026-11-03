@@ -7,7 +7,7 @@ I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider
 
 If your system sends SMS, or your clients have asked for it, we'd like to give you {free_sms} free SMS and our API docs to test the integration, at no cost and with no contract.
 
-I'd welcome a 15-minute call with your lead developer to plan the test. Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
+I'd welcome a 15-minute call with you to plan the test (bring your developer along if that helps). Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
 
 {booking_line}
 

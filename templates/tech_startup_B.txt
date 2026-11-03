@@ -7,7 +7,7 @@ I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider
 
 There's no contract and no minimum. After the free credits you pay as you go, from {price_from} per SMS.
 
-We can get your developer set up in a 15-minute call, {meet_options}. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
+We can get you set up in a 15-minute call, {meet_options} (bring your developer along if that helps). Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
 
 {booking_line}
 

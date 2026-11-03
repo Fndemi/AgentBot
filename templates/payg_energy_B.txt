@@ -7,7 +7,7 @@ I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider
 
 The easiest way for you to judge an SMS provider is to try it on your own messages. We'll give you {free_sms} free SMS to send unlock codes or payment reminders through our API, so you can test delivery, including to your customers on basic phones.
 
-I'd welcome a 15-minute call with your tech lead to plan the test. Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
+I'd welcome a 15-minute call with you to plan the test (bring your developer along if that helps). Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
 
 {booking_line}
 

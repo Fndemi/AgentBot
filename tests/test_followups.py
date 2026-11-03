@@ -64,8 +64,8 @@ def test_follow_up_goes_in_the_same_thread(world, mail):
     assert msg["Subject"] == "Re: Loan reminders by SMS"
     assert msg["In-Reply-To"] == FIRST_ID and msg["References"] == FIRST_ID
     text = msg.get_body(("plain",)).get_content()
-    assert "Hello Hurima Sacco team" in text
-    assert ("Just following up on my email about sending loan reminders and deposit confirmations "
+    assert text.startswith("Hello,\n\n")
+    assert ("Just following up on my email to Hurima Sacco about sending loan reminders and deposit confirmations "
             "by SMS. If that's something you're looking at, I'd be glad to visit or set up a quick "
             "call, whichever suits you.") in text
     assert 'just reply "unsubscribe"' in text  # footer, as on every email
@@ -113,8 +113,9 @@ def test_second_follow_up_threads_under_the_first_email(world, mail):
     assert second["In-Reply-To"] == first["Message-ID"]
     assert second["References"] == f"{FIRST_ID} {first['Message-ID']}"
     text = second.get_body(("plain",)).get_content()
-    # a lead from before the rotation gets its niche's new follow-up 2
-    assert "One last note from me. Whether it's a backup route or a lower price per SMS" in text
+    # a lead from before the rotation gets its niche's new follow-up 2, naming the company once:
+    # the thread's subject doesn't
+    assert "One last note from me to you at Hurima Sacco. Whether it's a backup route or a lower price per SMS" in text
     assert 'just reply "unsubscribe"' in text
     assert not list(second.iter_attachments())
 
@@ -218,25 +219,26 @@ def test_old_wording_lead_gets_the_bulk_sms_line(world, mail):
             subject="Loan repayment reminders by SMS — can we talk?")
     sender.run()
     text = plain(sent_to(mail, "info@zenka.co.ke")[0])
-    assert f"Just following up on my earlier email about bulk SMS. {OFFER_LINE}" in text
+    assert f"Just following up on my earlier email to Hurima Sacco about bulk SMS. {OFFER_LINE}" in text
     assert "OTPs and transaction alerts" not in text
     assert "Kind regards,\nFlorence\nTalkSasa Communications Ltd\n+254 762 000 008\n+254 712 295 880\n" in text
     age_all_sends(10)
     sender.run()  # follow-up 2 is the niche's new one, the same for everyone
-    assert "One last note from me." in plain(sent_to(mail, "info@zenka.co.ke")[1])
+    assert "One last note from me to you at Hurima Sacco." in plain(sent_to(mail, "info@zenka.co.ke")[1])
 
 
 def test_unknown_first_subject_counts_as_old_wording(world, mail):
     emailed("info@hurimasacco.co.ke", days_ago=10, subject=None)
     sender.run()
-    assert "Just following up on my earlier email about bulk SMS." in plain(sent_to(mail, "info@hurimasacco.co.ke")[0])
+    assert "Just following up on my earlier email to Hurima Sacco about bulk SMS." in plain(
+        sent_to(mail, "info@hurimasacco.co.ke")[0])
 
 
 def test_current_wording_lead_keeps_the_uses_line(world, mail):
     emailed("info@fintech.co.ke", days_ago=10, industry="fintech", subject="otps and transaction  alerts by SMS")
     sender.run()
     text = plain(sent_to(mail, "info@fintech.co.ke")[0])
-    assert f"Just following up on my email about sending OTPs and transaction alerts by SMS. {OFFER_LINE}" in text
+    assert f"Just following up on my email to Hurima Sacco about sending OTPs and transaction alerts by SMS. {OFFER_LINE}" in text
     assert "bulk SMS" not in text
 
 

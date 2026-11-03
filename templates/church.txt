@@ -1,9 +1,9 @@
 Subject: Event reminders by SMS
-Hello {company} team,
+{greeting}
 
 {opener}
 
-I'm {sender} from TalkSasa Communications in Nairobi. We help churches send event reminders, contribution confirmations and member updates by SMS.
+I'm {sender} from TalkSasa Communications in Nairobi, writing to you at {company}. We can help you send event reminders, contribution confirmations and member updates by SMS.
 
 How do you reach your congregation today? If SMS could help, I'd be glad to visit or set up a quick call, whichever suits you.
 

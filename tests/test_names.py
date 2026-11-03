@@ -222,7 +222,7 @@ def test_the_name_is_corrected_just_before_a_first_email(sending):
     assert sender.send_one(smtp, db.find_lead_by_email("info@garaconsultancy.co.ke")) == "sent"
     body = sender.plain_of(smtp.sent[0])
     assert "Ecommerce Agency" not in body + str(smtp.sent[0]["Subject"])
-    assert "Hello Gara Consultancy team," in body
+    assert body.startswith("Hello,\n\n") and "Gara Consultancy" in str(smtp.sent[0]["Subject"]) + body
     assert (row(lead_id)["company"], row(lead_id)["name_source"]) == ("Gara Consultancy", "copyright")
 
 
@@ -240,7 +240,7 @@ def test_a_follow_up_keeps_the_thread_subject_but_uses_the_corrected_name(sendin
     msg = smtp.sent[0]
     assert str(msg["Subject"]) == "Re: When your SMS provider goes down"
     assert msg["In-Reply-To"] == "<first@talksasa.co.ke>"
-    assert sender.plain_of(msg).startswith("Hello Gara Consultancy team,")
+    assert sender.plain_of(msg).startswith("Hello,\n\nA backup route for Gara Consultancy only needs")
     assert row(lead_id)["name_source"] == "domain"
 
 

@@ -1,9 +1,9 @@
 Subject: SMS reminders for your borrowers — can we meet?
-Hello {company} team,
+{greeting}
 
 {opener}
 
-I'm {sender} from TalkSasa Communications in Nairobi. Lenders use our bulk SMS for {uses}.
+I'm {sender} from TalkSasa Communications in Nairobi, writing to you at {company}. We can help you send {uses} by SMS.
 
 I'd like to understand how you reach your clients today and whether we could support you.
 

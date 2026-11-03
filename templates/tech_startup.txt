@@ -1,11 +1,11 @@
 Subject: OTPs and account alerts by SMS
-Hello {company} team,
+{greeting}
 
 {opener}
 
-I'm {sender} from TalkSasa Communications in Nairobi. We help tech companies send OTPs, account alerts and customer notifications by SMS.
+I'm {sender} from TalkSasa Communications in Nairobi, writing to you at {company}. We can help you send OTPs, account alerts and customer notifications by SMS.
 
-Who handles SMS on your side today? If it's worth comparing, I can send over our rates and API docs.
+How do you send SMS today? If it's worth comparing, I can send over our rates and API docs.
 
 {attachment_line}
 

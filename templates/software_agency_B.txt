@@ -5,9 +5,9 @@ Subject: Free SMS credits for {company}'s next project
 
 I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider.
 
-If you have a project that needs OTPs, alerts or reminders, we'd like to give you {free_sms} free SMS and our API docs so your developers can build and test with them, at no cost and with no contract.
+If you have a project that needs OTPs, alerts or reminders, we'd like to give you {free_sms} free SMS and our API docs so you can build and test with them, at no cost and with no contract.
 
-I'd welcome a 15-minute call with your lead developer to get you set up. Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
+I'd welcome a 15-minute call with you to get you set up (bring your developer along if that helps). Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
 
 {booking_line}
 

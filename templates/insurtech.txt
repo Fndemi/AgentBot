@@ -1,9 +1,9 @@
 Subject: Policy alerts and OTPs by SMS — can we talk?
-Hello {company} team,
+{greeting}
 
 {opener}
 
-I'm {sender} from TalkSasa Communications in Nairobi. Digital insurers use our bulk SMS for {uses}.
+I'm {sender} from TalkSasa Communications in Nairobi, writing to you at {company}. We can help you send {uses} by SMS.
 
 I'd like to understand how you reach your policyholders today and whether we could support you.
 

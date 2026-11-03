@@ -3,7 +3,7 @@ Subject: When your SMS provider goes down
 
 {opener}
 
-Quick question: what happens to your OTPs and transaction alerts if your SMS provider has an outage?
+Quick question for {company}: what happens to your OTPs and transaction alerts if your SMS provider has an outage?
 
 I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider. You probably already work with an SMS provider, and we're happy to work alongside yours as a second route, ready to take your traffic if your main one slows down or fails.
 

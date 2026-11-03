@@ -1,8 +1,8 @@
 {greeting}
 
-If you already have an SMS provider, we can also sit behind it as a backup route, ready to take your OTPs if your main one slows down. All it needs is your sender name registered on our route and an API key ready.
+If you already have an SMS provider for {company}, we can also sit behind it as a backup route, ready to take your OTPs if your main one slows down. All it needs is your sender name registered on our route and an API key ready.
 
-In 15 minutes we can agree the set-up with your developer. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+In 15 minutes we can agree the set-up with you (bring your developer along if that helps). Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
 
 {booking_line}
 

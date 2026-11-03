@@ -3,7 +3,7 @@ Subject: When your SMS provider goes down
 
 {opener}
 
-Quick question: what happens to your disbursement messages and OTPs if your SMS provider has an outage at month end, when loan volumes peak?
+Quick question for {company}: what happens to your disbursement messages and OTPs if your SMS provider has an outage at month end, when loan volumes peak?
 
 I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider. You probably already work with an SMS provider, and we're happy to work alongside yours as a second route, ready to take your traffic if your main one slows down or fails.
 

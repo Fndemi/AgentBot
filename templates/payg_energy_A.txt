@@ -3,7 +3,7 @@ Subject: Unlock codes that reach every customer
 
 {opener}
 
-I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider.
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider, writing to you at {company}.
 
 For you, the unlock code is the product: if it doesn't arrive, your customer sits in the dark and calls your support line. An SMS reaches any phone, including basic phones in areas with weak data. How do your customers receive their codes and payment reminders today?
 

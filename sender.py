@@ -133,12 +133,11 @@ def to_contact(lead):
 
 
 def greeting(lead):
-    """"Hello Jane," for a named contact, otherwise "Hello <short name> team,", or "Hello,"
-    when the lead has no name (names.py)."""
+    """"Hello Jane," for a named contact, otherwise "Hello,": the email speaks to the one person
+    reading it. The company is named once in the subject or the first line instead."""
     if to_contact(lead):
         return f"Hello {contacts.first_name(dict(lead)['contact_name'])},"
-    name = names.short_name(lead)
-    return f"Hello {name} team," if name else "Hello,"
+    return "Hello,"
 
 
 # A subject template's {company} when the lead has no name: "for {company}'s next project"
@@ -270,8 +269,8 @@ FOLLOWUP_OFFERS = {"church": VISIT_OFFER, "sacco": VISIT_OFFER, "school": VISIT_
 FOLLOWUP_USES = 2  # {uses} in a follow-up: the first two on the industry's list
 # Follow-up 1's first line, and what replaces it for a lead whose first email had older
 # wording than its template has now (that email may not have named these uses)
-FOLLOWUP1_LINE = "Just following up on my email about sending {uses} by SMS."
-OLD_WORDING_LINE = "Just following up on my earlier email about bulk SMS."
+FOLLOWUP1_LINE = "Just following up on my email to {company} about sending {uses} by SMS."
+OLD_WORDING_LINE = "Just following up on my earlier email to {company} about bulk SMS."
 # Added to the old follow-up 1 of a lead emailed before the rotation, just before the signature
 SIGNATURE_START = "Kind regards,"
 LEGACY_MEETING_LINES = ("It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you? "
@@ -333,10 +332,19 @@ def followup_body(lead, n, body, thread):
     return body[:at].rstrip() + "\n\n" + LEGACY_MEETING_LINES + "\n" + body[at:]
 
 
-def followup_extra(lead, n):
-    """The gaps a follow-up fills beyond fill's own: {uses}, {offer} and its own meeting slots."""
+def at_company(lead, subject):
+    """{at_company} in follow-up 2, which follows every variant's first email: " to you at
+    <short name>" when the thread's subject doesn't name the company, so the name appears
+    once in the subject or the first line; "" when it does, or when the lead has no name."""
+    name = names.short_name(lead)
+    return "" if not name or name.lower() in (subject or "").lower() else f" to you at {name}"
+
+
+def followup_extra(lead, n, subject=None):
+    """The gaps a follow-up fills beyond fill's own: {uses}, {offer}, its own meeting slots and
+    {at_company} (for the thread's `subject`)."""
     slot1, slot2 = rotation.slots(dict(lead).get("id"), n + 1)
-    return dict(followup_values(lead), slot1=slot1, slot2=slot2)
+    return dict(followup_values(lead), slot1=slot1, slot2=slot2, at_company=at_company(lead, subject))
 
 
 def build_followup(lead, n=1):
@@ -357,7 +365,7 @@ def build_followup(lead, n=1):
     ids = [r["message_id"] for r in thread if r["message_id"]] or [lead.get("message_id")]
     ids = [i for i in ids if i]
     msg = compose(lead, subject, body,
-                  in_reply_to=ids[-1] if ids else None, references=ids, extra=followup_extra(lead, n))
+                  in_reply_to=ids[-1] if ids else None, references=ids, extra=followup_extra(lead, n, first))
     return msg, f"{path.parent.name}/{path.stem}"
 
 

@@ -1,6 +1,6 @@
 {greeting}
 
-Here's the kind of reminder I meant, sent automatically through our API:
+Here's the kind of reminder I meant for {company}, sent automatically through our API:
 
 "Hi Brian, your Maths class starts today at 4pm. Log in at [your link] to join. - {company}"
 

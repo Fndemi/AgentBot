@@ -210,7 +210,7 @@ def test_old_lead_finishes_with_its_old_follow_up_1_and_a_meeting_request(world,
     text = plain(f1)
     assert f1["Subject"] == "Re: Loan reminders by SMS"
     assert re.search(
-        r"Just following up on my email about sending loan reminders and deposit confirmations by SMS\. "
+        r"Just following up on my email to Hurima Sacco about sending loan reminders and deposit confirmations by SMS\. "
         r"If that's something you're looking at, I'd be glad to visit or set up a quick call, whichever suits you\.\n\n"
         r"It takes 15 minutes, at your office if you're in or near Nairobi, on a video call or by phone\. "
         rf"Would {SLOT} or {SLOT} suit you\? If neither works, just tell me which day suits you better\.\n\n"
@@ -220,7 +220,7 @@ def test_old_lead_finishes_with_its_old_follow_up_1_and_a_meeting_request(world,
     age_all_sends(10)
     sender.run()
     f2 = mail["messages"][1]
-    assert "One last note from me. If reaching members on time" in plain(f2)  # the new follow-up 2
+    assert "One last note from me to you at Hurima Sacco. If reaching members on time" in plain(f2)  # the new follow-up 2
     assert "I won't keep filling your inbox" not in plain(f2)
 
 
@@ -228,7 +228,7 @@ def test_old_wording_lead_still_gets_the_bulk_sms_line_and_the_meeting_request(w
     old_lead(subject=None)
     sender.run()
     text = plain(mail["messages"][0])
-    assert "Just following up on my earlier email about bulk SMS." in text
+    assert "Just following up on my earlier email to Hurima Sacco about bulk SMS." in text
     assert "It takes 15 minutes," in text and "loan reminders and deposit" not in text
 
 

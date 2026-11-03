@@ -1,9 +1,9 @@
 Subject: Loan repayment reminders by SMS
-Hello {company} team,
+{greeting}
 
-I'm {sender} from TalkSasa Communications in Nairobi. We help digital lenders send loan repayment reminders, disbursement confirmations and OTPs by SMS.
+I'm {sender} from TalkSasa Communications in Nairobi, writing to you at {company}. We can help you send loan repayment reminders, disbursement confirmations and OTPs by SMS.
 
-Who handles SMS on your side today? If it's worth comparing, I can send over our rates and API docs.
+How do you send SMS today? If it's worth comparing, I can send over our rates and API docs.
 
 {attachment_line}
 
