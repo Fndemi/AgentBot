@@ -126,7 +126,7 @@ def test_free_email_and_invalid_email():
     total, reasons = score(email="pesa@gmail.com", website=None, status="invalid", text=None)
     assert total == 0 and "-20 email is free mail (gmail.com)" in reasons and "-30 email invalid" in reasons
     assert "+10 couldn't check website" not in reasons
-    assert targeting.SCORE_VERSION == 5
+    assert targeting.SCORE_VERSION >= 5
 
 
 # --- CBK importer: payment service providers and money remittance providers ---

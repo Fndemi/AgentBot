@@ -9,7 +9,7 @@ The scraper visits the homepage plus common contact/about pages and pulls emails
 import csv
 import re
 import time
-from urllib.parse import urljoin, urlparse
+from urllib.parse import unquote, urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -17,9 +17,22 @@ from bs4 import BeautifulSoup
 import db
 
 EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
+# Addresses written out to hide them from scrapers: "info [at] acme [dot] co.ke", "info(at)acme.com"
+HIDDEN_EMAIL = re.compile(r"\b([a-z0-9._%+-]+)\s*[\[({]\s*at\s*[\])}]\s*([a-z0-9-]+(?:(?:\s*[\[({]\s*dot\s*[\])}]\s*|\.)"
+                          r"[a-z0-9-]+)+)", re.I)
+DOT = re.compile(r"\s*[\[({]\s*dot\s*[\])}]\s*", re.I)   # a plain "." has no spaces round it
 CONTACT_PATHS = ["", "/contact", "/contact-us", "/contacts", "/about", "/about-us"]
 ABOUT_PATHS = ["", "/about", "/about-us"]
-HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; TalkSasaLeadBot/1.0)"}
+# Sites are read as a normal browser would: many turn away a bot's user-agent
+HEADERS = {
+    "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                   "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-GB,en;q=0.9",
+}
+# A refusal or overload that often clears on a second try; a timeout isn't tried again
+RETRY_STATUS = {403, 429, 500, 502, 503, 504}
+RETRY_PAUSE = 2  # seconds
 
 # Junk that looks like an email but isn't one
 BAD_ENDINGS = (".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".css", ".js")
@@ -50,13 +63,57 @@ def pick_best(emails):
     return sorted(emails)[0] if emails else None
 
 
+def get(url, timeout=10):
+    """A page's response (status 200), fetched as a browser would, or None. A refusal or an
+    overload (RETRY_STATUS) or a dropped connection is tried once more after RETRY_PAUSE;
+    a timeout is not, so a dead site costs one wait."""
+    for attempt in (1, 2):
+        try:
+            r = requests.get(url, headers=HEADERS, timeout=timeout)
+        except requests.Timeout:
+            return None
+        except requests.RequestException:
+            r = None
+        if r is not None and r.status_code == 200:
+            return r
+        if (r is not None and r.status_code not in RETRY_STATUS) or attempt == 2:
+            return None
+        time.sleep(RETRY_PAUSE)
+    return None
+
+
 def fetch(url):
     """One page as parsed HTML, or None if it can't be fetched."""
+    r = get(url)
+    return BeautifulSoup(r.text, "html.parser") if r is not None else None
+
+
+def cf_decode(code):
+    """An address hidden by Cloudflare's email protection (data-cfemail, or the part of an
+    /cdn-cgi/l/email-protection link after #): hex bytes, each XORed with the first."""
     try:
-        r = requests.get(url, headers=HEADERS, timeout=10)
-    except requests.RequestException:
-        return None
-    return BeautifulSoup(r.text, "html.parser") if r.status_code == 200 else None
+        data = bytes.fromhex(code.strip())
+    except ValueError:
+        return ""
+    return bytes(b ^ data[0] for b in data[1:]).decode("utf-8", "ignore") if data else ""
+
+
+def page_emails(soup):
+    """Every address a page gives: mailto links (any case, URL-decoded), addresses hidden by
+    Cloudflare, ones written out ("info [at] acme [dot] co.ke") and plain ones in the text."""
+    found = set()
+    for a in soup.select("a[href]"):
+        href = a["href"].strip()
+        if href.lower().startswith("mailto:"):
+            found.add(unquote(href[7:]).split("?")[0].strip())
+        elif "/cdn-cgi/l/email-protection#" in href:
+            found.add(cf_decode(href.split("#", 1)[1]))
+    for el in soup.select("[data-cfemail]"):
+        found.add(cf_decode(el["data-cfemail"]))
+    text = soup.get_text(" ")
+    found.update(EMAIL_RE.findall(text))
+    found.update(f"{m.group(1)}@{DOT.sub('.', m.group(2))}" for m in HIDDEN_EMAIL.finditer(text))
+    return {e for e in found if e}
 
 
 def scrape_site(url):
@@ -68,10 +125,7 @@ def scrape_site(url):
         soup = fetch(urljoin(url, path))
         if soup is None:
             continue
-        # mailto: links are the most reliable
-        for a in soup.select('a[href^="mailto:"]'):
-            found.add(a["href"][7:].split("?")[0])
-        found.update(EMAIL_RE.findall(soup.get_text(" ")))
+        found.update(page_emails(soup))
         time.sleep(1)  # be polite
         if found and path:
             break

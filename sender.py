@@ -573,21 +573,22 @@ def show_sent(email):
 
 def approved_waiting(quiet=False):
     """Waiting leads whose industry is approved in uses.yaml and whose need score is at
-    least MIN_SCORE, in sending order (highest score first). The rest are skipped and left
-    exactly as they are, so they go out once their industry is approved or their score
-    rises. A lead not scored yet counts as 0. A lead the niche check found fits no approved
-    niche (nichefit.py) is left out."""
+    least MIN_SCORE_FLOOR, in sending order (highest score first; batch() takes those at
+    MIN_SCORE first). The rest are skipped and left exactly as they are, so they go out once
+    their industry is approved or their score rises. A lead not scored yet counts as 0. A
+    lead the niche check found fits no approved niche (nichefit.py) is left out."""
     waiting = [l for l in ranking.waiting() if l["niche_fit"] != nichefit.NONE]
     leads = [l for l in waiting if personalise.approved(l)]
     if len(leads) < len(waiting) and not quiet:
         skipped = sorted({personalise.industry_key(l) for l in waiting if not personalise.approved(l)})
         print(f"Skipped {len(waiting) - len(leads)} waiting leads in industries not approved "
               f"in uses.yaml: {', '.join(skipped)}")
-    low = [l for l in leads if (ranking.need_score(l) or 0) < config.MIN_SCORE]
+    floor = min(config.MIN_SCORE, config.MIN_SCORE_FLOOR)
+    low = [l for l in leads if (ranking.need_score(l) or 0) < floor]
     if low and not quiet:
         unscored = sum(ranking.need_score(l) is None for l in low)
-        print(f"Skipped {len(low)} waiting leads with a need score below MIN_SCORE "
-              f"({config.MIN_SCORE})" + (f", {unscored} of them not scored yet" if unscored else ""))
+        print(f"Skipped {len(low)} waiting leads with a need score below {floor} "
+              f"(MIN_SCORE_FLOOR)" + (f", {unscored} of them not scored yet" if unscored else ""))
     low_ids = {l["id"] for l in low}
     today = rotation.today()  # a paused industry's leads stay waiting, untouched
     return [l for l in leads if l["id"] not in low_ids and not personalise.paused(l, today)]
@@ -603,6 +604,18 @@ def paused_niches():
 def _say_paused():
     for key, until in sorted(paused_niches().items()):
         print(f"{key} paused until {until.isoformat()}")
+
+
+def batch(leads, n):
+    """Today's n first emails from `leads` (approved_waiting): those scored at least
+    MIN_SCORE first (spread over industries), then, for the slots left, those scored at least
+    MIN_SCORE_FLOOR, so the daily limit isn't left unused while near-misses wait."""
+    strong = [l for l in leads if (ranking.need_score(l) or 0) >= config.MIN_SCORE]
+    chosen = spread(strong, n)
+    if len(chosen) < n:
+        chosen += spread([l for l in leads if (ranking.need_score(l) or 0) < config.MIN_SCORE],
+                         n - len(chosen))
+    return chosen
 
 
 def spread(leads, n):
@@ -694,7 +707,7 @@ def plan(dry_run=False):
         if not dry_run:
             ranking.fill_years()
             targeting.score_unscored()
-        leads = spread(approved_waiting(), remaining - len(due))
+        leads = batch(approved_waiting(), remaining - len(due))
         # Check today's leads belong to the niche whose email they would get (nichefit.py),
         # then pick again: a lead that fits none drops out, one that fits another niche
         # moves there and is scored again; one that couldn't be checked waits for next time
@@ -702,13 +715,13 @@ def plan(dry_run=False):
         while not dry_run and (todo := [l for l in leads if nichefit.needs_check(l) and l["id"] not in later]):
             later |= nichefit.check(todo)
             targeting.score_unscored()
-            leads = spread([l for l in approved_waiting(quiet=True) if l["id"] not in later], remaining - len(due))
+            leads = batch([l for l in approved_waiting(quiet=True) if l["id"] not in later], remaining - len(due))
         # Read today's leads' websites for who to write to (contacts.py), and write personal
         # lines for any of them that don't have them yet; then read the leads again
         if not dry_run and leads and (contacts.run(leads) + personalise.run(leads)
                                       or any(l["confidence"] is None for l in leads)):
-            leads = spread([l for l in approved_waiting(quiet=True) if l["id"] not in later],
-                           remaining - len(due))
+            leads = batch([l for l in approved_waiting(quiet=True) if l["id"] not in later],
+                          remaining - len(due))
     return due + [(lead, 0) for lead in leads]
 
 

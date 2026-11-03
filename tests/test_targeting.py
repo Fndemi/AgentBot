@@ -165,17 +165,33 @@ def test_lenders_get_their_own_first_email(world):
         "uses": "loan repayment reminders and disbursement confirmations", "offer": sender.API_OFFER}
 
 
-def test_highest_score_first_and_none_below_min_score(world, monkeypatch):
-    import sender
-    monkeypatch.setattr(config, "MIN_SCORE", 50)
-    for name, score in (("low", 45), ("high", 90), ("mid", 60), ("unscored", None)):
+def scored_leads():
+    for name, score in (("low", 45), ("high", 90), ("mid", 60), ("lowest", 30), ("unscored", None)):
         db.add_lead(name, f"{name}.co.ke", "fintech", f"info@{name}.co.ke", "manual")
         lead_id = db.find_lead_by_email(f"info@{name}.co.ke")["id"]
         db.set_status(lead_id, "verified", "verify")
         if score is not None:
             with db.conn() as c:
                 c.execute("UPDATE leads SET score=?, scored_at=CURRENT_TIMESTAMP WHERE id=?", (score, lead_id))
+
+
+def test_highest_score_first_and_none_below_min_score(world, monkeypatch):
+    import sender
+    monkeypatch.setattr(config, "MIN_SCORE", 50)
+    monkeypatch.setattr(config, "MIN_SCORE_FLOOR", 50)      # no near-misses
+    scored_leads()
     assert [l["company"] for l in sender.approved_waiting()] == ["high", "mid"]
+
+
+def test_spare_slots_go_to_near_misses_above_the_floor(world, monkeypatch):
+    import sender
+    monkeypatch.setattr(config, "MIN_SCORE", 50)
+    monkeypatch.setattr(config, "MIN_SCORE_FLOOR", 40)
+    scored_leads()
+    waiting = sender.approved_waiting()
+    assert [l["company"] for l in waiting] == ["high", "mid", "low"]
+    assert [l["company"] for l in sender.batch(waiting, 2)] == ["high", "mid"]       # no slot spare
+    assert [l["company"] for l in sender.batch(waiting, 10)] == ["high", "mid", "low"]
 
 
 def test_max_per_industry_mixes_the_batch_and_fills_spare_slots(monkeypatch):
@@ -190,13 +206,27 @@ def test_max_per_industry_mixes_the_batch_and_fills_spare_slots(monkeypatch):
     assert [l["id"] for l in sender.spread(leads, 4)] == [0, 1, 2, 3]
 
 
+def test_tech_niches_use_the_online_rules_and_listed_lenders_keep_free_mail():
+    # a fintech whose site shows none of the SACCO-style signs still reaches MIN_SCORE
+    assert targeting.need_score({"industry": "fintech", "website": "newfin.co.ke",
+                                 "email": "info@newfin.co.ke"}, "We build lending software.")[0] == 65
+    for niche in ("tech_startup", "saas", "hr_payroll"):
+        assert targeting.need_score({"industry": niche}, "")[1][0] == f"+50 start ({niche})"
+    # a lender on the regulator's list, giving it a gmail address and no website: 50 + 10, not 40
+    listed = lender(website=None, email="lender@gmail.com", imported_at="2026-10-20")
+    score, reasons = targeting.need_score(listed, None)
+    assert score == 60 and not any("free mail" in r for r in reasons)
+    found = lender(website=None, email="lender@gmail.com")              # found on the web: still -20
+    assert targeting.need_score(found, None)[0] == 40
+
+
 def test_sender_scores_waiting_leads_first(world, monkeypatch):
     monkeypatch.setattr(targeting, "site_text", lambda website: SITE)
     db.add_lead("New Fintech", "newfin.co.ke", "fintech", "info@newfin.co.ke", "manual")
     db.set_status(db.find_lead_by_email("info@newfin.co.ke")["id"], "verified", "verify")
     assert targeting.score_unscored() == 1
     lead = db.find_lead_by_email("info@newfin.co.ke")
-    assert lead["score"] == 60 and lead["scored_at"]  # 40 + app + M-Pesa
+    assert lead["score"] == 90 and lead["scored_at"]  # online rules: 50 + own domain + app + M-Pesa
     assert targeting.score_unscored() == 0
 
 

@@ -10,7 +10,10 @@ them, and they take turns, one search each, in PRIORITY order. A niche that has 
 stops; once every niche has its share or is out of searches, the ones with searches left go
 on until the day's total is reached. Each niche's LIST_QUERIES come first: searches for
 pages that list many companies (accelerator and incubator portfolios), whose linked company
-sites are visited. Then its QUERIES, each run with a random town from TOWNS in place of {town}.
+sites are visited. Then its QUERIES, starting at a different one each day: each run with a
+random town from TOWNS in place of {town}, or, without {town}, with the day's word from
+VARIATIONS, so the same searches don't bring back the same results every day. A site not on
+.ke must say on its homepage that it is in Kenya (KENYA: a town, +254, KES, M-Pesa...).
 
 Searches stop for the day when today's share of the month's Tavily calls is used
 (websearch.daily_allowance). What each niche did is kept in discovery_log by day: searches,
@@ -31,7 +34,6 @@ from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
-import requests
 from bs4 import BeautifulSoup
 
 import config
@@ -44,6 +46,11 @@ import scraper
 import websearch
 
 TOWNS = ["Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret", "Thika", "Nyeri", "Machakos"]
+# Added to a query without {town}, one a day in turn ("" = the query as written)
+VARIATIONS = ("", "Nairobi", "contact email", "Mombasa", "about us", "Kisumu", "our team",
+              "Nakuru", "customers", "Eldoret", "company profile", "SME")
+# A site that isn't on .ke is kept if its homepage says it is in Kenya, in any of these ways
+KENYA = re.compile(r"\b(?:kenya|nairobi|mombasa|kisumu|nakuru|eldoret|thika|ksh|kes|m-?pesa)\b|\+254", re.I)
 
 # Edit these freely. 3-5 queries per category; {town} is filled in from TOWNS.
 QUERIES = {
@@ -435,17 +442,14 @@ Listing = namedtuple("Listing", "home why")
 
 def look_at(url):
     """Fetch the homepage. Returns a Page, or None if unreachable."""
-    try:
-        r = requests.get(url, headers=scraper.HEADERS, timeout=10)
-    except requests.RequestException:
-        return None
-    if r.status_code != 200:
+    r = scraper.get(url)
+    if r is None:
         return None
     soup = BeautifulSoup(r.content, "html.parser")  # bytes: lets bs4 detect the encoding
     title = soup.title.get_text(" ", strip=True) if soup.title else ""
     intro = quality.page_intro(soup)
     headline = " | ".join([intro] + [h.get_text(" ", strip=True) for h in soup.select("h1, h2")])
-    return Page(title, "kenya" in soup.get_text(" ").lower(), headline,
+    return Page(title, bool(KENYA.search(soup.get_text(" "))), headline,
                 names.pick(soup, domain_of(url)), intro)
 
 
@@ -611,12 +615,29 @@ def from_list_pages(results, category, limit, seen, tally):
     return added
 
 
-def searches(category):
+def vary(template, day, i=0):
+    """A query as it is searched on `day` (a date): {town} filled with a random town; a query
+    without {town} gets VARIATIONS' word for the day, unless the query already says it."""
+    if "{town}" in template:
+        return template.format(town=random.choice(TOWNS))
+    for k in range(len(VARIATIONS)):
+        extra = VARIATIONS[(day.toordinal() + i + k) % len(VARIATIONS)]
+        if not extra or extra.lower() not in template.lower():
+            return f"{template} {extra}".strip()
+    return template
+
+
+def searches(category, day=None):
     """One niche's searches in the order they are made, as (kind, query): its list searches
-    first, since one of those finds many companies, then its ordinary ones."""
+    first, since one of those finds many companies, then its ordinary ones, starting at a
+    different one each day (a day's search budget often reaches only the first few)."""
+    day = day or websearch.now().date()
     lists = LIST_QUERIES.get(category, [])
+    queries = QUERIES[category]
+    start = day.toordinal() % len(queries)
+    ordered = queries[start:] + queries[:start]
     return ([("list", q) for q in random.sample(lists, min(LIST_QUERIES_PER_RUN, len(lists)))]
-            + [("search", t.format(town=random.choice(TOWNS))) for t in QUERIES[category]])
+            + [("search", vary(t, day, i)) for i, t in enumerate(ordered)])
 
 
 def run_search(kind, query, category, limit, seen, tally):

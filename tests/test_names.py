@@ -7,7 +7,6 @@ Consultancy"). Names are checked at discovery, by the bot's prepare step in batc
 before every email; a follow-up keeps its thread's subject but uses the corrected name.
 Websites, the AI and the mail server are fakes: nothing is fetched, asked or sent."""
 import json
-from datetime import datetime
 
 import pytest
 from bs4 import BeautifulSoup
@@ -278,8 +277,8 @@ def test_prepare_checks_waiting_and_emailed_leads_in_batches(sites):
     assert row(bounced)["name_version"] is None
 
 
-def test_the_bot_prepares_names_before_sending(monkeypatch):
-    calls, steps, left = [], [], [45]
+def test_the_bot_prepares_names_in_batches(monkeypatch):
+    calls, left = [], [45]
 
     def prepare(batch=names.BATCH):
         calls.append(batch)
@@ -289,10 +288,7 @@ def test_the_bot_prepares_names_before_sending(monkeypatch):
     monkeypatch.setattr(names, "prepare", prepare)
     assert auto._prepare() == "checked the names of 60 leads, 0 still to check"
     assert len(calls) == 3
-    monkeypatch.setattr(auto, "MARKER", type("Marker", (), {"write_text": lambda self, text: None})())
-    monkeypatch.setattr(auto, "step", lambda name, fn: steps.append(name))
-    auto.daily_run(datetime(2026, 11, 3, 9))
-    assert steps == ["discover", "verify", "personalise", "prepare", "send"]
+    assert [name for name, _ in auto.STEPS].index("prepare") < [name for name, _ in auto.STEPS].index("send")
 
 
 def test_report_of_the_most_recently_emailed(sites, capsys):

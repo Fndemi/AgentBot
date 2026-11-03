@@ -24,6 +24,9 @@ SEND_DELAY_SECONDS = int(env("SEND_DELAY_SECONDS", "90"))  # gap between emails
 # First emails go to the highest need score first (targeting.py); a lead scored below
 # MIN_SCORE, or not scored yet, is left waiting. Follow-ups don't depend on it.
 MIN_SCORE = int(env("MIN_SCORE", "50"))
+# Slots today's leads at or above MIN_SCORE can't fill go to the best waiting leads scored at
+# least MIN_SCORE_FLOOR, so the daily limit isn't left unused. Set it to MIN_SCORE to stop that.
+MIN_SCORE_FLOOR = int(env("MIN_SCORE_FLOOR", "40"))
 # At most this many first emails a day to one industry, so a high-scoring industry doesn't
 # take every slot. Slots no other industry can fill still go to it. 0 = no cap.
 MAX_PER_INDUSTRY = int(env("MAX_PER_INDUSTRY", "0"))

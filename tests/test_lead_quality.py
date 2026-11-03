@@ -202,6 +202,25 @@ def test_unreadable_site_or_ai_failure_waits_for_the_next_send(sending):
         assert c.execute("SELECT COUNT(*) FROM leads WHERE niche_checked_at IS NOT NULL").fetchone()[0] == 0
 
 
+def test_an_unreadable_site_keeps_its_niche_after_three_sends(sending, capsys):
+    texts, answers, _ = sending
+    dark = add("info@dark.co.ke", "Dark", "fintech")           # its site never loads
+    add("info@down.co.ke", "Down", "fintech")                  # the AI is down for it
+    texts["down.co.ke"] = "Payments"
+    assert planned() == {} and planned() == {}                 # sends 1 and 2: skipped
+    assert "2 leads skipped today (1 with a website that couldn't be read, 1 the AI" in capsys.readouterr().out
+    assert planned() == {"info@dark.co.ke": "fintech"}         # send 3: kept the niche it was found under
+    with db.conn() as c:
+        row = c.execute("SELECT niche_fit, niche_reason, niche_tries FROM leads WHERE id=?", (dark,)).fetchone()
+    assert row["niche_fit"] == "fintech" and row["niche_tries"] == 3
+    assert "kept the niche it was found under" in row["niche_reason"]
+
+
+def test_a_lead_with_no_website_keeps_its_niche_at_once(sending):
+    add("hello@gmail.com", "Hand Picked", "fintech", source="manual", website="")
+    assert planned() == {"hello@gmail.com": "fintech"}
+
+
 def test_directory_leads_are_not_checked(sending):
     _, _, asked = sending
     lead_id = add("loans@gmail.com", "Quick Cash", "digital_lender", source="CBK DCP directory", website="")

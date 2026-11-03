@@ -38,7 +38,7 @@ python main.py send                   # send today's batch (DAILY_LIMIT)
 python main.py watch                  # leave running; alerts you on replies
 python main.py stats
 python main.py export                 # leads.csv, events.csv, replies.csv (join on lead_id)
-python main.py auto                   # or leave this running: does all of the above on weekdays at 9am
+python main.py auto                   # or leave this running: does all of the above on weekdays from 9am (resumes after a restart)
 streamlit run dashboard.py            # optional dashboard
 ```
 

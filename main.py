@@ -18,7 +18,7 @@
   python main.py inbox                   check replies once
   python main.py inbox --catch-up        re-read mail earlier checks skipped; matches are held for you
   python main.py watch                   check replies every few minutes (leave running)
-  python main.py auto                    weekdays 9am: discover, verify, personalise, send; inbox in between
+  python main.py auto                    weekdays from 9am: send first, then discover, verify, score; inbox in between
   python main.py stats                   counts by status and reply label
   python main.py unsubscribe a@b.com     manually opt someone out
   python main.py export [folder]         write leads.csv, events.csv and replies.csv (joined on lead_id)

@@ -4,8 +4,10 @@ moves to it (its template and score follow); one that fits none is never emailed
 (niche_fit 'none'), so a tour company doesn't get the tech_startup email.
 
 Leads imported from a regulator's directory (targeting.py) are not checked: the directory
-says what they are. A lead whose website can't be read, or that the AI couldn't answer for,
-is skipped today and checked again at the next send.
+says what they are. A lead with no website, or whose website couldn't be read at MAX_TRIES
+sends, keeps the niche it was found under (its niche_reason says why), so it isn't held
+back for good. Until then a lead whose site can't be read, or that the AI couldn't answer
+for, is skipped today and checked again at the next send.
 """
 import json
 
@@ -16,6 +18,7 @@ import targeting
 
 MAX_TEXT = 4000
 NONE = "none"
+MAX_TRIES = 3   # sends at which a site may fail to load before the lead keeps its niche
 # What each niche is, for the AI. A niche not listed here is described by its name.
 DESCRIPTIONS = {
     "sacco": "a savings and credit cooperative (SACCO)",
@@ -81,7 +84,7 @@ def site_niche(lead):
 
 def check(leads):
     """Check the leads that need it. Returns the ids of those that couldn't be checked today."""
-    later = set()
+    later, unreadable = set(), 0
     for lead in leads:
         if not needs_check(lead):
             continue
@@ -93,8 +96,15 @@ def check(leads):
             later.add(lead["id"])
             continue
         if niche is None:
-            print(f"  niche check: {name}: {reason}; skipped today")
-            later.add(lead["id"])
+            tries = 0 if not lead["website"] else db.niche_try(lead["id"])
+            if not lead["website"] or tries >= MAX_TRIES:
+                why = "no website to read" if not lead["website"] else f"{reason} at {tries} sends"
+                db.save_niche_fit(lead["id"], lead["industry"], f"{why}; kept the niche it was found under")
+                print(f"  niche check: {name}: {why}; kept {lead['industry']}")
+            else:
+                print(f"  niche check: {name}: {reason} ({tries} of {MAX_TRIES}); skipped today")
+                later.add(lead["id"])
+                unreadable += 1
             continue
         moved = niche if niche not in (NONE, lead["industry"]) else None
         db.save_niche_fit(lead["id"], niche, reason, industry=moved)
@@ -102,4 +112,7 @@ def check(leads):
             print(f"  niche check: {name} fits no approved niche ({reason}); it won't be emailed")
         elif moved:
             print(f"  niche check: {name} moved from {lead['industry']} to {niche} ({reason})")
+    if later:
+        print(f"  niche check: {len(later)} leads skipped today ({unreadable} with a website that couldn't "
+              f"be read, {len(later) - unreadable} the AI couldn't answer for); tried again at the next send")
     return later

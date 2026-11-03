@@ -598,14 +598,8 @@ def import_markdown(run, result, added, table):
 
 
 # --- Websites ---
-# Some sites turn away LeadBot's own user-agent (scraper.py) or answer slowly: they are
-# tried again as a normal browser with a longer wait.
-BROWSER_HEADERS = {
-    "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                   "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-GB,en;q=0.9",
-}
+# Some sites answer slowly: a site scraper.py couldn't read is tried again with a longer wait.
+BROWSER_HEADERS = scraper.HEADERS
 BROWSER_TIMEOUT = 15  # seconds
 _browser_pages = {}
 
@@ -750,7 +744,7 @@ def unreadable_sites():
 # start at 50, each with its own rules; every other industry at 40 and gains 10 for each sign on its
 # website that it messages many people. A website that can't be read gives 10 instead of
 # what reading it might have, except in ONLINE_NICHES, whose rules don't include that.
-SCORE_VERSION = 5  # 1 was ranking.py's old points; raise this when the rules below change
+SCORE_VERSION = 6  # 1 was ranking.py's old points; raise this when the rules below change
 LENDER_START, OTHER_START, ONLINE_START = 50, 40, 50
 SITE_WORKERS = 8  # websites read at the same time
 # A website that can't be read even as a browser: it may still be a busy lender's, so it
@@ -761,7 +755,10 @@ PORTAL = re.compile(r"\bportal\b", re.I)
 MPESA = re.compile(r"\bm-?\s?pesa\b|\bpay\s?bill\b", re.I)
 SMS_ALERTS = re.compile(r"\bsms\s*(?:alerts?|notifications?)\b", re.I)
 BRANCHES = re.compile(r"\bbranches\b", re.I)
-ONLINE_NICHES = ("ecommerce", "delivery_app", "edtech", "healthtech", "microfinance")
+# tech_startup, fintech, saas and hr_payroll sell online products, so they are scored like
+# these, not by the SACCO-style signs (branches, members, SMS alerts) the other niches use
+ONLINE_NICHES = ("ecommerce", "delivery_app", "edtech", "healthtech", "microfinance",
+                 "tech_startup", "fintech", "saas", "hr_payroll")
 ONLINE = re.compile(r"\b(?:mobile app|apps?|api|google play|play\s?store|app\s?store|"
                     r"(?:order|book|learn|shop|buy|pay)\s+online|online\s+(?:orders?|ordering|booking|"
                     r"bookings|appointments?|learning|classes|courses|shopping|store|shop)|e-?learning)\b", re.I)
@@ -788,7 +785,9 @@ def _seen(pattern, text):
 
 
 def need_score(lead, text):
-    """(score, reasons) for one lead. `text` is site_text for its website."""
+    """(score, reasons) for one lead. `text` is site_text for its website. A free-mail address
+    costs points only for a lead found on the web: a regulator's directory (imported_at)
+    lists the address the licensed company gave it, often a free-mail one."""
     lead = dict(lead)
     email = (lead.get("email") or "").lower()
     website = ranking.urlparse_domain(lead["website"]) if lead.get("website") else None
@@ -804,7 +803,7 @@ def need_score(lead, text):
         licensed = lead.get("date_licensed") or ""
         if re.fullmatch(r"\d{4}-\d{2}-\d{2}", licensed) and date.fromisoformat(licensed) >= two_years_ago():
             points.append((10, f"licensed within the last 2 years ({licensed})"))
-        if domain_of(email) in FREE_MAIL:
+        if domain_of(email) in FREE_MAIL and not lead.get("imported_at"):
             points.append((-20, f"email is free mail ({domain_of(email)})"))
         if lead.get("status") == "invalid":
             points.append((-30, "email invalid"))
@@ -818,7 +817,7 @@ def need_score(lead, text):
             points.append((10, "site mentions M-Pesa, paybill or payments" + seen))
         if (seen := _seen(PEOPLE_COUNT, text)):
             points.append((10, "site says how many customers, learners, patients or members" + seen))
-        if domain_of(email) in FREE_MAIL:
+        if domain_of(email) in FREE_MAIL and not lead.get("imported_at"):
             points.append((-20, f"email is free mail ({domain_of(email)})"))
         if lead.get("status") == "invalid":
             points.append((-30, "email invalid"))
@@ -834,7 +833,7 @@ def need_score(lead, text):
             points.append((10, "site mentions an app" + seen))
         if lead["industry"] in SOFTWARE_NICHES and (seen := _seen(CLIENTS, text)):
             points.append((15, "site lists clients or serves schools, hospitals, SACCOs or businesses" + seen))
-        if domain_of(email) in FREE_MAIL:
+        if domain_of(email) in FREE_MAIL and not lead.get("imported_at"):
             points.append((-20, f"email is free mail ({domain_of(email)})"))
         if lead.get("status") == "invalid":
             points.append((-30, "email invalid"))

@@ -94,6 +94,8 @@ CREATE TABLE IF NOT EXISTS leads (
     niche_fit TEXT,
     niche_reason TEXT,
     niche_checked_at TEXT,
+    -- sends at which its website couldn't be read for the niche check (nichefit.MAX_TRIES)
+    niche_tries INTEGER,
     -- names.py: display_name is the short name greetings and subjects use (no Ltd, Limited,
     -- Society...); name_source is where the name came from (an official list, schema.org,
     -- og:site_name, footer, logo, title, headline, domain) or 'none' (greeted "Hello,")
@@ -181,6 +183,15 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT,
     updated_by INTEGER,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+-- the bot's daily run (auto.py): each step's tries and when it finished, by day in Nairobi,
+-- so a restart picks the run up where it stopped and a finished step never runs twice a day
+CREATE TABLE IF NOT EXISTS daily_steps (
+    day TEXT NOT NULL,
+    step TEXT NOT NULL,
+    tries INTEGER NOT NULL DEFAULT 0,
+    done_at TEXT,
+    PRIMARY KEY (day, step)
 );
 -- one row per lock held: only one send run at a time, across processes
 CREATE TABLE IF NOT EXISTS locks (
@@ -367,7 +378,7 @@ def init():
                                  ("leads", "excluded_reason", "TEXT"), ("leads", "niche_fit", "TEXT"),
                                  ("leads", "niche_reason", "TEXT"), ("leads", "niche_checked_at", "TEXT"),
                                  ("leads", "display_name", "TEXT"), ("leads", "name_source", "TEXT"),
-                                 ("leads", "name_version", "INTEGER")):
+                                 ("leads", "name_version", "INTEGER"), ("leads", "niche_tries", "INTEGER")):
             if col not in columns(c, table):
                 c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {kind}")
         # Leads from before these existed
@@ -501,6 +512,12 @@ def save_niche_fit(lead_id, niche, reason, industry=None):
             c.execute("UPDATE leads SET industry=?, scored_at=NULL WHERE id=?", (industry, lead_id))
             log_event(c, lead_id, "industry_changed", old=old, new=industry, by="niche check", why=reason)
 
+def niche_try(lead_id):
+    """Count one more send at which the lead's website couldn't be read; returns the count."""
+    with conn() as c:
+        c.execute("UPDATE leads SET niche_tries = COALESCE(niche_tries, 0) + 1 WHERE id=?", (lead_id,))
+        return c.execute("SELECT niche_tries FROM leads WHERE id=?", (lead_id,)).fetchone()[0]
+
 def find_lead_by_email(email):
     with conn() as c:
         return c.execute("SELECT * FROM leads WHERE email=?", (email.lower(),)).fetchone()
@@ -626,6 +643,21 @@ def sent_today():
                          (date.today().isoformat(),)).fetchone()[0]
 
 # --- Sending safely with more than one run (G-03, G-04) ---
+
+def daily_steps(day):
+    """{step: {"tries", "done_at"}} for the bot's daily run on `day` (YYYY-MM-DD)."""
+    with conn() as c:
+        return {r["step"]: {"tries": r["tries"], "done_at": r["done_at"]}
+                for r in c.execute("SELECT * FROM daily_steps WHERE day=?", (day,))}
+
+def daily_step_tried(day, step):
+    with conn() as c:
+        c.execute("INSERT INTO daily_steps (day, step, tries) VALUES (?, ?, 1)"
+                  " ON CONFLICT (day, step) DO UPDATE SET tries = daily_steps.tries + 1", (day, step))
+
+def daily_step_done(day, step):
+    with conn() as c:
+        c.execute("UPDATE daily_steps SET done_at=CURRENT_TIMESTAMP WHERE day=? AND step=?", (day, step))
 
 def acquire_lock(name, owner, seconds):
     """Take the named lock for `seconds`, unless another owner holds it and it hasn't
