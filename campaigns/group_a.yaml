@@ -32,7 +32,7 @@
   followup_body: ""
 
 - to: newton@bomahut.com
-  contact_name: ""
+  contact_name: Newton
   company: Bomahut
   website: bomahut.com
   subject: "A second SMS route for Bomahut"
