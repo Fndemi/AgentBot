@@ -1,7 +1,8 @@
 """Runs LeadBot unattended. Leave `python main.py auto` running.
 
 Weekdays, Nairobi time:
-  from 9am   send first (up to DAILY_LIMIT, to leads got ready the evening before), then
+  from 9am   send first (up to DAILY_LIMIT: named-contact campaigns' due follow-ups, then the
+             bot's own emails to leads got ready the evening before), then
              discover, verify, personalise and check company names (names.py)
   to 5pm     top up: while fewer than DAILY_LIMIT have gone out, send again every
              POLL_MINUTES (follow-ups that fall due, leads got ready since)
@@ -43,7 +44,9 @@ def step(name, fn):
 
 
 def _send():
+    import campaigns
     import sender
+    campaigns.send_followups()   # a named-contact campaign's due follow-ups go first
     sender.run()
     return f"{db.sent_today()} of {config.DAILY_LIMIT} sent today"
 

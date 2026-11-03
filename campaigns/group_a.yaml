@@ -1,0 +1,40 @@
+# Group A: named-contact campaign (python main.py send-group campaigns/group_a.yaml [--dry-run]).
+# Each entry is sent once, word for word, at most GROUP_DAILY_LIMIT a day; its followup_body goes
+# out once, in the same thread, 4 working days later if there is no reply. Add new entries at
+# the end: the same command sends only the ones not sent yet.
+#
+# contact_name, subject, body and followup_body come from campaigns/named_emails_2026-11-03.txt,
+# word for word. That file wasn't in the repository when this was set up, so they are still
+# empty: an entry without a subject, body or followup_body is reported as incomplete and never sent.
+
+- to: stephen@groundworkpm.com
+  contact_name: ""
+  company: GroundWork PM
+  website: groundworkpm.com
+  subject: ""
+  body: ""
+  followup_body: ""
+
+- to: info@boxleocourier.com
+  contact_name: ""
+  company: Boxleo
+  website: boxleocourier.com
+  subject: ""
+  body: ""
+  followup_body: ""
+
+- to: pmunyua@kilimoafya.com
+  contact_name: ""
+  company: Kilimo Afya
+  website: kilimoafya.com
+  subject: ""
+  body: ""
+  followup_body: ""
+
+- to: newton@bomahut.com
+  contact_name: ""
+  company: Bomahut
+  website: bomahut.com
+  subject: ""
+  body: ""
+  followup_body: ""

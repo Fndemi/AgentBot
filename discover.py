@@ -486,6 +486,8 @@ def consider(url, category, query, seen, tally=None):
         return dropped(tally, "already known")
     if skip_domain(domain):
         return dropped(tally, "social, directory, news or bank site")
+    if db.do_not_contact(domain):
+        return dropped(tally, "do-not-contact list")
     seen.add(domain)
     home = f"{urlparse(url).scheme or 'https'}://{urlparse(url).netloc}"
     page = look_at(home)
@@ -516,6 +518,9 @@ def consider(url, category, query, seen, tally=None):
     if db.is_suppressed(email):
         print(f"    {domain}: {email} is on the suppression list")
         return dropped(tally, "on the suppression list")
+    if db.do_not_contact(email):
+        print(f"    {domain}: {email} is on the do-not-contact list")
+        return dropped(tally, "do-not-contact list")
     picked = org or names.pick(None, domain)
     name = picked.full or domain        # no name: greeted "Hello," (names.short_name)
     if not db.add_lead(name, domain, category, email, "search", query, url):

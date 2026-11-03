@@ -101,7 +101,11 @@ CREATE TABLE IF NOT EXISTS leads (
     -- og:site_name, footer, logo, title, headline, domain) or 'none' (greeted "Hello,")
     display_name TEXT,
     name_source TEXT,
-    name_version INTEGER
+    name_version INTEGER,
+    -- a named-contact campaign (campaigns.py), e.g. "Group A": its own emails only, never the
+    -- bot's templates or follow-ups; campaign_followup is the one follow-up its entry gave
+    campaign TEXT,
+    campaign_followup TEXT
 );
 CREATE TABLE IF NOT EXISTS sent (
     id INTEGER PRIMARY KEY,
@@ -183,6 +187,13 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT,
     updated_by INTEGER,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+-- domains no one is emailed at by the bot's templates or follow-ups, and that discovery never
+-- adds (a named-contact campaign's companies: campaigns.py)
+CREATE TABLE IF NOT EXISTS do_not_contact (
+    domain TEXT PRIMARY KEY,
+    reason TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 -- the bot's daily run (auto.py): each step's tries and when it finished, by day in Nairobi,
 -- so a restart picks the run up where it stopped and a finished step never runs twice a day
@@ -378,7 +389,8 @@ def init():
                                  ("leads", "excluded_reason", "TEXT"), ("leads", "niche_fit", "TEXT"),
                                  ("leads", "niche_reason", "TEXT"), ("leads", "niche_checked_at", "TEXT"),
                                  ("leads", "display_name", "TEXT"), ("leads", "name_source", "TEXT"),
-                                 ("leads", "name_version", "INTEGER"), ("leads", "niche_tries", "INTEGER")):
+                                 ("leads", "name_version", "INTEGER"), ("leads", "niche_tries", "INTEGER"),
+                                 ("leads", "campaign", "TEXT"), ("leads", "campaign_followup", "TEXT")):
             if col not in columns(c, table):
                 c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {kind}")
         # Leads from before these existed
@@ -396,6 +408,29 @@ def _suppress(c, email, reason):
     email = email.lower().strip()
     c.execute("INSERT INTO suppression (email, domain, reason) VALUES (?,?,?) ON CONFLICT DO NOTHING",
               (email, email.rsplit("@", 1)[-1], reason))
+
+def email_domain(address):
+    """The domain of an address or a website ("info@acme.co.ke", "https://www.acme.co.ke/x")."""
+    text = (address or "").strip().lower()
+    text = text.rsplit("@", 1)[-1] if "@" in text else text.split("//", 1)[-1].split("/", 1)[0]
+    return text.split(":", 1)[0].removeprefix("www.")
+
+def add_do_not_contact(domain, reason):
+    domain = email_domain(domain)
+    if domain:
+        with conn() as c:
+            c.execute("INSERT INTO do_not_contact (domain, reason) VALUES (?, ?) ON CONFLICT DO NOTHING",
+                      (domain, reason))
+
+def do_not_contact_domains():
+    with conn() as c:
+        return {r[0] for r in c.execute("SELECT domain FROM do_not_contact")}
+
+def do_not_contact(address_or_site):
+    """Whether an address or website is on a do-not-contact domain (or a subdomain of one)."""
+    domain = email_domain(address_or_site)
+    blocked = do_not_contact_domains()
+    return bool(domain) and any(domain == d or domain.endswith("." + d) for d in blocked)
 
 def is_suppressed(email):
     with conn() as c:
@@ -617,7 +652,7 @@ def awaiting_followup(n=1):
             FROM leads l
             JOIN sent s ON s.id = (SELECT MIN(id) FROM sent WHERE lead_id = l.id)
             JOIN sent last ON last.id = (SELECT MAX(id) FROM sent WHERE lead_id = l.id)
-            WHERE l.status = 'sent' AND l.crm_emailed_at IS NULL
+            WHERE l.status = 'sent' AND l.crm_emailed_at IS NULL AND l.campaign IS NULL
               AND (SELECT COUNT(*) FROM sent s2 WHERE s2.lead_id = l.id) = ?
             ORDER BY s.id""", (n,)).fetchall()
 

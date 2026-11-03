@@ -129,16 +129,24 @@ def need_score(lead):
     return lead.get("score") if lead.get("scored_at") else None
 
 
+def _blocked(email, blocked):
+    domain = db.email_domain(email)
+    return any(domain == d or domain.endswith("." + d) for d in blocked)
+
+
 def waiting():
     """Verified leads in the order they will be emailed: highest need score first (see
     targeting.py; not scored yet comes last), then the points above, then oldest-found first. An address on the suppression list is never waiting,
     whatever its score, and neither is a lead that has already been emailed, even if
     its status was set back to verified: a first email is never sent twice. A lead someone
-    has emailed from the CRM is left to them."""
+    has emailed from the CRM is left to them, and so is a named-contact campaign's lead or
+    any address on its domains (do_not_contact: campaigns.py)."""
     suppressed = db.suppressed_emails()
     emailed = db.emailed_lead_ids()
+    blocked = db.do_not_contact_domains()
     leads = [l for l in db.leads_by_status("verified")
-             if l["email"] not in suppressed and l["id"] not in emailed and not l["crm_emailed_at"]]
+             if l["email"] not in suppressed and l["id"] not in emailed and not l["crm_emailed_at"]
+             and not l["campaign"] and not _blocked(l["email"], blocked)]
     return sorted(leads, key=lambda l: (-(need_score(l) if need_score(l) is not None else -1),
                                         -score(l), l["id"]))
 

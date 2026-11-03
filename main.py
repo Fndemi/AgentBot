@@ -20,6 +20,7 @@
   python main.py watch                   check replies every few minutes (leave running)
   python main.py auto                    weekdays: send at 9am (topped up until 5pm), then discover; prepare from 5pm
   python main.py prepare                 get waiting leads ready for their first email (score, niche, contact, opener)
+  python main.py send-group FILE [--dry-run]   a named-contact campaign: check addresses, send entries not sent yet
   python main.py stats                   counts by status and reply label
   python main.py unsubscribe a@b.com     manually opt someone out
   python main.py export [folder]         write leads.csv, events.csv and replies.csv (joined on lead_id)
@@ -57,6 +58,9 @@ def main():
         import discover
         max_new = take_number(args, "--max")
         discover.run(args[0] if args else None, max_new)
+    elif cmd == "send-group":
+        import campaigns
+        campaigns.main(args)
     elif cmd == "prepare":
         import prepare
         print(prepare.run())

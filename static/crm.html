@@ -999,7 +999,7 @@ function renderList() {
     <button class="row" data-id="${l.id}" ${l.id === state.sel ? 'aria-current="true"' : ""}>
       <span class="l1">${l.waiting ? '<span class="dot" title="Waiting for an answer"></span>' : ""}<b class="truncate">${esc(l.company || l.email)}</b>
         <span class="when">${esc(when(l.last_received))}</span></span>
-      <span class="l3">${scoreHTML(l.score)}${chip(STAGES, l.status)}${l.can_email ? "" : '<span class="chip neg plain">Can\'t be emailed</span>'}
+      <span class="l3">${scoreHTML(l.score)}${chip(STAGES, l.status)}${campaignChip(l)}${l.can_email ? "" : '<span class="chip neg plain">Can\'t be emailed</span>'}
         <span class="truncate" style="margin-left:auto">${l.owner ? (l.mine ? "You" : esc(l.owner)) : "Unclaimed"}</span></span>
     </button>`).join("");
 }
@@ -1009,6 +1009,8 @@ $("q").addEventListener("input", renderList);
 $("owner-f").addEventListener("change", renderList);
 $("stage-f").addEventListener("change", renderList);
 $("ind-f").addEventListener("change", renderList);
+// a named-contact campaign's lead (python main.py send-group): emailed by hand-written emails, not templates
+const campaignChip = (l) => l.campaign ? `<span class="chip plain" title="Named-contact campaign">${esc(l.campaign)}</span>` : "";
 const ownerText = (l) => l.owner ? (l.mine ? "You" : esc(l.owner)) : "Unclaimed";
 function orgRow(l) {
   return `
@@ -1016,7 +1018,7 @@ function orgRow(l) {
       <span class="l1">${l.waiting ? '<span class="dot" title="Waiting for an answer"></span>' : ""}<b class="truncate">${esc(l.company || l.email)}</b>
         <span class="when">${esc(when(l.last_emailed))}</span></span>
       <span class="l2">${esc(l.email || "")}</span>
-      <span class="l3">${scoreHTML(l.score)}${chip(STAGES, l.status)}${l.can_email ? "" : '<span class="chip neg plain">Can\'t be emailed</span>'}
+      <span class="l3">${scoreHTML(l.score)}${chip(STAGES, l.status)}${campaignChip(l)}${l.can_email ? "" : '<span class="chip neg plain">Can\'t be emailed</span>'}
         <span class="truncate" style="margin-left:auto">${ownerText(l)}</span></span>
     </button>`;
 }
@@ -1097,7 +1099,7 @@ function renderDetail() {
       <button class="iconbtn back" data-a="back" aria-label="Back to list"><svg class="i"><use href="#i-back"/></svg></button>
       <button class="iconbtn list-toggle" data-a="toggle-list" aria-pressed="${state.listHidden}" aria-label="${state.listHidden ? "Show" : "Hide"} the lead list" title="${state.listHidden ? "Show" : "Hide"} the lead list"><svg class="i"><use href="#i-panel"/></svg></button>
       <div class="d-id"><h2 class="truncate" title="${esc(nameTip)}">${esc(name)}</h2><div class="d-meta">${meta}</div>${score}</div>
-      <div class="d-actions">${owner}${buttons}${stageSel}</div>
+      <div class="d-actions">${campaignChip(lead)}${owner}${buttons}${stageSel}</div>
     </div>
     <div class="d-main">
       <div class="d-body">${personalHTML(lead.personal)}<div class="thread">${thread.length ? thread.map((m, i) => msgHTML(m, i, i >= fullFrom, i === newest)).join("") : `<p class="muted">Nothing in this conversation yet.</p>`}</div></div>
@@ -1405,6 +1407,7 @@ async function loadReport() {
         ${d.groups.technique.length ? repTable("By technique", "A (quick question) vs B (free test) vs C (niche angle), across every industry.", d.groups.technique) : ""}
         ${d.groups.opener.length ? repTable("Opener vs none", "First emails with a checked opener about a fact on their own website, against those without. Only emails sent since this was recorded.", d.groups.opener)
           : `<div class="panel"><h3>Opener vs none</h3><p class="lead2" style="padding-bottom:14px">No first emails recorded with or without an opener in this period yet.</p></div>`}
+        ${d.groups.campaign.length > 1 ? repTable("By campaign", "Each named-contact campaign (python main.py send-group) against the bot's own emails: sent, replied, interested and meetings.", d.groups.campaign) : ""}
         ${d.groups.contact.length ? repTable("Named contact vs role address", "First emails to a decision-maker named on their website, against those to a role address such as sales@ or info@. Only emails sent since this was recorded.", d.groups.contact) : ""}
         ${d.has_scores ? repTable("By need score", "If the scoring works, higher bands should reply more. If they don't, the rules need changing.", d.groups.score) : `<div class="panel"><h3>By need score</h3><p class="lead2" style="padding-bottom:14px">No scores yet. They appear once the targeting step has scored your leads.</p></div>`}
         ${d.has_source ? repTable("By where the lead came from", "", d.groups.source) : ""}

@@ -483,7 +483,7 @@ def _lead_or_404(c, lead_id, user):
 
 # What sales see of a lead; admins see every column
 SALES_FIELDS = ("id", "company", "email", "phone", "industry", "website", "score", "status",
-                "claimed_by", "claimed_at", "created_at")
+                "claimed_by", "claimed_at", "created_at", "campaign")
 
 
 def _has_response(c, lead_id):
@@ -559,7 +559,7 @@ def open_leads(scope: str = "open", user=Depends(current_user)):
         names = _user_names(c)
         sc = _score_cols(c)
         rows = [dict(r) for r in c.execute(f"""
-            SELECT l.id, l.company, l.email, l.industry, l.status, l.website, l.claimed_by, l.claimed_at,
+            SELECT l.id, l.company, l.email, l.industry, l.campaign, l.status, l.website, l.claimed_by, l.claimed_at,
                    {('l.' + sc['score']) if sc['score'] else 'NULL'} AS score,
                    (SELECT COUNT(*) FROM replies r WHERE r.lead_id = l.id AND {waiting}) AS waiting,
                    CASE WHEN l.status IN ({no_email}) THEN 0 ELSE 1 END AS can_email,
@@ -607,7 +607,7 @@ def organisations(user=Depends(current_user)):
         names = _user_names(c)
         sc = _score_cols(c)
         rows = [dict(r) for r in c.execute(f"""
-            SELECT l.id, l.company, l.email, l.phone, l.industry, l.website, l.status, l.claimed_by,
+            SELECT l.id, l.company, l.email, l.phone, l.industry, l.campaign, l.website, l.status, l.claimed_by,
                    {('l.' + sc['score']) if sc['score'] else 'NULL'} AS score,
                    CASE WHEN l.status IN ({no_email}) THEN 0 ELSE 1 END AS can_email,
                    (SELECT COUNT(*) FROM sent s WHERE s.lead_id = l.id) AS bot_emails,
@@ -1238,6 +1238,10 @@ def _band(score):
     return "Below 50"
 
 
+# The report's name for the leads the bot emailed with its own templates (no campaign)
+BOT_CAMPAIGN = "LeadBot's own emails"
+
+
 @router.get("/api/crm/report")
 def report(days: int = 0, user=Depends(admin_only)):
     """Reply results by segment, score band and source, counted per lead that was emailed.
@@ -1251,6 +1255,7 @@ def report(days: int = 0, user=Depends(admin_only)):
         since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d") if days else "0000"
         rows = c.execute(f"""
             SELECT l.id, COALESCE(NULLIF(l.industry, ''), 'default') AS industry, l.status, l.template_variant,
+                   l.campaign,
                    (SELECT f.with_opener FROM sent f WHERE f.lead_id = l.id ORDER BY f.id LIMIT 1) AS with_opener,
                    (SELECT f.to_contact FROM sent f WHERE f.lead_id = l.id ORDER BY f.id LIMIT 1) AS to_contact,
                    {('l.' + sc['score']) if sc['score'] else 'NULL'} AS score,
@@ -1273,13 +1278,16 @@ def report(days: int = 0, user=Depends(admin_only)):
     # the rotation (no variant) are in neither.
     # opener: first email with an AI opener vs without; contact: to a named contact vs a role
     # address. Leads first emailed before these were recorded are in neither.
-    groups = {"segment": {}, "score": {}, "source": {}, "template": {}, "technique": {}, "opener": {}, "contact": {}}
+    # campaign: each named-contact campaign (campaigns.py) against the bot's own leads
+    groups = {"segment": {}, "score": {}, "source": {}, "template": {}, "technique": {}, "opener": {}, "contact": {},
+              "campaign": {}}
     total = blank()
     for r in rows:
         bounced = r["status"] == "bounced" or bool(r["bounced_reply"])
         interested = bool(r["interested_reply"]) or r["status"] in ("meeting", "client")
         meeting = r["status"] in ("meeting", "client")
-        keys = {"segment": r["industry"], "score": _band(r["score"]), "source": r["source"]}
+        keys = {"segment": r["industry"], "score": _band(r["score"]), "source": r["source"],
+                "campaign": r["campaign"] or BOT_CAMPAIGN}
         variant = r["template_variant"]
         if variant:
             keys["template"] = f"{r['industry']} · {variant}"
@@ -1307,6 +1315,7 @@ def report(days: int = 0, user=Depends(admin_only)):
 
     order = {"score": ["80–100", "60–79", "50–59", "Below 50", "Not scored"],
              "opener": ["With an opener", "Without an opener"], "contact": ["Named contact", "Role address"]}
+    order["campaign"] = [BOT_CAMPAIGN] + sorted(k for k in groups["campaign"] if k != BOT_CAMPAIGN)
     out = {}
     for g, d in groups.items():
         items = [dict(finish(v), name=k) for k, v in d.items()]

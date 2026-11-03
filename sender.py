@@ -390,7 +390,7 @@ def followups_due():
     return [(lead, n) for n in range(1, MAX_FOLLOWUPS + 1) for lead in db.awaiting_followup(n)
             if personalise.approved(lead) and not personalise.paused(lead, nairobi) and followup_template(lead, n)
             and business_days_after(date.fromisoformat(lead["sent_on"]), config.FOLLOWUP_AFTER_DAYS) <= today
-            and lead["email"] not in suppressed
+            and lead["email"] not in suppressed and not db.do_not_contact(lead["email"])
             and not db.recent_out_of_office(lead["id"], OUT_OF_OFFICE_HOLD_DAYS)]
 
 
@@ -477,6 +477,10 @@ def deliver(smtp, lead, msg, tname, followup=0):
     that fits no approved niche (nichefit.py), and never while a fact the templates quote is
     missing (rotation.refusal).
     The lead's rotation variant is saved on the sent row, and on the lead with its first email."""
+    if dict(lead).get("campaign"):
+        raise RuntimeError(f"{lead['email']} is in the {dict(lead)['campaign']} campaign: only its own emails go to it")
+    if db.do_not_contact(lead["email"]):
+        raise RuntimeError(f"{lead['email']} is on a do-not-contact domain (a named-contact campaign's)")
     refused = rotation.refusal()
     if refused:
         raise RuntimeError(f"{lead['email']}: {refused}")

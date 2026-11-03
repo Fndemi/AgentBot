@@ -97,3 +97,11 @@ TAVILY_MONTHLY_CAP = int(env("TAVILY_MONTHLY_CAP", "900"))
 # New leads discover.py looks for in one run (python main.py discover, and the daily auto run),
 # shared evenly across the niches approved and not paused in uses.yaml
 DISCOVER_PER_DAY = int(env("DISCOVER_PER_DAY", "50"))
+
+# Named-contact campaigns (campaigns.py, python main.py send-group FILE): at most this many emails a
+# day per campaign, counted toward DAILY_LIMIT, from this name and address (the bot's own mailbox)
+GROUP_DAILY_LIMIT = int(env("GROUP_DAILY_LIMIT", "10"))
+GROUP_FROM_NAME = env("GROUP_FROM_NAME", "Mary from TalkSasa")
+GROUP_FROM_EMAIL = env("GROUP_FROM_EMAIL", FROM_EMAIL or "")
+# A campaign's entry gets its one follow-up this many working days after its first email
+GROUP_FOLLOWUP_AFTER_DAYS = int(env("GROUP_FOLLOWUP_AFTER_DAYS", "4"))
