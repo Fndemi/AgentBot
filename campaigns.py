@@ -4,7 +4,10 @@
   python main.py send-group campaigns/group_a.yaml             send the entries not sent yet
 
 The file is a YAML list; each entry has to, contact_name, company, website, subject, body and
-followup_body. The campaign is named after the file ("group_a.yaml" -> "Group A"). Entries are
+followup_body. contact_name and followup_body may be empty: an entry without a followup_body is
+sent normally but gets no automatic follow-up. A file whose name ends in "_hold"
+("group_a_hold.yaml") keeps entries back: it is never sent by any command (a dry run may preview
+it), and the bot never reads campaign files at all. The campaign is named after the file ("group_a.yaml" -> "Group A"). Entries are
 sent word for word, as plain text, from GROUP_FROM_NAME <GROUP_FROM_EMAIL> through the bot's own
 mail server, with a List-Unsubscribe header; the Message-ID is saved and a copy filed in Sent.
 Only entries not sent before go out, at most GROUP_DAILY_LIMIT a day per campaign, counted toward
@@ -43,7 +46,11 @@ import verify
 
 INDUSTRY = "named_contact"
 FIELDS = ("to", "contact_name", "company", "website", "subject", "body", "followup_body")
-NEEDED = ("to", "company", "subject", "body", "followup_body")   # contact_name may be blank (info@...)
+# contact_name may be blank (info@...); so may followup_body: that entry gets no automatic follow-up
+NEEDED = ("to", "company", "subject", "body")
+# A file whose name ends like this holds entries kept back ("group_a_hold.yaml"): it is never sent,
+# by any command; a dry run may preview it. To send one of its entries, move it to the campaign's file.
+HOLD_SUFFIX = "_hold"
 SEND_DELAY_SECONDS = 8   # between emails, so a run of GROUP_DAILY_LIMIT stays short
 CHECK_WORKERS = 8
 
@@ -213,8 +220,26 @@ def report(rows):
               f"{'yes, ' + result['page'] if result['page'] else 'no'}")
 
 
+def on_hold(path):
+    """Whether a campaign file is kept back (its name ends in HOLD_SUFFIX): never sent."""
+    return Path(path).stem.lower().endswith(HOLD_SUFFIX)
+
+
+def followup_note(entry):
+    if not entry["followup_body"].strip():
+        return "no follow-up"
+    return f"follow-up after {config.GROUP_FOLLOWUP_AFTER_DAYS} working days without a reply"
+
+
 def send_group(path, dry_run=False, connect=sender.connect):
-    """Check and send the file's entries not sent yet. Returns {address: what happened}."""
+    """Check and send the file's entries not sent yet. Returns {address: what happened}.
+    A file on hold (on_hold) is never sent: a dry run previews it, a real run refuses."""
+    if on_hold(path) and not dry_run:
+        print(f"{Path(path).name} is on hold: its entries are never sent. To send one, move it into "
+              "the campaign's own file. Nothing was sent.")
+        return {e["to"]: "on hold: never sent" for e in load(path)}
+    if on_hold(path):
+        print(f"{Path(path).name} is ON HOLD: preview only, it can never be sent.\n")
     campaign = campaign_name(path)
     entries = load(path)
     outcome = {e["to"]: why_not(e, campaign) for e in entries}
@@ -225,6 +250,8 @@ def send_group(path, dry_run=False, connect=sender.connect):
             print(f"  {e['to']}: {outcome[e['to']]}")
     if not todo:
         return outcome
+    for e in todo:
+        print(f"  {e['to']}: {followup_note(e)}")
     print("\nChecking each address (mail domain, and whether the company's website shows it)...")
     results = check_all(todo)
     report(list(zip(todo, results)))
@@ -243,7 +270,7 @@ def send_group(path, dry_run=False, connect=sender.connect):
     if dry_run:
         for entry in sendable:
             outcome[entry["to"]] = "would send"
-            print(f"\n--- would send to {entry['to']} ---\nFrom: {config.GROUP_FROM_NAME} "
+            print(f"\n--- would send to {entry['to']} ({followup_note(entry)}) ---\nFrom: {config.GROUP_FROM_NAME} "
                   f"<{config.GROUP_FROM_EMAIL or config.FROM_EMAIL}>\nSubject: {entry['subject']}\n\n{entry['body']}")
         print("\n(dry run) Nothing was sent or saved.")
         return outcome

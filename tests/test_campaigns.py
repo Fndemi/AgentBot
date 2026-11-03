@@ -92,7 +92,9 @@ def test_unknown_fields_are_refused(world):
 def test_the_committed_group_a_file_loads_and_nothing_incomplete_is_sent(world):
     entries = campaigns.load("campaigns/group_a.yaml")
     assert [e["to"] for e in entries] == ["stephen@groundworkpm.com", "info@boxleocourier.com",
-                                          "pmunyua@kilimoafya.com", "newton@bomahut.com"]
+                                          "pmunyua@kilimoafya.com", "newton@bomahut.com",
+                                          "rodgers@vorsagroup.co.ke", "lee@heureuxproperties.co.ke",
+                                          "b.okute@victoria-agribusiness.co.ke", "l.ongondo@victoria-agribusiness.co.ke"]
     outcome = send(world, "campaigns/group_a.yaml")
     # only complete entries go out (here to a fake mail server); the others wait for their text
     complete = [e["to"] for e in entries if not campaigns.missing(e)]
@@ -256,3 +258,49 @@ def test_the_crm_report_compares_campaigns_with_the_bots_emails(world):
             groups["Group A"]["meetings"]) == (2, 1, 1, 1)
     assert groups[crm.BOT_CAMPAIGN]["emailed"] == 1
     assert "campaign" in crm.SALES_FIELDS
+
+
+# --- Entries without a follow-up, and files on hold ---
+
+def test_an_entry_without_a_follow_up_is_sent_but_never_followed_up(world, monkeypatch, capsys):
+    monkeypatch.setattr(rotation, "today", lambda: TUESDAY)
+    path = campaign_file(world, [entry(1), dict(entry(2), followup_body="")])
+    assert send(world, path, dry_run=True) == {"jane1@acme1.co.ke": "would send", "jane2@acme2.co.ke": "would send"}
+    out = capsys.readouterr().out
+    assert "jane2@acme2.co.ke (no follow-up)" in out and "jane1@acme1.co.ke (follow-up after 4 working days" in out
+    assert send(world, path) == {"jane1@acme1.co.ke": "sent", "jane2@acme2.co.ke": "sent"}
+    sent_days_ago("jane1@acme1.co.ke", 10)
+    sent_days_ago("jane2@acme2.co.ke", 10)
+    assert [l["email"] for l in campaigns.followups_due()] == ["jane1@acme1.co.ke"]
+    assert campaigns.send_followups(connect=world["connect"]) == 1
+    assert [m["To"] for m in world["smtp"].sent] == ["jane1@acme1.co.ke", "jane2@acme2.co.ke", "jane1@acme1.co.ke"]
+
+
+def test_a_hold_file_is_never_sent(world, capsys):
+    path = campaign_file(world, [entry(1)], name="group_a_hold.yaml")
+    assert send(world, path) == {"jane1@acme1.co.ke": "on hold: never sent"}
+    assert world["smtp"].sent == [] and db.find_lead_by_email("jane1@acme1.co.ke") is None
+    assert "is on hold" in capsys.readouterr().out
+    # a dry run may preview it, clearly marked, and saves nothing
+    assert send(world, path, dry_run=True) == {"jane1@acme1.co.ke": "would send"}
+    assert "ON HOLD: preview only" in capsys.readouterr().out
+    assert world["smtp"].sent == [] and db.find_lead_by_email("jane1@acme1.co.ke") is None
+
+
+def test_the_committed_hold_file_is_refused_by_the_command(world, monkeypatch):
+    import main
+    assert campaigns.on_hold("campaigns/group_a_hold.yaml") and not campaigns.on_hold("campaigns/group_a.yaml")
+    monkeypatch.setattr(sender, "connect", lambda: pytest.fail("a hold file must never reach the mail server"))
+    monkeypatch.setattr(main.sys, "argv", ["main.py", "send-group", "campaigns/group_a_hold.yaml"])
+    main.main()
+    assert world["smtp"].sent == [] and db.do_not_contact_domains() == set()
+
+
+def test_the_committed_group_a_has_eight_complete_entries():
+    entries = campaigns.load("campaigns/group_a.yaml")
+    assert len(entries) == 8 and all(not campaigns.missing(e) for e in entries)
+    with_followup = [e["to"] for e in entries if e["followup_body"].strip()]
+    assert with_followup == ["stephen@groundworkpm.com", "info@boxleocourier.com",
+                             "pmunyua@kilimoafya.com", "newton@bomahut.com"]
+    held = {e["to"] for e in campaigns.load("campaigns/group_a_hold.yaml")}
+    assert held and not held & {e["to"] for e in entries}        # nothing on hold is in the campaign's file

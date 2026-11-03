@@ -1,0 +1,151 @@
+# Group A alternative contacts: ON HOLD. Do NOT send these yet.
+# Use only if the primary contact at that company doesn't reply after a follow-up period,
+# or redirects us. To send one, move its entry into campaigns/group_a.yaml.
+
+- to: management@vorsagroup.co.ke
+  contact_name: "Linda"
+  company: VorsaGroup
+  website: vorsagroup.co.ke
+  subject: "Making tenant updates easier to manage"
+  body: |
+    Hello Linda,
+
+    I'm reaching out because property management involves keeping tenants informed about rent, payments, maintenance and other important updates.
+
+    At TalkSasa, we help businesses automate these communications through bulk SMS. For a property management team, this could mean sending rent reminders, confirming payments, notifying tenants about maintenance or water interruptions, and sharing important notices without having to message each tenant individually.
+
+    We also provide API integration so messages can be triggered automatically from an existing property management system.
+
+    Would you be open to a short discussion on how this could fit into VorsaGroup's tenant management operations?
+
+    Kind regards,
+
+    Mary
+    TalkSasa | Bulk SMS & Communication Solutions
+    Website: https://talksasa.com
+    Tel: 0781 000 403 / 0712 295 880
+  followup_body: ""   # no automatic follow-up for this entry
+
+- to: lauryn@heureuxproperties.co.ke
+  contact_name: "Lauryn"
+  company: Heureux Properties
+  website: heureuxproperties.co.ke
+  subject: "Supporting client follow-ups through SMS"
+  body: |
+    Hello Lauryn,
+
+    I noticed your role at Heureux Properties involves property marketing, client engagement and investment advisory.
+
+    I'm reaching out from TalkSasa because timely communication can make a difference when handling property enquiries and prospective buyers or tenants.
+
+    Our bulk SMS service can help businesses send viewing confirmations, appointment reminders, follow-ups and property updates. These messages can be sent in bulk or automated through an API integration with an existing system.
+
+    Would this be something worth exploring for your client engagement process, or could you direct me to the person who handles technology and customer communication?
+
+    Kind regards,
+
+    Mary
+    TalkSasa | Bulk SMS & Communication Solutions
+    Website: https://talksasa.com
+    Tel: 0781 000 403 / 0712 295 880
+  followup_body: ""   # no automatic follow-up for this entry
+
+- to: pnjau@metropolispmgt.com
+  contact_name: "Gachigi"
+  company: Metropolis Property Management
+  website: metropolispmgt.com
+  subject: "Automating tenant communication at Metropolis"
+  body: |
+    Hello Gachigi,
+
+    I came across Metropolis Property Management and noticed your involvement in its property listings and tenant-facing operations.
+
+    I'm reaching out from TalkSasa to introduce our bulk SMS service. We help businesses automate important customer communications, and I believe this could be useful in property management.
+
+    For example, SMS could be used for rent reminders, payment confirmations, viewing appointments, maintenance notices and updates to tenants across different properties.
+
+    We can also integrate our SMS API with your existing systems at no integration cost, allowing messages to be triggered automatically.
+
+    Would you be available for a brief conversation to discuss whether this could support your operations?
+
+    Kind regards,
+
+    Mary
+    TalkSasa | Bulk SMS & Communication Solutions
+    Website: https://talksasa.com
+    Tel: 0781 000 403 / 0712 295 880
+  followup_body: ""   # no automatic follow-up for this entry
+
+- to: veromukami@metropolispmgt.com
+  contact_name: "Veronica"
+  company: Metropolis Property Management
+  website: metropolispmgt.com
+  subject: "Simplifying tenant and client updates at Metropolis"
+  body: |
+    Hello Veronica,
+
+    I came across your property listings at Metropolis Property Management and wanted to introduce a communication solution that may be useful to your team.
+
+    TalkSasa provides bulk SMS services that businesses use to send timely updates to customers and clients.
+
+    In property management, this could help with viewing confirmations, rent reminders, payment acknowledgements, maintenance notices and other tenant updates. Messages can also be automated through API integration rather than sent manually one by one.
+
+    Would you be open to a short conversation about how your team currently handles these communications and whether SMS automation could help?
+
+    Kind regards,
+
+    Mary
+    TalkSasa | Bulk SMS & Communication Solutions
+    Website: https://talksasa.com
+    Tel: 0781 000 403 / 0712 295 880
+  followup_body: ""   # no automatic follow-up for this entry
+
+- to: hiram@metropolispmgt.com
+  contact_name: "Hiram"
+  company: Metropolis Property Management
+  website: metropolispmgt.com
+  subject: "A bulk SMS solution for property-related updates"
+  body: |
+    Hello Hiram,
+
+    I'm reaching out from TalkSasa, a Kenyan bulk SMS provider.
+
+    I noticed your involvement in property listings at Metropolis. I wanted to explore whether automated SMS could help your team keep prospective tenants and existing clients informed.
+
+    Some practical uses include confirming property viewings, notifying clients when units become available, sending appointment reminders and sharing important tenant updates.
+
+    TalkSasa offers API integration, allowing messages to be sent automatically from a business system, alongside delivery reporting and branded sender ID options.
+
+    Would you be available for a short discussion, or could you point me to the person responsible for technology or operations?
+
+    Kind regards,
+
+    Mary
+    TalkSasa | Bulk SMS & Communication Solutions
+    Website: https://talksasa.com
+    Tel: 0781 000 403 / 0712 295 880
+  followup_body: ""   # no automatic follow-up for this entry
+
+- to: celineqs@metropolispmgt.com
+  contact_name: "Celine"
+  company: Metropolis Property Management
+  website: metropolispmgt.com
+  subject: "Improving property enquiry follow-ups through SMS"
+  body: |
+    Hello Celine,
+
+    I'm reaching out from TalkSasa because I believe automated SMS could be useful in managing property enquiries and keeping prospective clients informed.
+
+    For a property team, SMS can help confirm viewing appointments, follow up with interested clients, notify them about available units and share important updates without relying entirely on manual calls and messages.
+
+    TalkSasa provides bulk SMS and API integration, so these communications can be automated from an existing system.
+
+    Would this be relevant to your work at Metropolis, or would you be able to direct me to the person handling customer communication or technology?
+
+    Kind regards,
+
+    Mary
+    TalkSasa | Bulk SMS & Communication Solutions
+    Website: https://talksasa.com
+    Tel: 0781 000 403 / 0712 295 880
+  followup_body: ""   # no automatic follow-up for this entry

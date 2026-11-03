@@ -168,3 +168,107 @@
     Best regards,
     Mary
     TalkSasa
+
+# --- Added 3 Nov 2026: primary contacts (one round, no automatic follow-up) ---
+
+- to: rodgers@vorsagroup.co.ke
+  contact_name: "Rodgers"
+  company: VorsaGroup
+  website: vorsagroup.co.ke
+  subject: "Improving tenant communication at VorsaGroup"
+  body: |
+    Hello Rodgers,
+
+    I came across VorsaGroup's property management services, particularly your work in tenant management, rent collection and property administration.
+
+    I'm reaching out from TalkSasa to explore how automated SMS could support these operations. For example, your team could send tenants rent reminders, payment confirmations, service charge updates and maintenance notifications directly from your systems.
+
+    TalkSasa provides bulk SMS services and API integration, which we can offer at no integration cost to help connect messaging to your existing workflows.
+
+    Would you be available for a brief 15-minute conversation to explore whether this could be useful to VorsaGroup?
+
+    Kind regards,
+
+    Mary
+    TalkSasa | Bulk SMS & Communication Solutions
+    Website: https://talksasa.com
+    Tel: 0781 000 403 / 0712 295 880
+  followup_body: ""   # no automatic follow-up for this entry
+
+- to: lee@heureuxproperties.co.ke
+  contact_name: "Lee"
+  company: Heureux Properties
+  website: heureuxproperties.co.ke
+  subject: "Exploring automated client communication at Heureux Properties"
+  body: |
+    Hello Lee,
+
+    I came across Heureux Properties and your work in property investment, sales and property advisory.
+
+    I'd like to introduce TalkSasa, a Kenyan bulk SMS provider that helps businesses communicate with customers through automated text messages.
+
+    For a property business, SMS can support viewing confirmations, appointment reminders, client follow-ups, payment notifications and updates on property availability. These messages can also be triggered directly from your existing systems through our API.
+
+    We offer free API integration to make it easier for businesses to connect their platforms to our SMS service.
+
+    Would you be available for a brief 15-minute conversation to explore whether this could support your client communication?
+
+    Kind regards,
+
+    Mary
+    TalkSasa | Bulk SMS & Communication Solutions
+    Website: https://talksasa.com
+    Tel: 0781 000 403 / 0712 295 880
+  followup_body: ""   # no automatic follow-up for this entry
+
+- to: b.okute@victoria-agribusiness.co.ke
+  contact_name: "Boniface"
+  company: Victoria Agribusiness
+  website: victoria-agribusiness.co.ke
+  subject: "Exploring automated communication for Victoria Agribusiness"
+  body: |
+    Hello Boniface,
+
+    I came across Victoria Agribusiness and wanted to explore how TalkSasa could support communication with your customers, distributors and agricultural partners.
+
+    As an agribusiness, timely updates can be important when coordinating orders, deliveries, product availability and payments.
+
+    TalkSasa provides bulk SMS services that can help automate notifications such as order confirmations, delivery updates, payment acknowledgements and important customer announcements.
+
+    We also offer API integration to connect SMS directly to existing business systems, with no integration fee.
+
+    Would you be open to a brief 15-minute conversation to explore whether this could be useful to Victoria Agribusiness?
+
+    Kind regards,
+
+    Mary
+    TalkSasa | Bulk SMS & Communication Solutions
+    Website: https://talksasa.com
+    Tel: 0781 000 403 / 0712 295 880
+  followup_body: ""   # no automatic follow-up for this entry
+
+- to: l.ongondo@victoria-agribusiness.co.ke
+  contact_name: ""
+  company: Victoria Agribusiness
+  website: victoria-agribusiness.co.ke
+  subject: "SMS API integration for Victoria Agribusiness"
+  body: |
+    Hello,
+
+    I'm reaching out from TalkSasa, a Kenyan bulk SMS provider, to explore a possible SMS API integration with Victoria Agribusiness.
+
+    Our API allows businesses to trigger SMS notifications directly from their systems. Depending on your current workflows, this could support order confirmations, delivery notifications, payment alerts and updates to customers or distribution partners.
+
+    We provide API documentation, delivery reporting and free integration support. Businesses can also use branded sender IDs for their communications.
+
+    I would appreciate the opportunity to understand your current messaging setup and see whether TalkSasa could complement your existing infrastructure.
+
+    Would you be available for a short technical discussion?
+
+    Kind regards,
+
+    Mary
+    TalkSasa | Bulk SMS & Communication Solutions
+    Website: https://talksasa.com
+    Tel: 0781 000 403 / 0712 295 880
+  followup_body: ""   # no automatic follow-up for this entry
