@@ -8,7 +8,7 @@
 # empty: an entry without a subject, body or followup_body is reported as incomplete and never sent.
 
 - to: stephen@groundworkpm.com
-  contact_name: ""
+  contact_name: Stephen
   company: GroundWork PM
   website: groundworkpm.com
   subject: ""
