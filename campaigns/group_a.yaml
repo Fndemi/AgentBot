@@ -272,3 +272,147 @@
     Website: https://talksasa.com
     Tel: 0781 000 403 / 0712 295 880
   followup_body: ""   # no automatic follow-up for this entry
+
+# --- Added 5 Nov 2026: five-prospect meeting batch (no automatic follow-up) ---
+
+- to: stanley.munyao@brisk-credit.co.ke
+  contact_name: "Stanley"
+  company: Brisk Credit
+  website: brisk-credit.co.ke
+  subject: "Exploring SMS integration with Brisk Credit"
+  body: |
+    Hello Stanley,
+
+    I came across Brisk Credit and your digital lending services, particularly your work supporting businesses and farmers with financing through M-Pesa.
+
+    I'm reaching out from TalkSasa because digital lending platforms depend on timely communication throughout the customer journey.
+
+    From application acknowledgements and loan decision notifications to disbursement confirmations and repayment reminders, these communications can be automated through an SMS API integrated with your existing platform.
+
+    TalkSasa provides bulk SMS infrastructure, delivery reporting and free API integration support. We would be interested in exploring whether our service could complement your current messaging setup.
+
+    Could we schedule a 20-minute meeting next week with you or the person responsible for technology and operations to discuss your current SMS requirements and possible integration?
+
+    I would appreciate the opportunity to explore this with your team.
+
+    Kind regards,
+
+    Mary
+    TalkSasa | Bulk SMS & Communication Solutions
+    Website: https://talksasa.com
+    Tel: 0781 000 403 / 0712 295 880
+  followup_body: ""
+
+- to: moses@mywagepay.com
+  contact_name: "Moses"
+  company: MyWagepay
+  website: mywagepay.com
+  subject: "Exploring SMS API integration with MyWagepay"
+  body: |
+    Hello Moses,
+
+    I came across MyWagepay and its salary advance and employee financial wellness platform.
+
+    I'm reaching out from TalkSasa because platforms that manage employee salary advances and financial transactions have several opportunities to automate communication with their users.
+
+    For example, SMS can be used for application updates, approval notifications, disbursement confirmations, repayment reminders and important account notifications.
+
+    TalkSasa provides bulk SMS services and an API that allows messages to be triggered directly from an existing platform. We also offer free API integration support and delivery reporting.
+
+    I'd like to explore whether TalkSasa could support MyWagepay's messaging requirements or complement your existing SMS infrastructure.
+
+    Would you be available for a 20-minute meeting next week to discuss a possible integration?
+
+    Kind regards,
+
+    Mary
+    TalkSasa | Bulk SMS & Communication Solutions
+    Website: https://talksasa.com
+    Tel: 0781 000 403 / 0712 295 880
+  followup_body: ""
+
+- to: allan.oyier@farmnet.africa
+  contact_name: "Allan"
+  company: FarmNet
+  website: farmnet.africa
+  subject: "Exploring SMS integration for FarmNet's farmer network"
+  body: |
+    Hello Allan,
+
+    I came across FarmNet and its digital platform supporting farmers with farm management, planning and access to agricultural services and markets.
+
+    I'm reaching out from TalkSasa because platforms serving farmer networks need reliable ways to communicate important information, including when users may not be actively using an application or have internet access.
+
+    Through bulk SMS, FarmNet could deliver farmer onboarding updates, transaction confirmations, market information, collection schedules, payment notifications and other important agricultural updates.
+
+    TalkSasa provides an SMS API that can be integrated into existing platforms, allowing these messages to be triggered automatically. We also provide delivery reporting and free API integration support.
+
+    I'd appreciate an opportunity to understand how FarmNet currently handles farmer communication and explore whether TalkSasa could support your messaging infrastructure.
+
+    Could we schedule a 20-minute meeting next week to discuss a possible integration?
+
+    Kind regards,
+
+    Mary
+    TalkSasa | Bulk SMS & Communication Solutions
+    Website: https://talksasa.com
+    Tel: 0781 000 403 / 0712 295 880
+  followup_body: ""
+
+- to: info@tawifresh.com
+  contact_name: "Joyce"
+  company: Tawi Fresh
+  website: tawifresh.com
+  subject: "Exploring automated SMS communication at Tawi Fresh"
+  body: |
+    Hello Joyce,
+
+    I came across Tawi Fresh and your work connecting farmers with buyers and markets.
+
+    I believe there could be an opportunity to simplify communication across your agricultural supply chain using automated SMS.
+
+    For example, farmers and buyers could receive order confirmations, produce collection schedules, delivery updates, payment confirmations and important operational notifications directly on their phones.
+
+    TalkSasa provides bulk SMS infrastructure and API integration, allowing these messages to be triggered automatically from an existing business system. We also provide delivery reporting and free integration support.
+
+    I'd like to understand how Tawi Fresh currently communicates with farmers and buyers, and explore whether TalkSasa could complement your existing communication channels.
+
+    Could we arrange a 20-minute meeting next week to discuss this?
+
+    If possible, please direct this email to Joyce Mutuku or the person responsible for commercial operations and technology.
+
+    Kind regards,
+
+    Mary
+    TalkSasa | Bulk SMS & Communication Solutions
+    Website: https://talksasa.com
+    Tel: 0781 000 403 / 0712 295 880
+  followup_body: ""
+
+- to: credit@tazugroup.com
+  contact_name: ""
+  company: Tazu Credit
+  website: tazugroup.com
+  subject: "Exploring SMS infrastructure integration with Tazu Credit"
+  body: |
+    Hello Tazu Team,
+
+    I came across Tazu Credit and your online financing platform serving businesses, sole traders and individuals.
+
+    I'm reaching out from TalkSasa to explore whether we could support your customer communication infrastructure through bulk SMS and API integration.
+
+    For a digital financing platform, SMS can support application acknowledgements, financing decision notifications, disbursement confirmations, repayment reminders and important account updates.
+
+    TalkSasa provides an SMS API that allows businesses to automate these communications directly from their platforms. We also offer delivery reporting, branded sender IDs and free API integration support.
+
+    Rather than simply introduce another SMS provider, we'd like to understand your current messaging setup, volumes and integration requirements to see whether there is an opportunity to work together.
+
+    Would your technology or operations team be available for a 20-minute meeting next week?
+
+    Kind regards,
+
+    Mary
+    TalkSasa | Bulk SMS & Communication Solutions
+    Website: https://talksasa.com
+    Tel: 0781 000 403 / 0712 295 880
+  followup_body: ""

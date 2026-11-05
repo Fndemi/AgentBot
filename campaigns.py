@@ -15,6 +15,10 @@ DAILY_LIMIT, so more entries can be added to the file and the same command sends
 
 Before sending, every address is checked: its domain must receive mail (MX or A record) or the
 entry is skipped, and the company's website is read to see whether the address is published.
+An entry whose company the bot or another campaign has already emailed (a lead with a sent email
+whose address or website is on the entry's address or website domain; free-mail domains such as
+gmail.com don't count) is skipped as "company already emailed by LeadBot (address, date)", shown
+in the dry run too, unless the entry has allow_same_company: true.
 
 Each entry becomes a lead (status sent, industry "named_contact", campaign "Group A"), so its
 replies are linked and it shows in the CRM. The bot never sends its own templates or follow-ups
@@ -46,6 +50,8 @@ import verify
 
 INDUSTRY = "named_contact"
 FIELDS = ("to", "contact_name", "company", "website", "subject", "body", "followup_body")
+# allow_same_company: true sends the entry even when its company has been emailed before (company_emailed)
+FLAGS = ("allow_same_company",)
 # contact_name may be blank (info@...); so may followup_body: that entry gets no automatic follow-up
 NEEDED = ("to", "company", "subject", "body")
 # A file whose name ends like this holds entries kept back ("group_a_hold.yaml"): it is never sent,
@@ -70,10 +76,14 @@ def load(path):
     for i, item in enumerate(data, 1):
         if not isinstance(item, dict):
             raise ValueError(f"{path}: entry {i} is not a set of fields")
-        unknown = set(item) - set(FIELDS)
+        unknown = set(item) - set(FIELDS) - set(FLAGS)
         if unknown:
             raise ValueError(f"{path}: entry {i} has unknown fields: {', '.join(sorted(unknown))}")
         entry = {k: str(item.get(k) or "").strip("\n") for k in FIELDS}
+        for flag in FLAGS:
+            if not isinstance(item.get(flag, False), bool):
+                raise ValueError(f"{path}: entry {i}: {flag} must be true or false")
+            entry[flag] = item.get(flag, False)
         entry["to"] = entry["to"].strip().lower()
         entries.append(entry)
     return entries
@@ -133,6 +143,32 @@ def room(campaign):
     return max(0, min(config.GROUP_DAILY_LIMIT - sent_today(campaign), config.DAILY_LIMIT - db.sent_today()))
 
 
+def company_domains(entry):
+    """The entry's address and website domains, free-mail ones (gmail.com...) left out."""
+    return {d for d in (db.email_domain(entry["to"]), db.email_domain(entry["website"]))
+            if d and d not in ranking.FREE_MAIL}
+
+
+def company_emailed(entry, campaign):
+    """(address, date) of the first email the bot or another campaign sent to someone at the
+    entry's company: a lead whose address or website is on one of company_domains(entry).
+    This campaign's own leads don't count. None if there is no such email."""
+    domains = company_domains(entry)
+    if not domains:
+        return None
+    with db.conn() as c:
+        rows = c.execute("SELECT l.email, l.website, l.campaign, MIN(s.sent_on) AS first_sent"
+                         " FROM leads l JOIN sent s ON s.lead_id = l.id"
+                         " GROUP BY l.id, l.email, l.website, l.campaign ORDER BY first_sent, l.id").fetchall()
+    for r in rows:
+        if r["campaign"] == campaign or r["email"] == entry["to"]:
+            continue
+        theirs = {db.email_domain(r["email"]), db.email_domain(r["website"])} - {""}
+        if theirs & domains:
+            return r["email"], str(r["first_sent"])
+    return None
+
+
 def why_not(entry, campaign):
     """Why this entry won't be sent, or None if it will (when there's room today)."""
     if missing(entry):
@@ -143,6 +179,10 @@ def why_not(entry, campaign):
     if lead and emails_sent(lead["id"]):
         return ("already sent" if lead["campaign"] == campaign
                 else f"already emailed by {'the ' + lead['campaign'] + ' campaign' if lead['campaign'] else 'LeadBot'}")
+    if not entry.get("allow_same_company"):
+        earlier = company_emailed(entry, campaign)
+        if earlier:
+            return f"company already emailed by LeadBot ({earlier[0]}, {earlier[1]})"
     return None
 
 

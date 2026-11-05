@@ -89,12 +89,15 @@ def test_unknown_fields_are_refused(world):
         campaigns.load(path)
 
 
-def test_the_committed_group_a_file_loads_and_nothing_incomplete_is_sent(world):
+def test_the_committed_group_a_file_loads_and_nothing_incomplete_is_sent(world, monkeypatch):
     entries = campaigns.load("campaigns/group_a.yaml")
     assert [e["to"] for e in entries] == ["stephen@groundworkpm.com", "info@boxleocourier.com",
                                           "pmunyua@kilimoafya.com", "newton@bomahut.com",
                                           "rodgers@vorsagroup.co.ke", "lee@heureuxproperties.co.ke",
-                                          "b.okute@victoria-agribusiness.co.ke", "l.ongondo@victoria-agribusiness.co.ke"]
+                                          "b.okute@victoria-agribusiness.co.ke", "l.ongondo@victoria-agribusiness.co.ke",
+                                          "stanley.munyao@brisk-credit.co.ke", "moses@mywagepay.com",
+                                          "allan.oyier@farmnet.africa", "info@tawifresh.com", "credit@tazugroup.com"]
+    monkeypatch.setattr(config, "GROUP_DAILY_LIMIT", len(entries))                  # all in one run here
     outcome = send(world, "campaigns/group_a.yaml")
     # only complete entries go out (here to a fake mail server); the others wait for their text
     complete = [e["to"] for e in entries if not campaigns.missing(e)]
@@ -167,6 +170,73 @@ def test_someone_the_bot_already_emailed_is_not_sent_again(world):
     lead_id = db.find_lead_by_email("jane1@acme1.co.ke")["id"]
     db.record_sent(lead_id, "<bot@x>", "fintech_A")
     assert send(world, campaign_file(world, [entry(1)])) == {"jane1@acme1.co.ke": "already emailed by LeadBot"}
+
+
+def emailed(company, website, address, campaign=None, on="2026-10-21"):
+    """A lead the bot (or, with campaign, another campaign) has emailed, on that date."""
+    db.add_lead(company, website, "fintech", address, "search")
+    lead_id = db.find_lead_by_email(address)["id"]
+    with db.conn() as c:
+        c.execute("UPDATE leads SET campaign=? WHERE id=?", (campaign, lead_id))
+    db.record_sent(lead_id, f"<{address}>", f"campaign:{campaign}" if campaign else "fintech_A")
+    with db.conn() as c:
+        c.execute("UPDATE sent SET sent_on=? WHERE lead_id=?", (on, lead_id))
+
+
+def test_a_company_the_bot_already_emailed_is_skipped_and_shown_in_the_dry_run(world, capsys):
+    emailed("Acme 1", "https://www.acme1.co.ke/", "info@acme1.co.ke")
+    path = campaign_file(world, [entry(1), entry(2)])
+    expected = "company already emailed by LeadBot (info@acme1.co.ke, 2026-10-21)"
+    assert send(world, path, dry_run=True) == {"jane1@acme1.co.ke": expected, "jane2@acme2.co.ke": "would send"}
+    assert f"jane1@acme1.co.ke: {expected}" in capsys.readouterr().out
+    assert send(world, path) == {"jane1@acme1.co.ke": expected, "jane2@acme2.co.ke": "sent"}
+    assert [m["To"] for m in world["smtp"].sent] == ["jane2@acme2.co.ke"]
+    assert db.find_lead_by_email("jane1@acme1.co.ke") is None
+
+
+def test_the_company_matches_on_the_website_domain_too(world):
+    # the bot wrote to the company's other mail domain, whose lead lists the same website
+    emailed("Acme 1", "acme1.co.ke", "sales@acme1mail.com")
+    assert send(world, campaign_file(world, [entry(1)])) == \
+        {"jane1@acme1.co.ke": "company already emailed by LeadBot (sales@acme1mail.com, 2026-10-21)"}
+    # and the entry's website matches a lead's address even when the entry writes elsewhere
+    emailed("Acme 3", None, "info@acme3.co.ke")
+    outcome = send(world, campaign_file(world, [dict(entry(3), to="jane@acme3-group.com")], name="group_b.yaml"))
+    assert outcome == {"jane@acme3-group.com": "company already emailed by LeadBot (info@acme3.co.ke, 2026-10-21)"}
+
+
+def test_a_company_another_campaign_emailed_is_skipped(world):
+    emailed("Acme 1", "acme1.co.ke", "ceo@acme1.co.ke", campaign="Group A")
+    outcome = send(world, campaign_file(world, [entry(1)], name="group_b.yaml"))
+    assert outcome == {"jane1@acme1.co.ke": "company already emailed by LeadBot (ceo@acme1.co.ke, 2026-10-21)"}
+
+
+def test_this_campaigns_own_leads_at_the_company_dont_block_another_contact(world):
+    path = campaign_file(world, [entry(1)])
+    send(world, path)
+    campaign_file(world, [entry(1), dict(entry(1), to="john@acme1.co.ke", contact_name="John")])
+    assert send(world, path) == {"jane1@acme1.co.ke": "already sent", "john@acme1.co.ke": "sent"}
+
+
+def test_free_mail_domains_never_count_as_a_company(world):
+    emailed("Someone", None, "someone@gmail.com")
+    emailed("Webmail", "gmail.com", "other@yahoo.com")
+    path = campaign_file(world, [dict(entry(1), to="jane@gmail.com", website="")])
+    assert send(world, path) == {"jane@gmail.com": "sent"}
+
+
+def test_allow_same_company_sends_it_anyway(world):
+    emailed("Acme 1", "acme1.co.ke", "info@acme1.co.ke")
+    path = campaign_file(world, [dict(entry(1), allow_same_company=True)])
+    assert campaigns.load(path)[0]["allow_same_company"] is True
+    assert send(world, path, dry_run=True) == {"jane1@acme1.co.ke": "would send"}
+    assert send(world, path) == {"jane1@acme1.co.ke": "sent"}
+
+
+def test_allow_same_company_must_be_true_or_false(world):
+    with pytest.raises(ValueError, match="allow_same_company must be true or false"):
+        campaigns.load(campaign_file(world, [dict(entry(1), allow_same_company="yes please")]))
+    assert campaigns.load(campaign_file(world, [entry(1)]))[0]["allow_same_company"] is False
 
 
 def test_a_refused_address_is_marked_bounced(world):
@@ -296,9 +366,10 @@ def test_the_committed_hold_file_is_refused_by_the_command(world, monkeypatch):
     assert world["smtp"].sent == [] and db.do_not_contact_domains() == set()
 
 
-def test_the_committed_group_a_has_eight_complete_entries():
+def test_the_committed_group_a_has_thirteen_complete_entries():
     entries = campaigns.load("campaigns/group_a.yaml")
-    assert len(entries) == 8 and all(not campaigns.missing(e) for e in entries)
+    assert len(entries) == 13 and all(not campaigns.missing(e) for e in entries)
+    assert not any(e["allow_same_company"] for e in entries)
     with_followup = [e["to"] for e in entries if e["followup_body"].strip()]
     assert with_followup == ["stephen@groundworkpm.com", "info@boxleocourier.com",
                              "pmunyua@kilimoafya.com", "newton@bomahut.com"]
