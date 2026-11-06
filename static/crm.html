@@ -217,6 +217,9 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .personal .eyebrow { display: block; padding: 0; margin-bottom: 2px; }
 .personal p { margin: 0; }
 .personal a { color: var(--primary); }
+.personal ul.contacts { margin: 2px 0 0; padding-left: 18px; }
+.personal ul.contacts li { margin: 2px 0; overflow-wrap: anywhere; }
+.personal .conf-low { opacity: .7; }
 
 /* greeting for sales above the lead list, like the dashboard's */
 .hello { flex: none; padding: 18px 20px 0; background-image: var(--glow); }
@@ -1115,6 +1118,11 @@ function renderDetail() {
   else body.scrollTop = top.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop - 16;
   state.scrolledFor = state.sel; state.scrollEnd = false;
 }
+const CONFIDENCE_HELP = {
+  high: "Their address is on their own card on the company's site",
+  medium: "An address plainly theirs, found elsewhere on the site, in a company PDF or in the site's data",
+  low: "Named on the site, but no address of theirs is published: never emailed",
+};
 // Who LeadBot wrote to and the opener it used, with the sentence on their own site it came from
 function personalHTML(p) {
   if (!p) return "";
@@ -1122,14 +1130,19 @@ function personalHTML(p) {
   const c = p.contact;
   const who = c && p.to_contact ? `<b>${esc(c.name)}</b>, ${esc(c.title)} · ${esc(c.email)}<br><span class="muted">Named on</span>${link(c.url)}`
     : c ? `<b>${esc(c.name)}</b>, ${esc(c.title)} · ${esc(c.email)} <span class="muted">(found, but not used: that address is another lead's or opted out)</span>`
-    : p.checked ? `<span class="muted">Nobody named with their own address on the site, so a role address.</span>`
+    : p.checked ? `<span class="muted">Nobody named with their own address on the site, so a general inbox.</span>`
     : `<span class="muted">Their website hasn't been read for a contact yet.</span>`;
   const op = p.opener ? `“${esc(p.opener)}”<br><span class="muted">From their site:</span> “${esc(p.opener_source)}”${link(p.opener_url)}`
     : `<span class="muted">None${p.opener_note ? ": " + esc(p.opener_note) : ""}.</span>`;
   const sent = p.first_email && p.first_email.with_opener != null
     ? `<p class="muted" style="margin:6px 0 0">First email: ${p.first_email.to_contact ? "to the named contact" : "to a role address"}, ${p.first_email.with_opener ? "with the opener" : "without an opener"}.</p>` : "";
+  // Everyone found on their site, best first: high and medium can be written to, low never is
+  const found = (p.contacts || []).map(f => `<li>${f.name ? `<b>${esc(f.name)}</b>, ${esc(f.title || "")}` : `<b>General inbox</b>`}
+      · ${f.email ? esc(f.email) : `<span class="muted">no published address</span>`}
+      <span class="chip plain conf-${esc(f.confidence)}" title="${esc(CONFIDENCE_HELP[f.confidence] || "")}">${esc(f.confidence)}</span>${f.to ? ` <span class="chip plain">written to</span>` : ""}${link(f.source_url)}</li>`).join("");
+  const list = found ? `<div><span class="eyebrow">Contacts found</span><ul class="contacts">${found}</ul></div>` : "";
   return `<div class="personal"><div><span class="eyebrow">Written to</span><p>${who}${p.previous_email ? `<br><span class="muted">Was ${esc(p.previous_email)} before the website was read</span>` : ""}</p></div>
-    <div><span class="eyebrow">Opener</span><p>${op}</p></div>${sent}</div>`;
+    ${list}<div><span class="eyebrow">Opener</span><p>${op}</p></div>${sent}</div>`;
 }
 // Room under the conversation for the open composer, so the last message can scroll above it
 function padForComposer() {

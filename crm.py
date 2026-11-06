@@ -673,7 +673,11 @@ def lead_detail(lead_id: int, user=Depends(current_user)):
         has_response = _has_response(c, lead_id)
         first = c.execute("SELECT with_opener, to_contact FROM sent WHERE lead_id = ? ORDER BY id LIMIT 1",
                           (lead_id,)).fetchone()
-    lead["personal"] = _personal(row, first)
+        found = [dict(r) for r in c.execute(
+            "SELECT name, title, title_rank, email, email_type, source_url, confidence FROM lead_contacts"
+            " WHERE lead_id = ? ORDER BY title_rank, CASE confidence WHEN 'high' THEN 0 WHEN 'medium' THEN 1"
+            " ELSE 2 END, id", (lead_id,))]
+    lead["personal"] = _personal(row, first, found)
     # bot rows only have a date; put them at the start of that day so order stays sensible
     items.sort(key=lambda x: (x["at"] or "") if "T" in (x["at"] or "") else (x["at"] or "") + "T00:00:00Z")
     lead["owner"] = names.get(lead.get("claimed_by"))
@@ -686,15 +690,19 @@ def lead_detail(lead_id: int, user=Depends(current_user)):
             "has_response": has_response}
 
 
-def _personal(row, first):
+def _personal(row, first, found=()):
     """Who LeadBot wrote to and the opener it used, for the lead page: the named contact found
-    on their website (contacts.py), the opener with the exact sentence and page it is based on
-    (or why there is none), and whether the first email had them."""
+    on their website (contacts.py), every contact found there (lead_contacts: name, title,
+    address, confidence and the page or PDF it came from; "to" marks the one written to), the
+    opener with the exact sentence and page it is based on (or why there is none), and
+    whether the first email had them."""
     lead = dict(row)
+    people = [dict(p, to=bool(p["email"]) and p["email"] == lead.get("email")) for p in found]
     contact = ({k: lead.get(f"contact_{k}") for k in ("name", "title", "email", "url")}
                if lead.get("contact_name") else None)
     usable = lead.get("opener") and lead.get("confidence") == 1 and lead.get("opener_source")
     return {"contact": contact, "to_contact": bool(contact and contact["email"] == lead.get("email")),
+            "contacts": people,
             "checked": bool(lead.get("contact_checked_at")), "previous_email": lead.get("source_email"),
             "opener": lead["opener"] if usable else None,
             "opener_source": lead.get("opener_source") if usable else None,

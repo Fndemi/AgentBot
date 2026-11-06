@@ -231,6 +231,24 @@ CREATE TABLE IF NOT EXISTS bounces (
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS bounces_created ON bounces (created_at);
+-- everyone contacts.py found on a lead's own site (pages, JSON-LD, PDFs): each person with a
+-- title in contacts.TITLES (title_rank 1-4, best first) and each general inbox (title_rank 5+,
+-- sales@ first). email_type: named (plainly theirs), role (a post's inbox: ceo@...) or general
+-- (sales@, info@...). confidence: high (address on their card), medium (plainly theirs, found
+-- elsewhere on the site, in a PDF or JSON-LD) or low (no address of theirs: never emailed)
+CREATE TABLE IF NOT EXISTS lead_contacts (
+    id INTEGER PRIMARY KEY,
+    lead_id INTEGER REFERENCES leads(id),
+    name TEXT,
+    title TEXT,
+    title_rank INTEGER,
+    email TEXT,
+    email_type TEXT,
+    source_url TEXT,
+    confidence TEXT,
+    found_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS lead_contacts_lead ON lead_contacts (lead_id);
 -- one row per lock held: only one send run at a time, across processes
 CREATE TABLE IF NOT EXISTS locks (
     name TEXT PRIMARY KEY,

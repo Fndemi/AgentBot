@@ -1,19 +1,28 @@
 """Who at a lead the first email goes to, read from the lead's own website before it is sent.
+Free sources only: the site's own pages, its sitemap, its JSON-LD and PDFs on its own domain.
+An address is never guessed or put together from a name.
 
-1. A decision-maker: a person named on the site's team, about or leadership page with a
-   title in TITLES (CEO, founder, CTO, head of product, operations, partnerships, marketing
-   or finance), whose exact address is published on the same site. The address must be in
-   the same block of the page as their name and title, or, anywhere else on the site, plainly
-   be theirs (first and last name, or initial and last name, e.g. jane.wanjiru@, jwanjiru@).
-   Their name, title, address and the page are saved on the lead, and the email greets them
-   by first name.
-2. Otherwise the first of ROLE_ORDER published on the site's own domain (sales@ first).
-3. Otherwise the address the lead already has.
+Every person found with a title in TITLES is kept in lead_contacts (save_contacts), each with
+a confidence:
+  high    their address is published on the site's own domain in the same block of the page
+          as their name and title (a team member's card)
+  medium  an address on the site's own domain that plainly is theirs (first and last name, or
+          initial and last name: jane.wanjiru@, jwanjiru@), found elsewhere on the site, in a
+          company PDF (profile, brochure) or given for them in JSON-LD Person data
+  low     their name and title, but no address of theirs published: kept, never emailed
+The general inboxes on the site's own domain (GENERAL_INBOXES) are kept too.
 
-An address is never guessed or put together from a name: only addresses found on the site,
-on its own domain, are ever used. Only leads never emailed are changed, so a thread never
-moves to a new address. The address the lead had before is kept in source_email.
+The first email goes to the highest-ranked person with high or medium confidence (TITLES order,
+then high before medium), otherwise to the best general inbox, otherwise to the address the
+lead already has. A named person is greeted by first name, anyone else "Hello,".
+
+Only leads never emailed are changed, so a thread never moves to a new address. The address
+the lead had before is kept in source_email.
+
+  python main.py contacts [--recent N]   how many leads got a named contact, by title and confidence
 """
+import io
+import json
 import re
 import time
 import unicodedata
@@ -24,24 +33,44 @@ import db
 import ranking
 import scraper
 
-ROLE_ORDER = scraper.ROLE_ORDER  # best first; scraper.pick_best uses the same order
-# In this order of preference when a site names more than one
+ROLE_ORDER = scraper.ROLE_ORDER  # scraper.pick_best's order of role inboxes
+# Decision-makers, best first: (title_rank, group, pattern). Founder, CEO and MD share rank 1.
 TITLES = (
-    ("CEO", r"\bCEO\b|chief executive(?: officer)?|managing director|\bMD\b"),
-    ("Founder", r"\b(?:co-?)?founder\b"),
-    ("CTO", r"\bCTO\b|chief technology officer|chief technical officer"),
-    ("Head of product", r"\b(?:head|director|vp|vice president) of product\b|chief product officer|\bCPO\b|product director"),
-    ("Head of operations", r"\b(?:head|director|vp|vice president) of operations\b|chief operating officer|\bCOO\b|operations director"),
-    ("Head of partnerships", r"\b(?:head|director|vp|vice president) of (?:partnerships|business development)\b|partnerships director"),
-    ("Head of marketing", r"\b(?:head|director|vp|vice president) of marketing\b|chief marketing officer|\bCMO\b|marketing director"),
-    ("Head of finance", r"\b(?:head|director|vp|vice president) of finance\b|chief financial officer|\bCFO\b|finance director"),
+    (1, "Founder/CEO/Managing Director",
+     r"\b(?:co-?)?founder\b|\bCEO\b|chief executive(?: officer)?|managing director|\bMD\b"),
+    (2, "CTO/Head of Technology",
+     r"\bCTO\b|chief technology officer|chief technical officer|technology director|technical director"
+     r"|\b(?:head|director|vp|vice president) of (?:technology|engineering|tech)\b"),
+    (3, "Product Manager/Head of Product",
+     r"\bproduct (?:manager|lead|director|owner)\b|\b(?:head|director|vp|vice president) of product\b"
+     r"|chief product officer|\bCPO\b"),
+    (4, "Operations/Commercial Lead",
+     r"\b(?:head|director|vp|vice president) of (?:operations|commercial)\b|chief (?:operating|commercial) officer"
+     r"|\bCOO\b|\b(?:operations|commercial) (?:director|manager|lead)\b"),
 )
-TITLE_RE = re.compile("|".join(f"(?:{p})" for _, p in TITLES), re.I)
+TITLE_RE = re.compile("|".join(f"(?:{p})" for _, _, p in TITLES), re.I)
+# General inboxes, best first; they rank after every person (title_rank 5 onwards)
+GENERAL_INBOXES = ("sales", "partnerships", "business", "hello", "contact", "info")
+GENERAL_RANK = {name: len(TITLES) + 1 + i for i, name in enumerate(GENERAL_INBOXES)}
+# Other inboxes that are nobody's own address (support@, enquiries@...)
+GENERAL_WORDS = ("info", "enquir", "inquir", "office", "admin", "support", "help", "contact", "hello",
+                 "mail", "customer", "care", "team", "service", "sales", "partnerships", "business")
+CONFIDENCES = ("high", "medium", "low")
 # Pages that may name the team: the address or the link text says so
 PEOPLE_PAGE = re.compile(r"team|about|leader|management|people|who-we-are|founder|board|our-story", re.I)
+CONTACT_PAGE = re.compile(r"contact", re.I)
+# Never read for people: posts and listings ("/blog/property-management-tips" is not a team page)
+SKIP_PAGE = re.compile(r"/(?:blog|news|posts?|articles?|category|categories|tags?|insights|press|media|events"
+                       r"|careers|jobs|vacancies|products?|shop|store|faqs?|help|docs|wp-content|feed)(?:/|$)", re.I)
 PATHS = ("", "/contact", "/contact-us", "/about", "/about-us", "/team", "/our-team", "/leadership",
          "/management", "/people", "/who-we-are", "/about-us/team", "/about/team")
-MAX_PAGES = 12
+MAX_PAGES = 15        # pages and PDFs read per site
+MAX_HTML = 12         # of which web pages at most, leaving room for PDFs
+MAX_TRIES = 30        # addresses asked for per site: a missing page costs a try, not a page
+MAX_SITEMAPS = 3      # sitemaps read from a sitemap index
+MAX_PDF_BYTES = 8_000_000
+PDF_PAGES = 20        # pages of a PDF read
+PDF_HINT = re.compile(r"profile|brochure|company|about|team|leadership|management|board", re.I)
 MAX_BLOCK = 600   # characters: a team member's card, not the whole page
 HONORIFICS = {"dr", "mr", "mrs", "ms", "miss", "prof", "eng", "hon", "cpa", "rev"}
 NOT_NAME_WORDS = {"our", "the", "team", "meet", "about", "chief", "officer", "head", "director", "board",
@@ -49,7 +78,7 @@ NOT_NAME_WORDS = {"our", "the", "team", "meet", "about", "chief", "officer", "he
                   "finance", "partnerships", "limited", "ltd", "kenya", "nairobi", "contact", "us", "email",
                   "phone", "read", "more", "view", "profile", "linkedin", "management", "leadership", "and",
                   "of", "vice", "president", "technology", "company", "group", "plc", "africa", "home",
-                  "ceo", "cto", "coo", "cfo", "cmo", "cpo", "md", "vp"}
+                  "ceo", "cto", "coo", "cfo", "cmo", "cpo", "md", "vp", "manager", "commercial", "lead"}
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 NAME_RE = re.compile(r"\b([A-Z][a-zA-Z'’-]+\.?(?:\s+[A-Z][a-zA-Z'’-]+\.?){1,3})\b")
 
@@ -58,6 +87,17 @@ def fetch(url):
     """One page as parsed HTML, or None (targeting.browser_fetch: as a normal browser)."""
     import targeting
     return targeting.browser_fetch(url)
+
+
+def fetch_raw(url):
+    """A file's bytes (a sitemap, a PDF), or None. Never raises: a site that fails is skipped."""
+    try:
+        r = scraper.get(url, timeout=20)
+    except Exception:
+        return None
+    if r is None or len(r.content) > MAX_PDF_BYTES:
+        return None
+    return r.content
 
 
 def _site(website):
@@ -86,32 +126,117 @@ def page_emails(soup):
     return out
 
 
-def read_site(website):
-    """[(page address, parsed page)]: the homepage, the usual contact, about and team pages,
-    and pages the homepage links to that sound like them. [] if the homepage can't be read."""
+def _host(url):
+    return urlparse(url).netloc.lower().removeprefix("www.")
+
+
+def _links(soup, base, host):
+    """Links on a page to the same site, in page order: (url, link text). A page's address
+    is taken without its query (?intent=demo) or #part, so it is read once."""
+    out = []
+    for a in soup.select("a[href]"):
+        url = urljoin(base, a["href"]).split("#")[0]
+        if not url.lower().split("?")[0].endswith(".pdf"):
+            url = url.split("?")[0]
+        if url.startswith("http") and _host(url) == host:
+            out.append((url, a.get_text(" ")))
+    return out
+
+
+def _people_or_contact_page(url, text=""):
+    """Whether a page sounds like a team, about, leadership or contact page, from its address
+    (its last part) or its link text, and is not a post or a listing (SKIP_PAGE)."""
+    path = urlparse(url).path
+    if SKIP_PAGE.search(path):
+        return False
+    last = path.rstrip("/").rsplit("/", 1)[-1]
+    return bool(PEOPLE_PAGE.search(last) or CONTACT_PAGE.search(last) or (text and PEOPLE_PAGE.search(text)))
+
+
+def sitemap_urls(base, host):
+    """Page and PDF addresses on the site's own domain from its sitemap (and up to
+    MAX_SITEMAPS sitemaps a sitemap index lists). [] if it has none."""
+    data = fetch_raw(urljoin(base, "/sitemap.xml"))
+    if not data:
+        return []
+    locs = re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", data.decode("utf-8", "ignore"))
+    nested = [u for u in locs if u.lower().endswith(".xml")][:MAX_SITEMAPS]
+    for url in nested:
+        more = fetch_raw(url)
+        if more:
+            locs += re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", more.decode("utf-8", "ignore"))
+    return [u for u in dict.fromkeys(locs) if not u.lower().endswith(".xml") and _host(u) == host]
+
+
+def pdf_text(data):
+    """The text of a PDF's first PDF_PAGES pages, or "" if it can't be read."""
+    try:
+        import pdfplumber
+        with pdfplumber.open(io.BytesIO(data)) as pdf:
+            return "\n".join(page.extract_text() or "" for page in pdf.pages[:PDF_PAGES])
+    except Exception:
+        return ""
+
+
+def crawl(website, pdfs=True):
+    """{"pages": [(url, parsed page)], "pdfs": [(url, text)]} from the lead's own site, at most
+    MAX_PAGES in all: the homepage, then the pages it, the other pages and the sitemap link to
+    that sound like a team, about, leadership or contact page, then the usual addresses of
+    those, then PDFs on the site's own domain (a company profile or brochure first).
+    Nothing if the homepage can't be read."""
     base = _site(website)
+    host = _host(base)
     home = fetch(base)
     if home is None:
-        return []
-    urls = [urljoin(base, p) for p in PATHS[1:]]
-    host = urlparse(base).netloc.removeprefix("www.")
-    for a in home.select("a[href]"):
-        url = urljoin(base, a["href"]).split("#")[0]
-        if urlparse(url).netloc.removeprefix("www.") == host and (
-                PEOPLE_PAGE.search(urlparse(url).path) or PEOPLE_PAGE.search(a.get_text(" "))):
-            urls.append(url)
-    pages, seen = [(base, home)], {base.rstrip("/")}
-    for url in urls:
-        if len(pages) >= MAX_PAGES:
+        return {"pages": [], "pdfs": []}
+    pages, seen, tries = [(base, home)], {base.rstrip("/")}, 1
+    texts = {" ".join(home.get_text(" ").split())}  # some sites answer every address with the same page
+    linked, pdf_links = [], []
+
+    def note_links(soup, url):
+        for link, text in _links(soup, url, host):
+            if link.lower().split("?")[0].endswith(".pdf"):
+                pdf_links.append(link)
+            elif _people_or_contact_page(link, text):
+                linked.append(link)
+
+    note_links(home, base)
+    mapped = sitemap_urls(base, host)
+    tries += 1
+    pdf_links += [u for u in mapped if u.lower().split("?")[0].endswith(".pdf")]
+    mapped = [u for u in mapped if not u.lower().split("?")[0].endswith(".pdf") and _people_or_contact_page(u)]
+    guesses = [urljoin(base, p) for p in PATHS[1:]]
+    while len(pages) < MAX_HTML and tries < MAX_TRIES:
+        url = next((u for u in linked + mapped + guesses if u.rstrip("/") not in seen), None)
+        if url is None:
             break
-        if url.rstrip("/") in seen:
-            continue
         seen.add(url.rstrip("/"))
+        tries += 1
         soup = fetch(url)
-        if soup is not None:
+        text = " ".join(soup.get_text(" ").split()) if soup is not None else None
+        if soup is not None and text not in texts:
+            texts.add(text)
             pages.append((url, soup))
+            note_links(soup, url)
         time.sleep(0.5)  # be polite
-    return pages
+    found_pdfs = []
+    if pdfs:
+        ordered = sorted(dict.fromkeys(pdf_links), key=lambda u: not PDF_HINT.search(urlparse(u).path))
+        for url in ordered:
+            if len(pages) + len(found_pdfs) >= MAX_PAGES or tries >= MAX_TRIES:
+                break
+            tries += 1
+            data = fetch_raw(url)
+            text = pdf_text(data) if data and data[:5] == b"%PDF-" else ""
+            if text.strip():
+                found_pdfs.append((url, text))
+    return {"pages": pages, "pdfs": found_pdfs}
+
+
+def read_site(website):
+    """[(page address, parsed page)]: the site's pages crawl reads, without its PDFs.
+    [] if the homepage can't be read."""
+    return crawl(website, pdfs=False)["pages"]
 
 
 def _ascii(text):
@@ -121,7 +246,19 @@ def _ascii(text):
 def is_role(local):
     """Whether an address's local part is an inbox, not a person (sales, info, ceo...)."""
     import targeting
-    return local.startswith(targeting.ROLE_WORDS) or local in ROLE_ORDER
+    return local.startswith(targeting.ROLE_WORDS) or local in ROLE_ORDER or local in GENERAL_INBOXES
+
+
+def email_type(email, name=None):
+    """"named" (plainly this person's), "general" (an inbox anyone may read: sales@, info@,
+    support@...), "role" (a post's own inbox: ceo@, md@, operations@...) or None (another
+    person's address)."""
+    local = email.split("@")[0].lower()
+    if name and belongs(email, name, strict=False):
+        return "named"
+    if local in GENERAL_INBOXES or local.startswith(GENERAL_WORDS):
+        return "general"
+    return "role" if is_role(local) else None
 
 
 def name_words(name):
@@ -191,44 +328,153 @@ def people(url, soup, company=""):
     return out
 
 
-def _rank(title):
-    return next((i for i, (_, p) in enumerate(TITLES) if re.search(p, title, re.I)), len(TITLES))
+def pdf_people(url, text, company=""):
+    """[(name, title, pdf address)] for each decision-maker a PDF names: a title on a short
+    line, with the name on the same line or the line before or after it."""
+    out = []
+    lines = [" ".join(line.split()) for line in text.splitlines()]
+    for i, line in enumerate(lines):
+        m = TITLE_RE.search(line)
+        if not m or len(line) > 120:
+            continue
+        rest = (line[:m.start()] + " " + line[m.end():]).strip(" ,–—-|:")
+        names = [n for n in NAME_RE.findall(rest) if looks_like_name(n, company)]
+        names += [n for n in (lines[i - 1] if i else "", lines[i + 1] if i + 1 < len(lines) else "")
+                  if looks_like_name(n, company)]
+        if names:
+            out.append((names[0], m.group(0), url))
+    return out
+
+
+# JSON-LD keys whose values are people, and the title each implies ("" = their own jobTitle)
+PEOPLE_KEYS = {"founder": "Founder", "founders": "Founder", "employee": "", "employees": "", "member": ""}
+
+
+def ld_people(url, soup):
+    """[(name, title, page, email or None)] for each person in the page's JSON-LD: Person
+    objects anywhere, and an organisation's founder(s), employees and members."""
+    out = []
+
+    def walk(obj, slot=None):
+        if isinstance(obj, list):
+            for item in obj:
+                walk(item, slot)
+            return
+        if not isinstance(obj, dict):
+            return
+        kinds = obj.get("@type") if isinstance(obj.get("@type"), list) else [obj.get("@type")]
+        if obj.get("name") and ("Person" in kinds or (slot is not None and not any(kinds))):
+            email = str(obj.get("email") or "").removeprefix("mailto:").strip().lower() or None
+            out.append((" ".join(str(obj["name"]).split()), str(obj.get("jobTitle") or slot or ""), url, email))
+        for key, value in obj.items():
+            walk(value, PEOPLE_KEYS.get(key))
+
+    for script in soup.select('script[type="application/ld+json"]'):
+        try:
+            walk(json.loads(script.string or script.get_text() or ""))
+        except ValueError:
+            continue
+    return out
+
+
+def title_rank(title):
+    """1-4 for a title in TITLES (best first), None for any other."""
+    return next((rank for rank, _, p in TITLES if re.search(p, title or "", re.I)), None)
+
+
+def title_group(rank):
+    return next((group for r, group, _ in TITLES if r == rank), "other")
 
 
 def find(website, company=""):
     """What the site says about who to write to:
-    {"emails": [addresses on its own domain], "role": the best role address or None,
-     "contact": {"name", "title", "email", "url"} or None}."""
+    {"emails": [addresses on its own domain, as found],
+     "role": the best general inbox (GENERAL_INBOXES order) or None,
+     "contact": {"name", "title", "email", "url"} of the person to write to, or None,
+     "people": every person found: {"name", "title", "title_rank", "email", "email_type",
+               "url", "confidence"}, best first,
+     "inboxes": [(general inbox, page it is on)] in GENERAL_INBOXES order}."""
     domain = ranking.urlparse_domain(website)
-    pages = read_site(website)
-    emails = []
-    for _, soup in pages:
+    site = crawl(website)
+    own = lambda e: e.endswith("@" + domain) and not scraper.placeholder(e)
+    emails, where = [], {}
+    for url, soup in site["pages"]:
         for e in page_emails(soup):
-            if e.endswith("@" + domain) and e not in emails:
+            if own(e) and e not in emails:
                 emails.append(e)
-    role = next((f"{r}@{domain}" for r in ROLE_ORDER if f"{r}@{domain}" in emails), None)
+                where[e] = url
+    for url, text in site["pdfs"]:
+        for e in EMAIL_RE.findall(text):
+            e = e.lower().strip(".")
+            if own(e) and e not in emails:
+                emails.append(e)
+                where[e] = url
+
+    def plainly_theirs(name, extra=()):
+        return next((e for e in list(extra) + emails if own(e) and belongs(e, name, strict=True)), None)
+
     found = []
-    for url, soup in pages:
-        if url.rstrip("/") == _site(website).rstrip("/") or not PEOPLE_PAGE.search(
+    home = _site(website).rstrip("/")
+    for url, soup in site["pages"]:
+        if url.rstrip("/") != home and PEOPLE_PAGE.search(
                 urlparse(url).path + " " + (soup.title.get_text(" ") if soup.title else "")):
-            continue  # names only count on a team, about or leadership page
-        for name, title, page, near in people(url, soup, company):
-            near = [e for e in near if e.endswith("@" + domain) and not is_role(e.split("@")[0])]
-            email = (next((e for e in near if belongs(e, name, strict=False)), None)
-                     or next((e for e in emails if not is_role(e.split("@")[0]) and belongs(e, name, strict=True)), None))
-            if email:
-                found.append({"name": " ".join(name.split()), "title": title, "email": email, "url": page})
-    found.sort(key=lambda p: _rank(p["title"]))
-    return {"emails": emails, "role": role, "contact": found[0] if found else None}
+            for name, title, page, near in people(url, soup, company):
+                near = [e for e in near if own(e) and email_type(e, name) in ("named", "role")]
+                if near:
+                    found.append((name, title, page, near[0], "high"))
+                else:
+                    found.append((name, title, page, plainly_theirs(name), None))
+        for name, title, page, email in ld_people(url, soup):
+            if title_rank(title) and looks_like_name(name, company):
+                found.append((name, title, page, plainly_theirs(name, [email] if email else []), None))
+    for url, text in site["pdfs"]:
+        for name, title, page in pdf_people(url, text, company):
+            found.append((name, title, page, plainly_theirs(name), None))
+
+    best = {}
+    for order, (name, title, page, email, confidence) in enumerate(found):
+        confidence = confidence or ("medium" if email else "low")
+        rank = title_rank(title)
+        if not rank:
+            continue
+        person = {"name": " ".join(name.split()), "title": title, "title_rank": rank,
+                  "email": email if confidence != "low" else None,
+                  "email_type": email_type(email, name) if email and confidence != "low" else None,
+                  "url": page, "confidence": confidence, "order": order}
+        key = " ".join(w.lower() for w in name_words(name))
+        old = best.get(key)
+        if old is None or (CONFIDENCES.index(confidence), rank) < (CONFIDENCES.index(old["confidence"]), old["title_rank"]):
+            best[key] = person
+    ranked = sorted(best.values(), key=lambda p: (p["title_rank"], CONFIDENCES.index(p["confidence"]), p["order"]))
+    for p in ranked:
+        del p["order"]
+    to = next((p for p in ranked if p["confidence"] in ("high", "medium")), None)
+    inboxes = [(f"{g}@{domain}", where[f"{g}@{domain}"]) for g in GENERAL_INBOXES if f"{g}@{domain}" in where]
+    return {"emails": emails, "role": inboxes[0][0] if inboxes else None,
+            "contact": {k: to[k] for k in ("name", "title", "email", "url")} if to else None,
+            "people": ranked, "inboxes": inboxes}
 
 
 def choose(lead, result):
-    """(address to use, why) for a lead, from find()'s result."""
+    """(address to use, why) for a lead, from find()'s result: the best person with high or
+    medium confidence, else the best general inbox, else the address it has."""
     if result["contact"]:
         return result["contact"]["email"], "named contact"
     if result["role"]:
-        return result["role"], "role address"
-    return lead["email"], "kept (no contact or role address on the site)"
+        return result["role"], "general inbox"
+    return lead["email"], "kept (no named contact or general inbox on the site)"
+
+
+def save_contacts(c, lead_id, result):
+    """Keep every person and general inbox find() found for the lead, in place of any kept before."""
+    c.execute("DELETE FROM lead_contacts WHERE lead_id=?", (lead_id,))
+    rows = [(p["name"], p["title"], p["title_rank"], p["email"], p["email_type"], p["url"], p["confidence"])
+            for p in result.get("people", [])]
+    rows += [(None, None, GENERAL_RANK[email.split("@")[0]], email, "general", page, "high")
+             for email, page in result.get("inboxes", [])]
+    for row in rows:
+        c.execute("INSERT INTO lead_contacts (lead_id, name, title, title_rank, email, email_type, source_url,"
+                  " confidence) VALUES (?,?,?,?,?,?,?,?)", (lead_id, *row))
 
 
 def run(leads):
@@ -246,10 +492,11 @@ def run(leads):
             result = find(lead["website"], lead.get("company") or "")
         except Exception as e:  # one broken site never stops the day's sending
             print(f"  {lead['company']}: couldn't read {lead['website']} for contacts ({e})")
-            result = {"emails": [], "role": None, "contact": None}
+            result = {"emails": [], "role": None, "contact": None, "people": [], "inboxes": []}
         new, why = choose(lead, result)
         contact = result["contact"]
         with db.conn() as c:
+            save_contacts(c, lead["id"], result)
             if new != lead["email"] and c.execute(
                     "SELECT 1 FROM leads WHERE email=? AND id<>? UNION SELECT 1 FROM suppression WHERE email=?",
                     (new, lead["id"], new)).fetchone():
@@ -354,3 +601,43 @@ def recheck_addresses(leads, today=None):
             print(f"  {lead['company']}: {lead['email']} is no longer on {lead['website']}; not emailed")
             counts["gone"] += 1
     return counts
+
+
+# --- python main.py contacts [--recent N] ---
+
+def summary(recent=None):
+    """How many leads whose website was read got a named contact, by title and confidence.
+    recent: only the N leads read most recently. Test leads (source 'manual') are left out."""
+    with db.conn() as c:
+        leads = c.execute(f"SELECT id, email, contact_name, contact_email FROM leads"
+                          f" WHERE contact_checked_at IS NOT NULL AND {db.real()}"
+                          " ORDER BY contact_checked_at DESC, id DESC" + (" LIMIT ?" if recent else ""),
+                          (recent,) if recent else ()).fetchall()
+        ids = {l["id"] for l in leads}
+        found = [r for r in c.execute("SELECT lead_id, title_rank, confidence FROM lead_contacts"
+                                      " WHERE name IS NOT NULL") if r["lead_id"] in ids]
+    n = len(leads)
+    lines = [f"Leads whose website was read for contacts: {n}" + (f" (the {recent} read most recently)" if recent else "")]
+    if not n:
+        return lines
+    pct = lambda k: f"{k} ({100 * k / n:.0f}%)"
+    named = {r["lead_id"] for r in found if r["confidence"] in ("high", "medium")}
+    only_low = {r["lead_id"] for r in found} - named
+    to_person = sum(1 for l in leads if l["contact_name"] and l["contact_email"] == l["email"])
+    to_general = sum(1 for l in leads if not (l["contact_name"] and l["contact_email"] == l["email"])
+                     and email_type(l["email"] or "") == "general")
+    lines += [f"With a named contact to write to (high or medium confidence): {pct(len(named))}",
+              f"Named on the site but no address of theirs published (low only): {pct(len(only_low))}",
+              f"First email goes to: a named person {to_person}, a general inbox {to_general}, "
+              f"the address it came with {n - to_person - to_general}",
+              "", f"{'BY TITLE':32}  {'LEADS':>5}  {'HIGH':>4}  {'MEDIUM':>6}  {'LOW':>4}"]
+    for rank, group, _ in TITLES:
+        cell = lambda conf: len({r["lead_id"] for r in found if r["title_rank"] == rank
+                                 and (conf is None or r["confidence"] == conf)})
+        lines.append(f"  {group:30}  {cell(None):>5}  {cell('high'):>4}  {cell('medium'):>6}  {cell('low'):>4}")
+    lines.append("(a lead counts once in each column it has someone for)")
+    return lines
+
+
+def report(recent=None):
+    print("\n".join(summary(recent)))

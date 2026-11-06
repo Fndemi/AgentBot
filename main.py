@@ -22,6 +22,7 @@
   python main.py prepare                 get waiting leads ready for their first email (score, niche, contact, opener)
   python main.py send-group FILE [--dry-run]   a named-contact campaign: check addresses, send entries not sent yet
   python main.py stats                   counts by status and reply label
+  python main.py contacts [--recent N]   how many leads got a named contact, by title and confidence
   python main.py bounces [days]          bounces in the last N days (default 30): by email type, lead source, step; top reasons
   python main.py unsubscribe a@b.com     manually opt someone out
   python main.py export [folder]         write leads.csv, events.csv and replies.csv (joined on lead_id)
@@ -130,6 +131,12 @@ def main():
     elif cmd == "watch":
         import inbox
         inbox.watch()
+    elif cmd == "contacts":
+        import contacts
+        recent = take_number(args, "--recent")
+        if args:
+            sys.exit("Usage: python main.py contacts [--recent N]")
+        contacts.report(recent)
     elif cmd == "bounces":
         import bounces
         if args and not args[0].isdigit():
