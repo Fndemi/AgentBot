@@ -771,13 +771,14 @@ def prepared(lead):
     niche checked (nichefit.py), its site read for a contact (contacts.py; nothing to read
     without a website), with USE_AI_OPENER its opening line tried (personalise.py), and for
     a lead found more than contacts.RECHECK_AFTER_DAYS ago, its address seen on its website
-    again within contacts.RECHECK_VALID_DAYS. The prepare job (prepare.py) does all that,
-    never the send."""
+    again within contacts.RECHECK_VALID_DAYS, and for a lead from an imported list (a CBK
+    directory), its address settled against its website (contacts.settle_listed). The
+    prepare job (prepare.py) does all that, never the send."""
     lead = dict(lead)
     return (targeting.scored(lead) and not nichefit.needs_check(lead)
             and bool(lead.get("contact_checked_at") or not lead.get("website"))
             and (not config.USE_AI_OPENER or lead.get("confidence") is not None)
-            and not contacts.needs_address_check(lead))
+            and not contacts.needs_address_check(lead) and not contacts.needs_list_check(lead))
 
 
 def plan(dry_run=False, quiet=False):

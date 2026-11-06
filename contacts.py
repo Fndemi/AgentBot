@@ -187,6 +187,10 @@ def crawl(website, pdfs=True):
     base = _site(website)
     host = _host(base)
     home = fetch(base)
+    if home is None and base.startswith("https://"):
+        # many small sites have a broken certificate but load over plain http
+        base = "http://" + base.removeprefix("https://")
+        home = fetch(base)
     if home is None:
         return {"pages": [], "pdfs": []}
     pages, seen, tries = [(base, home)], {base.rstrip("/")}, 1
@@ -450,7 +454,7 @@ def find(website, company=""):
         del p["order"]
     to = next((p for p in ranked if p["confidence"] in ("high", "medium")), None)
     inboxes = [(f"{g}@{domain}", where[f"{g}@{domain}"]) for g in GENERAL_INBOXES if f"{g}@{domain}" in where]
-    return {"read": bool(site["pages"]), "emails": emails, "role": inboxes[0][0] if inboxes else None,
+    return {"read": bool(site["pages"]), "emails": emails, "where": where, "role": inboxes[0][0] if inboxes else None,
             "contact": {k: to[k] for k in ("name", "title", "email", "url")} if to else None,
             "people": ranked, "inboxes": inboxes}
 
@@ -477,17 +481,27 @@ def save_contacts(c, lead_id, result):
                   " confidence) VALUES (?,?,?,?,?,?,?,?)", (lead_id, *row))
 
 
-def run(leads, again=False):
+def run(leads, again=False, outcomes=None):
     """Read the websites of leads never emailed and not read yet: save the named contact, if
     any, and switch the lead to the address choose() picks. Returns how many sites were read.
     A site that can't be read leaves the lead as it is, and it isn't tried again.
     again=True (reread): read them even if they were read before; a site that can't be read
-    then leaves the lead exactly as it was, contact and all, to be tried at the next reread."""
+    then leaves the lead exactly as it was, contact and all, to be tried at the next reread.
+    A lead from an imported list (from_list) not settled yet is read whatever else, and its
+    address settled by settle_listed; `outcomes` (a Counter), if given, counts what happened."""
     read = 0
     emailed = db.emailed_lead_ids()
     for lead in leads:
         lead = dict(lead)
-        if (lead.get("contact_checked_at") and not again) or lead["id"] in emailed or not lead.get("website"):
+        listed = needs_list_check(lead)
+        if lead["id"] in emailed or (lead.get("contact_checked_at") and not again and not listed):
+            continue
+        if listed and not lead.get("website"):
+            outcome = settle_listed(lead, None)
+            if outcomes is not None:
+                outcomes[outcome] += 1
+            continue
+        if not lead.get("website"):
             continue
         read += 1
         try:
@@ -495,6 +509,11 @@ def run(leads, again=False):
         except Exception as e:  # one broken site never stops the day's sending
             print(f"  {lead['company']}: couldn't read {lead['website']} for contacts ({e})")
             result = {"read": False, "emails": [], "role": None, "contact": None, "people": [], "inboxes": []}
+        if listed:
+            outcome = settle_listed(lead, result)
+            if outcomes is not None:
+                outcomes[outcome] += 1
+            continue
         if again and not result.get("read", True):
             print(f"  {lead['company']}: couldn't read {lead['website']}; left as it was")
             continue
@@ -570,6 +589,8 @@ def address_from_site(lead):
     'search'), or put in place of the address it came with (source_email). An address from a
     regulator's directory or a list was never said to be on the site."""
     lead = dict(lead)
+    if lead.get("address_source"):  # settled for an imported lead (settle_listed)
+        return lead["address_source"] == "site"
     return lead.get("source") == "search" or bool(lead.get("source_email"))
 
 
@@ -676,3 +697,157 @@ def summary(recent=None):
 
 def report(recent=None):
     print("\n".join(summary(recent)))
+
+
+# --- Leads from an imported list (CBK directories, a CSV): an address published today ---
+# The list's address is not trusted. Before the first email the lender's own website is read
+# and an address it publishes today is used: a named person only at high confidence, otherwise
+# the best general inbox (ROLE_ORDER first, then any other inbox anyone may read). If the site
+# publishes none, the list's address is kept only if it is on the site's own domain and its mail
+# server answers; otherwise the lead is excluded as "no current address". A site that can't be
+# read is tried again at MAX_LIST_TRIES checks before the list's address is judged on its own;
+# a DNS lookup that can't say (a timeout) is tried again too. Nothing is ever guessed.
+MAX_LIST_TRIES = 3
+NO_CURRENT_ADDRESS = "no current address"
+
+
+def from_list(lead):
+    """Whether the lead's address came from an imported list (a regulator's directory, a CSV)."""
+    lead = dict(lead)
+    return bool(lead.get("imported_at")) or lead.get("source") == "csv"
+
+
+def needs_list_check(lead):
+    """Whether an imported lead's address hasn't been settled against its website yet."""
+    lead = dict(lead)
+    return from_list(lead) and not lead.get("address_source")
+
+
+def list_address(lead):
+    """The address the list gave (kept in source_email once an address replaced it)."""
+    lead = dict(lead)
+    return (lead.get("source_email") or lead.get("email") or "").lower().strip()
+
+
+def site_candidates(result):
+    """[(address, why, page, person or None)] the site publishes today, best first: people at
+    high confidence (title order), then ROLE_ORDER inboxes, then any other inbox (not a
+    person's own address)."""
+    out = [(p["email"], f"named contact ({p['title']})", p["url"], p)
+           for p in result.get("people", []) if p["confidence"] == "high" and p["email"]]
+    emails = result.get("emails", [])
+    pages = {**dict(result.get("inboxes", [])), **result.get("where", {})}
+    for role in ROLE_ORDER:
+        out += [(e, f"{role}@ published on the site", pages.get(e), None) for e in emails if e.split("@")[0] == role]
+    # then any other inbox it publishes (enquiries@, loans@...): never a person's own address
+    out += [(e, "an inbox published on the site", pages.get(e), None) for e in sorted(emails)
+            if e.split("@")[0] not in ROLE_ORDER and email_type(e) in ("general", "role")]
+    seen, unique = set(), []
+    for c in out:
+        if c[0] not in seen:
+            seen.add(c[0])
+            unique.append(c)
+    return unique
+
+
+def settle_listed(lead, result):
+    """Settle an imported lead's address from find()'s result (None: it has no website).
+    Returns "changed" (now an address the site publishes, or back to the list's), "kept"
+    (the same address, found on the site or kept by the list rule), "skipped" (no current
+    address: excluded, never emailed) or "waiting" (site or DNS didn't answer; tried again)."""
+    import verify
+    lead = dict(lead)
+    lead_id, before = lead["id"], (lead.get("email") or "").lower()
+    if result is not None and not result.get("read", True):
+        tries = (lead.get("address_tries") or 0) + 1
+        with db.conn() as c:
+            c.execute("UPDATE leads SET address_tries=? WHERE id=?", (tries, lead_id))
+        if tries < MAX_LIST_TRIES:
+            return "waiting"
+    if result is not None and result.get("read", True):
+        with db.conn() as c:
+            save_contacts(c, lead_id, result)
+        for email, why, page, person in site_candidates(result):
+            with db.conn() as c:
+                taken = c.execute("SELECT 1 FROM leads WHERE email=? AND id<>? UNION SELECT 1 FROM suppression"
+                                  " WHERE email=?", (email, lead_id, email)).fetchone()
+            if taken:
+                continue
+            answers = verify.mail_answers(db.email_domain(email))
+            if answers is None:
+                return "waiting"
+            if answers:
+                _use(lead, email, "site", why, page, person)
+                return "kept" if email == before else "changed"
+    # The site publishes no address that can be used: judge the list's own
+    listed, site = list_address(lead), db.email_domain(lead.get("website") or "")
+    domain = db.email_domain(listed)
+    if not site:
+        return _no_address(lead, "no website to check the list's address against")
+    if not domain or not (domain == site or domain.endswith("." + site)):
+        return _no_address(lead, f"the site publishes no address and the list's ({listed}) isn't on {site}")
+    answers = verify.mail_answers(domain)
+    if answers is None:
+        return "waiting"
+    if not answers:
+        return _no_address(lead, f"the site publishes no address and {domain}'s mail server doesn't answer")
+    _use(lead, listed, "list", "the list's address: on the site's domain, and its mail server answers", None, None)
+    return "kept" if listed == before else "changed"
+
+
+def _use(lead, email, source, why, page, person):
+    """Write the settled address on the lead, with the named contact if it is one."""
+    with db.conn() as c:
+        c.execute("UPDATE leads SET contact_name=?, contact_title=?, contact_email=?, contact_url=?,"
+                  " contact_checked_at=CURRENT_TIMESTAMP, address_source=?, address_page=?,"
+                  " address_checked_at=CASE WHEN ? = 'site' THEN CURRENT_TIMESTAMP ELSE address_checked_at END"
+                  " WHERE id=?",
+                  (person and person["name"], person and person["title"], person and person["email"],
+                   person and person["url"], source, page, source, lead["id"]))
+        if email != (lead.get("email") or "").lower():
+            c.execute("UPDATE leads SET source_email=COALESCE(source_email, email), email=? WHERE id=?",
+                      (email, lead["id"]))
+            db.log_event(c, lead["id"], "email_changed", old=lead.get("email"), new=email, why=why, by="list check")
+            print(f"  {lead.get('company')}: {lead.get('email')} -> {email} ({why})")
+        db.log_event(c, lead["id"], "list_address_settled", address=email, source=source, why=why)
+    if lead.get("status") in ("new", "invalid"):  # its address is a working one now
+        db.set_status(lead["id"], "verified", "list check")
+
+
+def _no_address(lead, why):
+    db.exclude(lead["id"], f"{NO_CURRENT_ADDRESS}: {why}", by="list check")
+    print(f"  {lead.get('company')}: {NO_CURRENT_ADDRESS} ({why}); not emailed")
+    return "skipped"
+
+
+def listed_to_check():
+    """Leads from an imported list never emailed whose address isn't settled yet, best need
+    score first: verified, new or invalid (a dead list address may have a live one on the site),
+    not suppressed, not left to a CRM user or a campaign."""
+    emailed = db.emailed_lead_ids()
+    suppressed = db.suppressed_emails()
+    with db.conn() as c:
+        rows = c.execute("SELECT * FROM leads WHERE status IN ('new', 'verified', 'invalid')"
+                         " AND crm_emailed_at IS NULL AND campaign IS NULL AND address_source IS NULL"
+                         " ORDER BY COALESCE(score, -1) DESC, id").fetchall()
+    return [r for r in rows if from_list(r) and r["id"] not in emailed
+            and (r["email"] or "").lower() not in suppressed]
+
+
+def check_listed(limit=None):
+    """Settle the address of every imported lead listed_to_check (the first `limit`), reading
+    each one's website. Prints and returns {"changed", "kept", "skipped", "waiting": n}."""
+    from collections import Counter
+    todo = listed_to_check()
+    total = len(todo)
+    todo = todo[:limit] if limit else todo
+    print(f"{total} leads from imported lists not emailed yet and not checked" +
+          (f"; checking {len(todo)}" if limit and limit < total else ""))
+    outcomes = Counter()
+    for i, lead in enumerate(todo, 1):
+        print(f"[{i}/{len(todo)}] {lead['company']} ({lead['website'] or 'no website'})", flush=True)
+        run([lead], outcomes=outcomes)
+    counts = {k: outcomes[k] for k in ("changed", "kept", "skipped", "waiting")}
+    print(f"Changed {counts['changed']}, kept {counts['kept']}, skipped {counts['skipped']} "
+          f"({NO_CURRENT_ADDRESS}), waiting {counts['waiting']} (site or DNS didn't answer; tried again later).")
+    return counts

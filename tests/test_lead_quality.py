@@ -226,9 +226,13 @@ def test_a_lead_with_no_website_keeps_its_niche_at_once(sending):
 
 
 def test_directory_leads_are_not_checked(sending):
+    """The directory says what they are. (Its address is settled against the lender's own site
+    first, contacts.settle_listed: here already, so only the niche check is in question. A
+    directory lead on gmail.com with no website gets no email at all: test_list_addresses.)"""
     _, _, asked = sending
-    lead_id = add("loans@gmail.com", "Quick Cash", "digital_lender", source="CBK DCP directory", website="")
+    lead_id = add("loans@quickcash.co.ke", "Quick Cash", "digital_lender", source="CBK DCP directory",
+                  website="quickcash.co.ke")
     with db.conn() as c:
-        c.execute("UPDATE leads SET imported_at=CURRENT_TIMESTAMP WHERE id=?", (lead_id,))
-    assert planned() == {"loans@gmail.com": "digital_lender"} and asked == []
+        c.execute("UPDATE leads SET imported_at=CURRENT_TIMESTAMP, address_source='list' WHERE id=?", (lead_id,))
+    assert planned() == {"loans@quickcash.co.ke": "digital_lender"} and asked == []
     assert "digital_lender" in nichefit.approved_niches() and "school" in personalise.USES

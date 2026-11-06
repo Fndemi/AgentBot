@@ -196,7 +196,16 @@ def test_at_most_15_pages_a_site(world, monkeypatch):
 def test_an_unreadable_homepage_reads_nothing_else(world, monkeypatch):
     asked = website(monkeypatch, {"/team": team(("Jane Wanjiru", "CEO", "jane@acme.co.ke"))})
     assert contacts.crawl(SITE) == {"pages": [], "pdfs": []}
-    assert asked == [SITE]
+    assert asked == [SITE, "http://acme.co.ke"]          # https, then plain http
+
+
+def test_a_site_with_a_broken_certificate_is_read_over_http(world, monkeypatch):
+    pages = {"http://acme.co.ke": HOME, "http://acme.co.ke/team": team(("Jane Wanjiru", "CEO", "jane@acme.co.ke"))}
+    monkeypatch.setattr(contacts, "fetch", lambda url: BeautifulSoup(pages[url.rstrip("/")], "html.parser")
+                        if url.rstrip("/") in pages else None)
+    found = contacts.find(SITE, "Acme")
+    assert found["contact"] == {"name": "Jane Wanjiru", "title": "CEO", "email": "jane@acme.co.ke",
+                                "url": "http://acme.co.ke/team"}
 
 
 # --- Saved on the lead, and the email ---

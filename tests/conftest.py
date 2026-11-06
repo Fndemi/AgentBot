@@ -72,6 +72,8 @@ def no_need_scores(monkeypatch):
     import contacts
     monkeypatch.setattr(contacts, "fetch", lambda url: None)  # no site can be read for contacts
     monkeypatch.setattr(contacts, "fetch_raw", lambda url: None)  # nor its sitemap or PDFs
+    import verify  # no real DNS: a test that needs a mail server's answer says what it is
+    monkeypatch.setattr(verify, "mail_answers", lambda domain: pytest.fail(f"a test looked up {domain}'s mail server"))
 
 
 @pytest.fixture(autouse=True)

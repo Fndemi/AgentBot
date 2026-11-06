@@ -110,7 +110,13 @@ CREATE TABLE IF NOT EXISTS leads (
     -- website has the site read again before its first email: when that was, and the page
     -- that still shows the address (contacts.recheck_addresses)
     address_checked_at TEXT,
-    address_page TEXT
+    address_page TEXT,
+    -- a lead from an imported list (contacts.settle_listed): where its address was settled from,
+    -- 'site' (published on its website today) or 'list' (the list's, on the site's domain with a
+    -- mail server that answers); NULL = not settled yet. address_tries: checks its site couldn't
+    -- be read at
+    address_source TEXT,
+    address_tries INTEGER
 );
 CREATE TABLE IF NOT EXISTS sent (
     id INTEGER PRIMARY KEY,
@@ -436,7 +442,8 @@ def init():
                                  ("leads", "display_name", "TEXT"), ("leads", "name_source", "TEXT"),
                                  ("leads", "name_version", "INTEGER"), ("leads", "niche_tries", "INTEGER"),
                                  ("leads", "campaign", "TEXT"), ("leads", "campaign_followup", "TEXT"),
-                                 ("leads", "address_checked_at", "TEXT"), ("leads", "address_page", "TEXT")):
+                                 ("leads", "address_checked_at", "TEXT"), ("leads", "address_page", "TEXT"),
+                                 ("leads", "address_source", "TEXT"), ("leads", "address_tries", "INTEGER")):
             if col not in columns(c, table):
                 c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {kind}")
         # Leads from before these existed

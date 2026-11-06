@@ -24,6 +24,7 @@
   python main.py stats                   counts by status and reply label
   python main.py contacts [--recent N]   how many leads got a named contact, by title and confidence
   python main.py contacts --reread [--limit N]   read waiting leads' sites again for contacts (best first; resumable)
+  python main.py list-addresses [--limit N]   imported leads (CBK...): use an address their site publishes today
   python main.py bounces [days]          bounces in the last N days (default 30): by email type, lead source, step; top reasons
   python main.py unsubscribe a@b.com     manually opt someone out
   python main.py export [folder]         write leads.csv, events.csv and replies.csv (joined on lead_id)
@@ -145,6 +146,12 @@ def main():
             contacts.reread(limit)
         else:
             contacts.report(recent)
+    elif cmd == "list-addresses":
+        import contacts
+        limit = take_number(args, "--limit")
+        if args:
+            sys.exit("Usage: python main.py list-addresses [--limit N]")
+        contacts.check_listed(limit)
     elif cmd == "bounces":
         import bounces
         if args and not args[0].isdigit():

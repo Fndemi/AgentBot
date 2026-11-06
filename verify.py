@@ -36,3 +36,25 @@ def run():
             bad += 1
             print(f"  invalid: {email}")
     print(f"Verified {good}, rejected {bad}.")
+
+
+def mail_answers(domain):
+    """Whether the domain's mail server answers today: True if DNS gives it an MX record (or,
+    with none, an A record mail can go to), False if the domain or both records don't exist,
+    None if DNS couldn't say (a timeout, no name server answered): try again later."""
+    if not domain:
+        return False
+    try:
+        return len(dns.resolver.resolve(domain, "MX", lifetime=8)) > 0
+    except dns.resolver.NXDOMAIN:
+        return False
+    except dns.resolver.NoAnswer:
+        pass
+    except Exception:
+        return None
+    try:
+        return len(dns.resolver.resolve(domain, "A", lifetime=8)) > 0
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
+        return False
+    except Exception:
+        return None
