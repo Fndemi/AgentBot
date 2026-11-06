@@ -416,3 +416,143 @@
     Website: https://talksasa.com
     Tel: 0781 000 403 / 0712 295 880
   followup_body: ""
+
+# --- Added 6 Nov 2026: Nairobi agritech and technology prospects (one follow-up each) ---
+
+- to: info@agrotechplus.co.ke
+  contact_name: ""
+  company: Agrotech Plus
+  website: agrotekplus.com
+  subject: "Supporting farmer communication at Agrotech Plus"
+  body: |
+    Hello Agrotech Plus Team,
+
+    I came across Agrotech Plus and your work connecting farmers to markets and agricultural opportunities across Kenya.
+
+    I noticed the scale of your farmer network and the work you do around farmer and buyer coordination.
+
+    I'm reaching out from TalkSasa. We provide bulk SMS and API integration that businesses can use to automate communication through their existing systems.
+
+    I wanted to find out how you currently communicate important updates to farmers and buyers, particularly around produce collection, payment confirmations and operational updates.
+
+    If SMS is part of your communication workflow, there may be an opportunity for us to support it through our messaging services or API integration.
+
+    Would you be available for a brief conversation?
+
+    Regards,
+
+    TalkSasa Team
+  followup_body: |
+    Hello Agrotech Plus Team,
+
+    I wanted to follow up on my earlier email about how TalkSasa could potentially support your communication with farmers and buyers through bulk SMS and API integration.
+
+    I would be interested to understand how you currently handle updates around produce collection, buyer coordination and payments, and whether there is an opportunity for us to complement your existing setup.
+
+    If this is something worth exploring, I'd be happy to arrange a brief conversation at a convenient time.
+
+    Regards,
+
+    TalkSasa Team
+
+- to: almut@eprod-solutions.com
+  contact_name: "Almut"
+  company: eProd Solutions
+  website: eprod-solutions.com
+  subject: "Potential SMS API integration partnership with eProd"
+  body: |
+    Hello Almut,
+
+    I came across eProd Solutions and your work providing technology solutions for agribusinesses and agricultural supply chains.
+
+    I'm reaching out from TalkSasa, a Kenyan bulk SMS provider offering API integration for businesses that want to incorporate SMS communication into their existing systems.
+
+    I thought there could be a potential technology partnership worth exploring, particularly where agribusiness clients need automated notifications such as transaction confirmations, operational updates, reminders or customer alerts.
+
+    I would be interested to know whether SMS integration is something your clients currently request and whether there could be room for collaboration.
+
+    Would you be open to a short discussion?
+
+    Regards,
+
+    TalkSasa Team
+  followup_body: |
+    Hello Almut,
+
+    I wanted to follow up on my earlier email about a possible SMS API integration between TalkSasa and eProd for your agribusiness clients.
+
+    I would be interested to understand whether your clients ask for SMS notifications within their systems, and whether there is an opportunity for us to complement your existing setup.
+
+    If this is something worth exploring, I'd be happy to arrange a brief conversation at a convenient time.
+
+    Regards,
+
+    TalkSasa Team
+
+- to: sales@synnefa.io
+  contact_name: ""
+  company: Synnefa
+  website: synnefa.io
+  subject: "SMS integration for Synnefa's farming solutions"
+  body: |
+    Hello Synnefa Team,
+
+    I've been looking into Synnefa's smart farming solutions, particularly FarmCloud and your work supporting farmers and agricultural institutions.
+
+    I'm reaching out from TalkSasa. We provide bulk SMS and API integration that businesses can use to automate communication through their platforms.
+
+    I wanted to explore whether there could be an opportunity to support farmer-facing communication, operational alerts or other notifications connected to your farming solutions.
+
+    I would first be interested in understanding which communication channels you currently use and whether SMS is an area you are looking to expand or improve.
+
+    Would you be open to a brief conversation?
+
+    Regards,
+
+    TalkSasa Team
+  followup_body: |
+    Hello Synnefa Team,
+
+    I wanted to follow up on my earlier email about how TalkSasa could potentially support farmer-facing notifications connected to FarmCloud through bulk SMS and API integration.
+
+    I would be interested to understand how you currently send alerts and updates to farmers, and whether there is an opportunity for us to complement your existing setup.
+
+    If this is something worth exploring, I'd be happy to arrange a brief conversation at a convenient time.
+
+    Regards,
+
+    TalkSasa Team
+
+- to: hello@shambafiti.co.ke
+  contact_name: ""
+  company: Shamba Fiti
+  website: shambafiti.co.ke
+  subject: "Exploring SMS integration with Shamba Fiti"
+  body: |
+    Hello Shamba Fiti Team,
+
+    I came across Shamba Fiti and your work bringing farm management, AI crop support and agricultural commerce together in one platform.
+
+    I'm reaching out from TalkSasa. We provide bulk SMS and API integration for businesses that want to automate notifications through their existing systems.
+
+    I thought it would be worth exploring whether SMS could complement your current farmer communication channels, particularly for important platform updates, reminders or notifications that need to reach farmers directly.
+
+    I'd be interested to understand how your platform currently handles these communications and whether an SMS integration would be useful.
+
+    Would you be open to a short discussion?
+
+    Regards,
+
+    TalkSasa Team
+  followup_body: |
+    Hello Shamba Fiti Team,
+
+    I wanted to follow up on my earlier email about how TalkSasa could potentially support your farmer communication and platform notifications through bulk SMS and API integration.
+
+    I would be interested to understand how you currently reach farmers with important updates and reminders, and whether there is an opportunity for us to complement your existing setup.
+
+    If this is something worth exploring, I'd be happy to arrange a brief conversation at a convenient time.
+
+    Regards,
+
+    TalkSasa Team

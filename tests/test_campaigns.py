@@ -96,7 +96,9 @@ def test_the_committed_group_a_file_loads_and_nothing_incomplete_is_sent(world, 
                                           "rodgers@vorsagroup.co.ke", "lee@heureuxproperties.co.ke",
                                           "b.okute@victoria-agribusiness.co.ke", "l.ongondo@victoria-agribusiness.co.ke",
                                           "stanley.munyao@brisk-credit.co.ke", "moses@mywagepay.com",
-                                          "allan.oyier@farmnet.africa", "info@tawifresh.com", "credit@tazugroup.com"]
+                                          "allan.oyier@farmnet.africa", "info@tawifresh.com", "credit@tazugroup.com",
+                                          "info@agrotechplus.co.ke", "almut@eprod-solutions.com",
+                                          "sales@synnefa.io", "hello@shambafiti.co.ke"]
     monkeypatch.setattr(config, "GROUP_DAILY_LIMIT", len(entries))                  # all in one run here
     outcome = send(world, "campaigns/group_a.yaml")
     # only complete entries go out (here to a fake mail server); the others wait for their text
@@ -366,12 +368,14 @@ def test_the_committed_hold_file_is_refused_by_the_command(world, monkeypatch):
     assert world["smtp"].sent == [] and db.do_not_contact_domains() == set()
 
 
-def test_the_committed_group_a_has_thirteen_complete_entries():
+def test_the_committed_group_a_has_seventeen_complete_entries():
     entries = campaigns.load("campaigns/group_a.yaml")
-    assert len(entries) == 13 and all(not campaigns.missing(e) for e in entries)
+    assert len(entries) == 17 and all(not campaigns.missing(e) for e in entries)
     assert not any(e["allow_same_company"] for e in entries)
     with_followup = [e["to"] for e in entries if e["followup_body"].strip()]
     assert with_followup == ["stephen@groundworkpm.com", "info@boxleocourier.com",
-                             "pmunyua@kilimoafya.com", "newton@bomahut.com"]
+                             "pmunyua@kilimoafya.com", "newton@bomahut.com",
+                             "info@agrotechplus.co.ke", "almut@eprod-solutions.com",
+                             "sales@synnefa.io", "hello@shambafiti.co.ke"]
     held = {e["to"] for e in campaigns.load("campaigns/group_a_hold.yaml")}
     assert held and not held & {e["to"] for e in entries}        # nothing on hold is in the campaign's file
