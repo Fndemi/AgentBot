@@ -450,7 +450,7 @@ def find(website, company=""):
         del p["order"]
     to = next((p for p in ranked if p["confidence"] in ("high", "medium")), None)
     inboxes = [(f"{g}@{domain}", where[f"{g}@{domain}"]) for g in GENERAL_INBOXES if f"{g}@{domain}" in where]
-    return {"emails": emails, "role": inboxes[0][0] if inboxes else None,
+    return {"read": bool(site["pages"]), "emails": emails, "role": inboxes[0][0] if inboxes else None,
             "contact": {k: to[k] for k in ("name", "title", "email", "url")} if to else None,
             "people": ranked, "inboxes": inboxes}
 
@@ -477,26 +477,34 @@ def save_contacts(c, lead_id, result):
                   " confidence) VALUES (?,?,?,?,?,?,?,?)", (lead_id, *row))
 
 
-def run(leads):
+def run(leads, again=False):
     """Read the websites of leads never emailed and not read yet: save the named contact, if
     any, and switch the lead to the address choose() picks. Returns how many sites were read.
-    A site that can't be read leaves the lead as it is, and it isn't tried again."""
+    A site that can't be read leaves the lead as it is, and it isn't tried again.
+    again=True (reread): read them even if they were read before; a site that can't be read
+    then leaves the lead exactly as it was, contact and all, to be tried at the next reread."""
     read = 0
     emailed = db.emailed_lead_ids()
     for lead in leads:
         lead = dict(lead)
-        if lead.get("contact_checked_at") or lead["id"] in emailed or not lead.get("website"):
+        if (lead.get("contact_checked_at") and not again) or lead["id"] in emailed or not lead.get("website"):
             continue
         read += 1
         try:
             result = find(lead["website"], lead.get("company") or "")
         except Exception as e:  # one broken site never stops the day's sending
             print(f"  {lead['company']}: couldn't read {lead['website']} for contacts ({e})")
-            result = {"emails": [], "role": None, "contact": None, "people": [], "inboxes": []}
+            result = {"read": False, "emails": [], "role": None, "contact": None, "people": [], "inboxes": []}
+        if again and not result.get("read", True):
+            print(f"  {lead['company']}: couldn't read {lead['website']}; left as it was")
+            continue
         new, why = choose(lead, result)
         contact = result["contact"]
         with db.conn() as c:
             save_contacts(c, lead["id"], result)
+            if result.get("read", True):  # read under today's rules: a reread doesn't do it again
+                db.log_event(c, lead["id"], "contacts_read", people=len(result.get("people", [])),
+                             inboxes=len(result.get("inboxes", [])))
             if new != lead["email"] and c.execute(
                     "SELECT 1 FROM leads WHERE email=? AND id<>? UNION SELECT 1 FROM suppression WHERE email=?",
                     (new, lead["id"], new)).fetchone():
@@ -512,6 +520,33 @@ def run(leads):
                 db.log_event(c, lead["id"], "email_changed", old=lead["email"], new=new, why=why, by="contacts")
                 print(f"  {lead['company']}: {lead['email']} -> {new} ({why})")
     return read
+
+
+def to_reread():
+    """Waiting leads (verified, never emailed: ranking.waiting, in sending order) with a website
+    that haven't been read under today's rules (no contacts_read event), so their contacts
+    are found the way find() finds them now."""
+    import ranking as rank
+    with db.conn() as c:
+        done = {r[0] for r in c.execute("SELECT DISTINCT lead_id FROM lead_events WHERE event_type='contacts_read'")}
+    return [l for l in rank.waiting() if l["website"] and l["id"] not in done]
+
+
+def reread(limit=None):
+    """Read again the websites of the waiting leads to_reread lists (the first `limit` of
+    them), saving everyone found and switching each to the address choose() picks. Can be
+    stopped and run again: leads already read are skipped. Returns how many were read."""
+    todo = to_reread()
+    total = len(todo)
+    todo = todo[:limit] if limit else todo
+    print(f"{total} waiting leads to read again" + (f"; reading {len(todo)}" if limit and limit < total else ""))
+    done = 0
+    for i, lead in enumerate(todo, 1):
+        print(f"[{i}/{len(todo)}] {lead['company']} ({lead['website']})", flush=True)
+        done += run([lead], again=True)
+    left = len(to_reread())
+    print(f"Read {done}. {left} still to read" + (" (sites that couldn't be read are tried again next time)." if left else "."))
+    return done
 
 
 # --- Is an old lead's address still on its website? ---

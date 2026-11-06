@@ -23,6 +23,7 @@
   python main.py send-group FILE [--dry-run]   a named-contact campaign: check addresses, send entries not sent yet
   python main.py stats                   counts by status and reply label
   python main.py contacts [--recent N]   how many leads got a named contact, by title and confidence
+  python main.py contacts --reread [--limit N]   read waiting leads' sites again for contacts (best first; resumable)
   python main.py bounces [days]          bounces in the last N days (default 30): by email type, lead source, step; top reasons
   python main.py unsubscribe a@b.com     manually opt someone out
   python main.py export [folder]         write leads.csv, events.csv and replies.csv (joined on lead_id)
@@ -134,9 +135,16 @@ def main():
     elif cmd == "contacts":
         import contacts
         recent = take_number(args, "--recent")
-        if args:
-            sys.exit("Usage: python main.py contacts [--recent N]")
-        contacts.report(recent)
+        limit = take_number(args, "--limit")
+        reread = "--reread" in args
+        if reread:
+            args.remove("--reread")
+        if args or (limit and not reread) or (recent and reread):
+            sys.exit("Usage: python main.py contacts [--recent N] | contacts --reread [--limit N]")
+        if reread:
+            contacts.reread(limit)
+        else:
+            contacts.report(recent)
     elif cmd == "bounces":
         import bounces
         if args and not args[0].isdigit():

@@ -39,6 +39,7 @@ python main.py send                   # send today's batch (DAILY_LIMIT)
 python main.py watch                  # leave running; alerts you on replies
 python main.py stats
 python main.py contacts --recent 50   # how many leads got a named contact, by title and confidence
+python main.py contacts --reread --limit 50   # read waiting leads' sites again for contacts (best first; stop and rerun any time)
 python main.py bounces 30             # bounces in the last 30 days: by email type, lead source, step; top reasons
 python main.py export                 # leads.csv, events.csv, replies.csv (join on lead_id)
 python main.py auto                   # or leave this running: sends at 9am, tops up until 5pm, prepares leads after 5pm (resumes after a restart)

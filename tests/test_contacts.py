@@ -322,3 +322,67 @@ def test_summary_by_title_and_confidence(world, capsys, monkeypatch):
 
 def test_summary_with_nothing_read(world):
     assert contacts.summary() == ["Leads whose website was read for contacts: 0"]
+
+
+# --- python main.py contacts --reread ---
+
+def read_before(lead_id, name="Mark Kamau", title="Head of Marketing", email="mark@acme.co.ke"):
+    """A lead read under the old rules: one contact saved on the lead, nothing in lead_contacts."""
+    with db.conn() as c:
+        c.execute("UPDATE leads SET contact_name=?, contact_title=?, contact_email=?, contact_url=?,"
+                  " contact_checked_at='2026-10-30 10:00:00', source_email=email, email=? WHERE id=?",
+                  (name, title, email, f"{SITE}/team", email, lead_id))
+
+
+def test_reread_finds_contacts_under_todays_rules(world, monkeypatch, capsys):
+    website(monkeypatch, {"": HOME, "/contact": "<p>sales@acme.co.ke</p>",
+                          "/team": team(("Mark Kamau", "Head of Marketing", "mark@acme.co.ke"),
+                                        ("Jane Wanjiru", "CEO", "jane@acme.co.ke"))})
+    lead_id = add()
+    read_before(lead_id)
+    assert [l["id"] for l in contacts.to_reread()] == [lead_id]
+    assert contacts.reread() == 1
+    l = lead(lead_id)
+    assert (l["email"], l["contact_name"], l["source_email"]) == ("jane@acme.co.ke", "Jane Wanjiru", "info@acme.co.ke")
+    assert [r[0] for r in saved(lead_id)] == ["Jane Wanjiru", None]
+    assert contacts.to_reread() == []
+    assert contacts.reread() == 0                       # stopped and run again: nothing read twice
+    assert "0 waiting leads to read again" in capsys.readouterr().out
+
+
+def test_reread_leaves_a_lead_whose_site_cannot_be_read_as_it_was(world, monkeypatch):
+    website(monkeypatch, {})                            # the site is down today
+    lead_id = add()
+    read_before(lead_id, "Jane Wanjiru", "CEO", "jane@acme.co.ke")
+    assert contacts.reread() == 1
+    l = lead(lead_id)
+    assert (l["email"], l["contact_name"], l["contact_checked_at"]) == \
+        ("jane@acme.co.ke", "Jane Wanjiru", "2026-10-30 10:00:00")
+    assert [x["id"] for x in contacts.to_reread()] == [lead_id]   # tried again next time
+
+
+def test_reread_only_touches_waiting_leads_best_first(world, monkeypatch):
+    website(monkeypatch, {"": HOME, "/contact": "<p>sales@acme.co.ke</p>"})
+    emailed, waiting, best, unverified = (add(f"info@lead{i}.co.ke") for i in range(4))
+    db.record_sent(emailed, "<1@x>", "t")
+    db.set_status(emailed, "sent", "send")
+    db.set_status(unverified, "new", "manual")
+    with db.conn() as c:
+        c.execute("UPDATE leads SET score=90, scored_at=CURRENT_TIMESTAMP WHERE id=?", (best,))
+        c.execute("UPDATE leads SET score=50, scored_at=CURRENT_TIMESTAMP WHERE id=?", (waiting,))
+    assert [l["id"] for l in contacts.to_reread()] == [best, waiting]
+    assert contacts.reread(limit=1) == 1
+    assert [l["id"] for l in contacts.to_reread()] == [waiting]
+    assert lead(emailed)["email"] == "info@lead0.co.ke"
+
+
+def test_reread_command_line(world, monkeypatch, capsys):
+    import main
+    website(monkeypatch, {})
+    monkeypatch.setattr("sys.argv", ["main.py", "contacts", "--reread", "--limit", "5"])
+    main.main()
+    assert "0 waiting leads to read again" in capsys.readouterr().out
+    for bad in (["--limit", "5"], ["--reread", "--recent", "3"], ["--again"]):
+        monkeypatch.setattr("sys.argv", ["main.py", "contacts", *bad])
+        with pytest.raises(SystemExit, match="Usage"):
+            main.main()
