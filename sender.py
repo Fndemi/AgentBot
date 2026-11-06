@@ -16,6 +16,7 @@ from email.message import EmailMessage
 from email.utils import formatdate, make_msgid, formataddr
 from pathlib import Path
 
+import bounces
 import config
 import contacts
 import db
@@ -387,8 +388,10 @@ def followups_due():
     if not config.FOLLOWUPS_APPROVED:
         return []
     today, suppressed, nairobi = date.today(), db.suppressed_emails(), rotation.today()
+    paused = db.soft_bounced_lead_ids(bounces.SOFT_PAUSE_HOURS)  # mailbox full, try later
     return [(lead, n) for n in range(1, MAX_FOLLOWUPS + 1) for lead in db.awaiting_followup(n)
-            if personalise.approved(lead) and not personalise.paused(lead, nairobi) and followup_template(lead, n)
+            if lead["id"] not in paused
+            and personalise.approved(lead) and not personalise.paused(lead, nairobi) and followup_template(lead, n)
             and business_days_after(date.fromisoformat(lead["sent_on"]), config.FOLLOWUP_AFTER_DAYS) <= today
             and lead["email"] not in suppressed and not db.do_not_contact(lead["email"])
             and not db.recent_out_of_office(lead["id"], OUT_OF_OFFICE_HOLD_DAYS)]
@@ -591,7 +594,8 @@ def approved_waiting(quiet=False):
     MIN_SCORE first). The rest are skipped and left exactly as they are, so they go out once
     their industry is approved or their score rises. A lead not scored yet counts as 0. A
     lead the niche check found fits no approved niche (nichefit.py) is left out."""
-    waiting = [l for l in ranking.waiting() if l["niche_fit"] != nichefit.NONE]
+    paused = db.soft_bounced_lead_ids(bounces.SOFT_PAUSE_HOURS)  # mailbox full, try later
+    waiting = [l for l in ranking.waiting() if l["niche_fit"] != nichefit.NONE and l["id"] not in paused]
     leads = [l for l in waiting if personalise.approved(l)]
     if len(leads) < len(waiting) and not quiet:
         skipped = sorted({personalise.industry_key(l) for l in waiting if not personalise.approved(l)})
@@ -765,12 +769,15 @@ def leftover_claims():
 def prepared(lead):
     """Whether a waiting lead is ready for its first email: scored under today's rules, its
     niche checked (nichefit.py), its site read for a contact (contacts.py; nothing to read
-    without a website) and, with USE_AI_OPENER, its opening line tried (personalise.py).
-    The prepare job (prepare.py) does all that, never the send."""
+    without a website), with USE_AI_OPENER its opening line tried (personalise.py), and for
+    a lead found more than contacts.RECHECK_AFTER_DAYS ago, its address seen on its website
+    again within contacts.RECHECK_VALID_DAYS. The prepare job (prepare.py) does all that,
+    never the send."""
     lead = dict(lead)
     return (targeting.scored(lead) and not nichefit.needs_check(lead)
             and bool(lead.get("contact_checked_at") or not lead.get("website"))
-            and (not config.USE_AI_OPENER or lead.get("confidence") is not None))
+            and (not config.USE_AI_OPENER or lead.get("confidence") is not None)
+            and not contacts.needs_address_check(lead))
 
 
 def plan(dry_run=False, quiet=False):
@@ -944,17 +951,25 @@ def send_one(s, lead, followup=0, owner=None):
         deliver(s, lead, msg, tname, followup)
     except (smtplib.SMTPException, OSError, RuntimeError):
         db.release_claim(lead["id"])  # raised before the email went out (see deliver)
-        return _not_sent(sys.exc_info()[1], lead)
+        return _not_sent(sys.exc_info()[1], lead, followup)
     if not followup:  # after a follow-up the lead stays at sent, waiting for an answer
         db.set_status(lead["id"], "sent", "send")
     return "sent"
 
 
-def _not_sent(error, lead):
-    """What send_one returns for an email the mail server or deliver's checks didn't send."""
+def _not_sent(error, lead, followup=0):
+    """What send_one returns for an email the mail server or deliver's checks didn't send.
+    A refused address is recorded as a bounce (bounces.py): a hard one bounces the lead and
+    suppresses the address; a soft one (mailbox full, try later) fails this email only, and
+    the lead waits SOFT_PAUSE_HOURS before it is tried again."""
     try:
         raise error
-    except smtplib.SMTPRecipientsRefused:
+    except smtplib.SMTPRecipientsRefused as e:
+        code, text = next(iter(e.recipients.values()), (0, b""))
+        kind, code, reason = bounces.from_refusal(code, text)
+        bounces.record(lead["id"], lead["email"], kind, code, reason, followup, "send")
+        if kind == bounces.SOFT:
+            return _failed(lead, f"soft bounce, tried again later: {reason}", code)
         db.set_status(lead["id"], "bounced", "send")
         return "bounced"
     except (smtplib.SMTPSenderRefused, smtplib.SMTPAuthenticationError) as e:

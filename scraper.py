@@ -36,31 +36,65 @@ RETRY_PAUSE = 2  # seconds
 
 # Junk that looks like an email but isn't one
 BAD_ENDINGS = (".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".css", ".js")
-BAD_WORDS = ("example.com", "sentry", "wixpress", "domain.com", "yourname", "email.com")
+BAD_WORDS = ("example", "sentry", "wixpress", "domain.com", "yourdomain", "yourname", "email.com")
+# Placeholders left in a site's template: these local parts, and the domain company.com
+PLACEHOLDER_LOCALS = ("name", "john", "test")
+PLACEHOLDER_DOMAINS = ("company.com",)
+# The web designer's credit ("Website by Acme Digital, hello@acmedigital.com"): an address
+# this close to one of these phrases is the designer's, never the company's
+CREDIT = re.compile(r"\b(?:designed|website|developed|powered)\s+by\b", re.I)
+CREDIT_REACH = 60  # characters either side of the address
 # Prefer generic business inboxes (safer under the Data Protection Act)
 PREFERRED = ("info@", "sales@", "admin@", "hello@", "contact@", "enquiries@", "office@")
+# Role inboxes after PREFERRED, best first (contacts.py uses the same order)
+ROLE_ORDER = ("sales", "partnerships", "business", "tech", "ops", "hello", "contact", "info")
+
+
+def placeholder(email):
+    """Whether an address is a template's placeholder or junk, not a real inbox."""
+    local, _, domain = email.partition("@")
+    return (email.endswith(BAD_ENDINGS) or any(w in email for w in BAD_WORDS)
+            or local in PLACEHOLDER_LOCALS or domain in PLACEHOLDER_DOMAINS)
+
+
+def on_site(email, site_domain):
+    """Whether an address is on the site's own domain or one of its subdomains."""
+    domain = email.rsplit("@", 1)[-1]
+    site = db.email_domain(site_domain)
+    return bool(site) and (domain == site or domain.endswith("." + site))
 
 
 def clean(emails, site_domain):
+    """The real addresses among `emails` on the site's own domain or its subdomains. Never an
+    address on another domain: when the site gives none of its own, the result is empty and
+    no lead is added."""
     out = set()
     for e in emails:
-        e = e.lower().strip(".")
+        e = e.lower().strip().strip(".")
         if not EMAIL_RE.fullmatch(e):  # e.g. a mailto: link with no address in it
             continue
-        if e.endswith(BAD_ENDINGS) or any(w in e for w in BAD_WORDS):
+        if placeholder(e) or not on_site(e, site_domain):
             continue
         out.add(e)
-    # Keep emails on the company's own domain first; fall back to anything found
-    own = {e for e in out if e.split("@")[1].endswith(site_domain)}
-    return own or out
+    return out
 
 
 def pick_best(emails):
+    """The address to write to: the first of PREFERRED, else the first of ROLE_ORDER. Only when
+    the site gives neither: another inbox (support@, help@, accounts@...: targeting.ROLE_WORDS)
+    before a person's address. None if there is no address."""
+    import targeting  # here: targeting imports this module
+    emails = sorted(emails)
     for p in PREFERRED:
         for e in emails:
             if e.startswith(p):
                 return e
-    return sorted(emails)[0] if emails else None
+    for role in ROLE_ORDER:
+        for e in emails:
+            if e.split("@")[0] == role:
+                return e
+    inboxes = [e for e in emails if e.split("@")[0].startswith(targeting.ROLE_WORDS)]
+    return (inboxes or emails or [None])[0]
 
 
 def get(url, timeout=10):
@@ -98,22 +132,63 @@ def cf_decode(code):
     return bytes(b ^ data[0] for b in data[1:]).decode("utf-8", "ignore") if data else ""
 
 
+def _near_credit(el):
+    """Whether a link or element sits in a designer's credit: its own text or its parent's
+    (when that is short, like a footer line) says "designed by", "website by"..."""
+    texts = [el.get_text(" ")]
+    if el.parent is not None and len(el.parent.get_text(" ")) <= 300:
+        texts.append(el.parent.get_text(" "))
+    return any(CREDIT.search(t) for t in texts)
+
+
 def page_emails(soup):
     """Every address a page gives: mailto links (any case, URL-decoded), addresses hidden by
-    Cloudflare, ones written out ("info [at] acme [dot] co.ke") and plain ones in the text."""
-    found = set()
+    Cloudflare, ones written out ("info [at] acme [dot] co.ke") and plain ones in the text.
+    An address next to a designer's credit (CREDIT) is left out, wherever else it appears."""
+    found, credit = set(), set()
+
+    def add(address, in_credit):
+        address = address.strip()
+        if address:
+            found.add(address)
+            if in_credit:
+                credit.add(address.lower().strip().strip("."))
+
     for a in soup.select("a[href]"):
         href = a["href"].strip()
         if href.lower().startswith("mailto:"):
-            found.add(unquote(href[7:]).split("?")[0].strip())
+            add(unquote(href[7:]).split("?")[0], _near_credit(a))
         elif "/cdn-cgi/l/email-protection#" in href:
-            found.add(cf_decode(href.split("#", 1)[1]))
+            add(cf_decode(href.split("#", 1)[1]), _near_credit(a))
     for el in soup.select("[data-cfemail]"):
-        found.add(cf_decode(el["data-cfemail"]))
+        add(cf_decode(el["data-cfemail"]), _near_credit(el))
     text = soup.get_text(" ")
     found.update(EMAIL_RE.findall(text))
     found.update(f"{m.group(1)}@{DOT.sub('.', m.group(2))}" for m in HIDDEN_EMAIL.finditer(text))
-    return {e for e in found if e}
+    credit |= _credits_in_text(soup)
+    return {e.strip() for e in found if e.strip() and e.lower().strip().strip(".") not in credit}
+
+
+def _credits_in_text(soup):
+    """Addresses written in a page's text within CREDIT_REACH characters of a credit phrase in
+    the same block (the element the text is in, when that is short like a footer line): a
+    contact line in the paragraph before a credit is not part of it."""
+    credit, seen = set(), set()
+    for string in soup.find_all(string=True):
+        block = string.parent
+        if block is None or id(block) in seen:
+            continue
+        seen.add(id(block))
+        text = block.get_text(" ")
+        if len(text) > 300:
+            text = str(string)
+        if not CREDIT.search(text):
+            continue
+        for m in list(EMAIL_RE.finditer(text)) + list(HIDDEN_EMAIL.finditer(text)):
+            if CREDIT.search(text[max(0, m.start() - CREDIT_REACH):m.end() + CREDIT_REACH]):
+                address = m.group(0) if m.re is EMAIL_RE else f"{m.group(1)}@{DOT.sub('.', m.group(2))}"
+                credit.add(address.lower().strip().strip("."))
+    return credit
 
 
 def scrape_site(url):

@@ -1110,6 +1110,8 @@ def _send(c, lead, user, to, subject, msg, plain, files, in_reply_to, event):
     """Send one CRM email and record it (with its attachments). The lead becomes the
     sender's if nobody had it, and the bot sends it nothing more."""
     lead_id = lead["id"]
+    if db.is_suppressed(to or ""):  # e.g. a colleague's address that hard-bounced or opted out
+        raise HTTPException(409, f"{to} bounced or asked not to be emailed. Don't email that address.")
     status, error = ("dry_run" if CRM_DRY_RUN else "sent"), None
     try:
         _deliver(msg)

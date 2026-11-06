@@ -4,7 +4,9 @@ spends its time reading websites or asking the AI:
   1. need score (targeting.py), for every waiting lead in an approved industry, in batches
   2. for the leads the next sends would pick, best first (sender.batch), until TARGET_FACTOR
      x DAILY_LIMIT of them are ready: the niche check (nichefit.py), the contact on the site
-     (contacts.py) and, with USE_AI_OPENER, the personal opening (personalise.py)
+     (contacts.py), with USE_AI_OPENER the personal opening (personalise.py), and for a lead
+     found more than contacts.RECHECK_AFTER_DAYS ago, whether its address is still on its
+     website (contacts.recheck_addresses)
 
 sender.plan() only picks leads that are ready (sender.prepared). The bot runs this after 5pm
 on weekdays and one small step between inbox checks (auto.py).
@@ -57,6 +59,9 @@ def step(skip=None, score_batch=SCORE_BATCH, lead_batch=LEAD_BATCH):
     checked = [l for l in sender.approved_waiting(quiet=True) if l["id"] in ids and not nichefit.needs_check(l)]
     contacts.run(checked)
     personalise.run(checked)
+    # a lead found long ago: is its address still on its website? (read again after contacts.run,
+    # which may have changed the address)
+    contacts.recheck_addresses([l for l in sender.approved_waiting(quiet=True) if l["id"] in ids])
     still = {l["id"] for l in sender.approved_waiting(quiet=True) if l["id"] in ids and not sender.prepared(l)
              and targeting.scored(l)}
     skip |= still   # e.g. the AI couldn't write its opening: tried again next run

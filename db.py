@@ -105,7 +105,12 @@ CREATE TABLE IF NOT EXISTS leads (
     -- a named-contact campaign (campaigns.py), e.g. "Group A": its own emails only, never the
     -- bot's templates or follow-ups; campaign_followup is the one follow-up its entry gave
     campaign TEXT,
-    campaign_followup TEXT
+    campaign_followup TEXT,
+    -- a lead found more than contacts.RECHECK_AFTER_DAYS ago whose address came from its
+    -- website has the site read again before its first email: when that was, and the page
+    -- that still shows the address (contacts.recheck_addresses)
+    address_checked_at TEXT,
+    address_page TEXT
 );
 CREATE TABLE IF NOT EXISTS sent (
     id INTEGER PRIMARY KEY,
@@ -204,6 +209,28 @@ CREATE TABLE IF NOT EXISTS daily_steps (
     done_at TEXT,
     PRIMARY KEY (day, step)
 );
+-- every bounce (bounces.py): a delivery report read from the inbox (via 'inbox') or an address
+-- the mail server refused while sending (via 'send'). kind is hard (no such user, domain not
+-- found: that address is never emailed again), soft (mailbox full, try later: nothing is
+-- stopped) or unknown (treated as hard). code is the status the server gave (5.1.1, 550...),
+-- reason its own words. step: 0 = the first email, n = follow-up n, NULL = not known.
+-- reply_id and event_id tie a row to the reply or lead event it was made from, so
+-- bounces from before this table are added once (bounces.backfill)
+CREATE TABLE IF NOT EXISTS bounces (
+    id INTEGER PRIMARY KEY,
+    lead_id INTEGER REFERENCES leads(id),
+    email TEXT,
+    kind TEXT,
+    code TEXT,
+    reason TEXT,
+    step INTEGER,
+    via TEXT,
+    reply_id INTEGER UNIQUE,
+    event_id INTEGER UNIQUE,
+    backfilled INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS bounces_created ON bounces (created_at);
 -- one row per lock held: only one send run at a time, across processes
 CREATE TABLE IF NOT EXISTS locks (
     name TEXT PRIMARY KEY,
@@ -390,7 +417,8 @@ def init():
                                  ("leads", "niche_reason", "TEXT"), ("leads", "niche_checked_at", "TEXT"),
                                  ("leads", "display_name", "TEXT"), ("leads", "name_source", "TEXT"),
                                  ("leads", "name_version", "INTEGER"), ("leads", "niche_tries", "INTEGER"),
-                                 ("leads", "campaign", "TEXT"), ("leads", "campaign_followup", "TEXT")):
+                                 ("leads", "campaign", "TEXT"), ("leads", "campaign_followup", "TEXT"),
+                                 ("leads", "address_checked_at", "TEXT"), ("leads", "address_page", "TEXT")):
             if col not in columns(c, table):
                 c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {kind}")
         # Leads from before these existed
@@ -440,6 +468,19 @@ def is_suppressed(email):
 def suppressed_emails():
     with conn() as c:
         return {r[0] for r in c.execute("SELECT email FROM suppression")}
+
+def suppress(email, reason):
+    """Never email this address again, whether or not it is a lead's (e.g. a hard bounce)."""
+    if email and email.strip():
+        with conn() as c:
+            _suppress(c, email, reason)
+
+def soft_bounced_lead_ids(hours=24):
+    """Leads with a soft bounce in the last `hours`: not tried again until that has passed."""
+    with conn() as c:
+        return {r[0] for r in c.execute(
+            "SELECT DISTINCT lead_id FROM bounces WHERE kind='soft' AND lead_id IS NOT NULL"
+            " AND created_at >= datetime('now', ?)", (f"-{int(hours)} hours",))}
 
 def unsubscribe(email):
     """Opt an address out for good, whether or not it is a lead."""

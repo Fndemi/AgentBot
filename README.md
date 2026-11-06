@@ -38,6 +38,7 @@ python main.py preview                # one email, plain and HTML versions
 python main.py send                   # send today's batch (DAILY_LIMIT)
 python main.py watch                  # leave running; alerts you on replies
 python main.py stats
+python main.py bounces 30             # bounces in the last 30 days: by email type, lead source, step; top reasons
 python main.py export                 # leads.csv, events.csv, replies.csv (join on lead_id)
 python main.py auto                   # or leave this running: sends at 9am, tops up until 5pm, prepares leads after 5pm (resumes after a restart)
 streamlit run dashboard.py            # optional dashboard
@@ -91,4 +92,5 @@ Columns: `company,website,industry,email`. Leave `email` blank to have it scrape
 | not_interested | replied | no (stays unread in inbox) |
 | out_of_office | replied | no |
 | unsubscribe | unsubscribed, never emailed again | no |
-| bounce | bounced | no |
+| bounce (hard: no such user, domain not found, or not known) | bounced; that address is never emailed again | no |
+| bounce (soft: mailbox full, try later) | unchanged; the lead isn't tried again for 24 hours | no |

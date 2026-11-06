@@ -17,13 +17,14 @@ moves to a new address. The address the lead had before is kept in source_email.
 import re
 import time
 import unicodedata
+from datetime import date
 from urllib.parse import unquote, urljoin, urlparse
 
 import db
 import ranking
 import scraper
 
-ROLE_ORDER = ("sales", "partnerships", "business", "tech", "ops", "hello", "contact", "info")
+ROLE_ORDER = scraper.ROLE_ORDER  # best first; scraper.pick_best uses the same order
 # In this order of preference when a site names more than one
 TITLES = (
     ("CEO", r"\bCEO\b|chief executive(?: officer)?|managing director|\bMD\b"),
@@ -264,3 +265,92 @@ def run(leads):
                 db.log_event(c, lead["id"], "email_changed", old=lead["email"], new=new, why=why, by="contacts")
                 print(f"  {lead['company']}: {lead['email']} -> {new} ({why})")
     return read
+
+
+# --- Is an old lead's address still on its website? ---
+# A lead found more than RECHECK_AFTER_DAYS ago whose address came from its own website has the
+# site read again before its first email (prepare.py does it; sender.prepared waits for it).
+# Still shown: the check counts for RECHECK_VALID_DAYS. Gone: the lead is excluded, never
+# emailed. A site that can't be read leaves the lead waiting, to be read again next time.
+RECHECK_AFTER_DAYS = 60
+RECHECK_VALID_DAYS = 7
+
+
+def _day(text):
+    try:
+        return date.fromisoformat(str(text)[:10]) if text else None
+    except ValueError:
+        return None
+
+
+def address_from_site(lead):
+    """Whether the lead's address was read off its website: found by discovery (source
+    'search'), or put in place of the address it came with (source_email). An address from a
+    regulator's directory or a list was never said to be on the site."""
+    lead = dict(lead)
+    return lead.get("source") == "search" or bool(lead.get("source_email"))
+
+
+def needs_address_check(lead, today=None):
+    """Whether the lead's website must be read again before its first email."""
+    lead = dict(lead)
+    today = today or date.today()
+    if not lead.get("website") or not lead.get("email") or not address_from_site(lead):
+        return False
+    found = _day(lead.get("discovered_at") or lead.get("created_at"))
+    if not found or (today - found).days <= RECHECK_AFTER_DAYS:
+        return False
+    checked = _day(lead.get("address_checked_at"))
+    return not checked or (today - checked).days >= RECHECK_VALID_DAYS
+
+
+def published_page(lead):
+    """(readable, page): whether the lead's website could be read at all, and the page that
+    still shows its address (any way scraper.page_emails finds one), or None."""
+    lead = dict(lead)
+    pages = read_site(lead["website"])
+    if not pages:
+        return False, None
+    urls = {u.rstrip("/") for u, _ in pages}
+    for extra in (lead.get("contact_url"), lead.get("address_page")):
+        if extra and extra.rstrip("/") not in urls and urlparse(extra).netloc.removeprefix("www.") == \
+                urlparse(_site(lead["website"])).netloc.removeprefix("www."):
+            soup = fetch(extra)
+            if soup is not None:
+                pages.append((extra, soup))
+    email = lead["email"].lower().strip()
+    for url, soup in pages:
+        if email in {e.lower().strip().strip(".") for e in scraper.page_emails(soup)}:
+            return True, url
+    return True, None
+
+
+def recheck_addresses(leads, today=None):
+    """Read again the website of each lead that needs_address_check. Returns
+    {"published": n, "gone": n, "unreadable": n}."""
+    today = today or date.today()
+    counts = {"published": 0, "gone": 0, "unreadable": 0}
+    for lead in leads:
+        lead = dict(lead)
+        if not needs_address_check(lead, today):
+            continue
+        try:
+            readable, page = published_page(lead)
+        except Exception as e:  # one broken site never stops the others
+            print(f"  {lead['company']}: couldn't read {lead['website']} to recheck its address ({e})")
+            readable, page = False, None
+        if not readable:
+            counts["unreadable"] += 1
+            continue
+        if page:
+            with db.conn() as c:
+                c.execute("UPDATE leads SET address_checked_at=CURRENT_TIMESTAMP, address_page=? WHERE id=?",
+                          (page, lead["id"]))
+                db.log_event(c, lead["id"], "address_rechecked", page=page)
+            counts["published"] += 1
+        else:
+            db.exclude(lead["id"], f"its address is no longer published on {lead['website']} "
+                                   f"(checked {today.isoformat()})", by="prepare")
+            print(f"  {lead['company']}: {lead['email']} is no longer on {lead['website']}; not emailed")
+            counts["gone"] += 1
+    return counts

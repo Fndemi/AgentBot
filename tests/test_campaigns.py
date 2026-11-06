@@ -24,12 +24,14 @@ TUESDAY = date(2026, 11, 3)
 
 class FakeSMTP:
     def __init__(self, refuse=()):
-        self.sent, self.refuse = [], set(refuse)
+        self.sent, self.refuse, self.full = [], set(refuse), set()
 
     def send_message(self, msg):
+        import smtplib
         if msg["To"] in self.refuse:
-            import smtplib
             raise smtplib.SMTPRecipientsRefused({msg["To"]: (550, b"no such user")})
+        if msg["To"] in self.full:
+            raise smtplib.SMTPRecipientsRefused({msg["To"]: (452, b"4.2.2 Mailbox full")})
         self.sent.append(msg)
 
     def quit(self):
@@ -245,6 +247,23 @@ def test_a_refused_address_is_marked_bounced(world):
     world["smtp"].refuse.add("jane1@acme1.co.ke")
     assert send(world, campaign_file(world, [entry(1)])) == {"jane1@acme1.co.ke": "bounced"}
     assert lead("jane1@acme1.co.ke")["status"] == "bounced"
+    with db.conn() as c:
+        row = dict(c.execute("SELECT * FROM bounces").fetchone())
+        assert c.execute("SELECT 1 FROM suppression WHERE email='jane1@acme1.co.ke'").fetchone()
+    assert (row["email"], row["kind"], row["code"], row["step"], row["via"]) == \
+        ("jane1@acme1.co.ke", "hard", "550", 0, "send")
+
+
+def test_a_full_mailbox_is_a_soft_bounce_and_can_be_sent_another_day(world):
+    world["smtp"].full.add("jane1@acme1.co.ke")
+    path = campaign_file(world, [entry(1)])
+    outcome = send(world, path)["jane1@acme1.co.ke"]
+    assert outcome.startswith("not sent (soft bounce, try again later: 452 4.2.2 Mailbox full")
+    with db.conn() as c:
+        assert c.execute("SELECT kind FROM bounces").fetchone()[0] == "soft"
+        assert not c.execute("SELECT 1 FROM suppression").fetchone()
+    world["smtp"].full.clear()
+    assert send(world, path) == {"jane1@acme1.co.ke": "sent"}
 
 
 # --- Never the bot's emails, to them or their domains ---

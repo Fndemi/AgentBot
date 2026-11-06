@@ -40,6 +40,7 @@ from urllib.parse import urljoin
 
 import yaml
 
+import bounces
 import config
 import db
 import ranking
@@ -237,8 +238,13 @@ def deliver(smtp, lead, msg, step, campaign):
         return "limit" if refused.startswith("daily limit") else refused
     try:
         smtp.send_message(msg)
-    except smtplib.SMTPRecipientsRefused:
+    except smtplib.SMTPRecipientsRefused as e:
         db.release_claim(lead["id"])
+        code, text = next(iter(e.recipients.values()), (0, b""))
+        kind, code, reason = bounces.from_refusal(code, text)
+        bounces.record(lead["id"], lead["email"], kind, code, reason, step, "send")
+        if kind == bounces.SOFT:  # mailbox full, try later: run the campaign again another day
+            return f"not sent (soft bounce, try again later: {reason})"
         db.set_status(lead["id"], "bounced", campaign)
         return "bounced"
     except (smtplib.SMTPException, OSError) as e:

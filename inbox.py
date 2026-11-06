@@ -10,6 +10,7 @@ from email.header import decode_header, make_header
 from email.utils import parseaddr
 from pathlib import Path
 
+import bounces
 import classifier
 import config
 import db
@@ -360,13 +361,25 @@ def check_message(box, uid, key, subjects, catch_up, newly_skipped):
         if action and action.group(1).lower() != "failed":
             newly_skipped.append(key)
             return None
+        raw = msg.as_string()
         failed = find_original_recipient(msg)
-        lead = db.find_lead_by_email(failed) if failed else thread_lead(msg)
+        returned = bounces.sent_message_ids(raw)  # the returned email's Message-ID: one of ours
+        # A failed address that is no lead's (a forward, say) links to no lead: the lead is
+        # never bounced for another address's failure. That address is still suppressed below.
+        lead = (db.find_lead_by_email(failed) if failed
+                else thread_lead(msg) or db.lead_by_message_ids(returned))
+        kind, code, reason = bounces.from_report(raw)
+        sent = bounces.sent_by_ids(returned)
+        step = sent[1] if lead and sent and sent[0] == lead["id"] else bounces.last_step(lead["id"] if lead else None)
+        bounce = {"email": failed or (lead["email"] if lead else None), "kind": kind, "code": code,
+                  "reason": reason, "step": step}
+        why = f"{kind} bounce" + (f": {reason[:150]}" if reason else "")
         if lead:
-            result = {"label": "bounce", "summary": f"delivery to {failed or lead['email']} failed"}
+            result = {"label": "bounce", "summary": f"delivery to {bounce['email']} failed ({why})", "bounce": bounce}
         else:  # shown, so you can tell whose email it was; it changes no lead
-            result = {"label": "bounce", "summary": "A delivery failure the bot could not link to a "
-                                                    "lead; not read by the AI. Check which email it was."}
+            result = {"label": "bounce", "bounce": bounce,
+                      "summary": f"A delivery failure the bot could not link to a lead ({why}); not read "
+                                 "by the AI. Check which email it was."}
     elif is_auto_reply(msg, subject):
         result = {"label": "out_of_office", "summary": "automatic reply"}
     elif lead is None:  # a reply to our email from an address linked to no lead
@@ -381,7 +394,13 @@ def check_message(box, uid, key, subjects, catch_up, newly_skipped):
                             result["summary"], key, message_id)
     if not reply_id:
         return None  # stored by an earlier check: nothing is logged or alerted twice
+    bounce = result.get("bounce")
+    if bounce:  # recorded first: a hard bounce suppresses the failed address at once
+        bounces.record(lead["id"] if lead else None, bounce["email"], bounce["kind"], bounce["code"],
+                       bounce["reason"], bounce["step"], "inbox", reply_id=reply_id)
     for each in colleagues or ([lead] if lead else []):  # a colleague's opt-out covers the company
+        if bounce and bounce["kind"] == bounces.SOFT:
+            continue  # mailbox full, try later: the lead carries on as it was
         new_status = status_after(each["status"], label)
         if new_status:
             db.set_status(each["id"], new_status, "inbox")
