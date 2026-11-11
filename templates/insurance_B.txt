@@ -1,0 +1,20 @@
+Subject: 50 test SMS for {company}
+{greeting}
+
+{opener}
+
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider.
+
+The easiest way for you to judge SMS is to try it on your own clients. We'll give you {free_sms} free SMS to send real renewal reminders to clients whose policies are due next month, so you can see the delivery reports and the renewals for yourself.
+
+I'd welcome a 15-minute call with you to plan the test. Would {slot1} or {slot2} work for you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

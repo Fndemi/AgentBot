@@ -1,0 +1,15 @@
+{greeting}
+
+Here's the kind of reminder I meant:
+
+"Dear customer, your water bill for account 10234 is KES 1,250, due on 20 Nov. Pay via Paybill [your paybill], account 10234. - {company}"
+
+It can go out automatically every billing cycle. I'd be glad to walk you through it in 15 minutes. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

@@ -1,0 +1,13 @@
+{greeting}
+
+Here's how a test could look for you: pick one building, send every tenant a rent reminder three days before the due date, and compare how many pay on time with the month before.
+
+The {free_sms} test SMS are on us. I'd be glad to set it up with you in 15 minutes. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

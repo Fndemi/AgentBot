@@ -76,7 +76,7 @@ hr_payroll:
   approved: true
   uses: [payslip alerts, OTPs, leave approvals]
 insurance:
-  approved: false
+  approved: true
   uses: [premium reminders, policy renewal notices, claim status updates]
 insurtech:
   approved: false
@@ -103,7 +103,7 @@ payment_provider:
   approved: true
   uses: [OTPs, payment confirmations, transfer alerts]
 proptech:
-  approved: false
+  approved: true
   uses: [rent reminders, payment confirmations, viewing reminders, OTPs]
 real_estate:
   approved: false
@@ -142,7 +142,7 @@ transport:
 utility:
   approved: false
   uses: [bill reminders, outage notices, meter reading alerts, payment reminders]
-# water service providers (WASREB's register): not approved until its templates exist
+# water service providers (WASREB's register)
 water_utility:
-  approved: false
+  approved: true
   uses: [bill reminders, water interruption notices, meter reading alerts, payment confirmations]

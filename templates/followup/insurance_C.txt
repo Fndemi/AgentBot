@@ -1,0 +1,15 @@
+{greeting}
+
+Here's another message your clients would value:
+
+"Dear client, your claim CLM-0457 has been approved. Payment of KES 38,000 will be made to your account within 5 working days. - {company}"
+
+Updates like this save your team calls from clients asking where their claim is. I'd be glad to show you how in 15 minutes. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

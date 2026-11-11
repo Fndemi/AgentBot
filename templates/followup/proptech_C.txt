@@ -1,0 +1,15 @@
+{greeting}
+
+Here's another message your clients would value:
+
+"Hi Wanjiru, a reminder of your viewing of the 2-bedroom at Kilimani Heights tomorrow, Sat 21 Nov, at 11am. Call [agent phone] if you need to change it. - {company}"
+
+Reminders like this mean fewer missed viewings. I'd be glad to show you how in 15 minutes. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

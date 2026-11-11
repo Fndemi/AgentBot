@@ -1,0 +1,20 @@
+Subject: Fewer lapsed policies at {company}
+{greeting}
+
+{opener}
+
+Every policy that lapses because a client forgot the renewal date is business you have to win back.
+
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider. Sending 1,000 renewal reminders costs about KES 250 at KES 0.25 per SMS. If they keep even one policy from lapsing, they've paid for themselves.
+
+I'd be glad to show you how you could set it up. It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

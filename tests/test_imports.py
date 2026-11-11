@@ -186,9 +186,11 @@ def test_a_bot_check_page_is_unavailable_not_a_list(monkeypatch):
         imports.fetch("https://www.ira.go.ke/x.pdf")
 
 
-def test_new_niches_are_in_uses_yaml_and_not_approved():
+def test_the_lists_niches_are_in_uses_yaml_and_approved_with_their_templates():
     for niche in ("water_utility", "insurance", "proptech"):
-        assert personalise.USES[niche]["approved"] is False
+        assert personalise.USES[niche]["approved"] is True
+        for variant in "ABC":
+            assert (personalise.Path(personalise.__file__).parent / "templates" / f"{niche}_{variant}.txt").exists()
     for niche in {lst.niche for s in imports.SOURCES.values() for lst in s.lists}:
         assert niche in personalise.USES
 

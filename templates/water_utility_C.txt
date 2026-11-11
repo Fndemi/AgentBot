@@ -1,0 +1,20 @@
+Subject: Getting water bills paid sooner at {company}
+{greeting}
+
+{opener}
+
+A short reminder a few days before the due date can bring payments in sooner and mean fewer disconnection visits for your team.
+
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider. If you have 5,000 customers and send each one a bill reminder every month, that costs about KES 1,250 a month at KES 0.25 per SMS.
+
+I'd be glad to show you how you could set it up. It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

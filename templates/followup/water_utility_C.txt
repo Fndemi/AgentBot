@@ -1,0 +1,15 @@
+{greeting}
+
+Here's another message your customers would value:
+
+"Dear customer, water supply in Kiamunyi will be off on Thu 19 Nov, 8am to 4pm, for pipe repairs. We apologise for the inconvenience. - {company}"
+
+One message reaches every customer in the zone, including those on basic phones. I'd be glad to show you how in 15 minutes. Would {slot1} or {slot2} work? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}

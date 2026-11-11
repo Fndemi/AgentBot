@@ -1,0 +1,20 @@
+Subject: Tenant and client updates at {company}
+{greeting}
+
+{opener}
+
+Chasing rent and confirming viewings by phone takes up a lot of your team's day.
+
+I'm {sender} from TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider. If you manage 200 units and send each tenant a rent reminder and a payment confirmation every month, that costs about KES 100 a month at KES 0.25 per SMS.
+
+I'd be glad to show you how you could set it up. It takes 15 minutes, {meet_options}. Would {slot1} or {slot2} suit you? If neither works, just tell me which day suits you better.
+
+{booking_line}
+
+{profile_line}
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}
+{website}
