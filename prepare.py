@@ -4,7 +4,9 @@ spends its time reading websites or asking the AI:
   1. need score (targeting.py), for every waiting lead in an approved industry, in batches
   2. for the leads the next sends would pick, best first (sender.batch), until TARGET_FACTOR
      x DAILY_LIMIT of them are ready: the niche check (nichefit.py), the contact on the site
-     (contacts.py), with USE_AI_OPENER the personal opening (personalise.py), and for a lead
+     (contacts.py), the first email's variant, stored on the lead (sender.choose_variant: D
+     only for a name beyond doubt), with USE_AI_OPENER the personal opening (personalise.py;
+     never for a D lead, whose email has none), and for a lead
      found more than contacts.RECHECK_AFTER_DAYS ago, whether its address is still on its
      website (contacts.recheck_addresses)
 
@@ -58,6 +60,12 @@ def step(skip=None, score_batch=SCORE_BATCH, lead_batch=LEAD_BATCH):
     # read again: a lead that fits no niche has dropped out, one that moved niche is scored next
     checked = [l for l in sender.approved_waiting(quiet=True) if l["id"] in ids and not nichefit.needs_check(l)]
     contacts.run(checked)
+    # the variant, stored on the lead (its name checked first: D only for a name beyond
+    # doubt), before the opener, which a D lead never gets
+    for lead in sender.approved_waiting(quiet=True):
+        if lead["id"] in ids and not nichefit.needs_check(lead):
+            sender.choose_variant(lead)
+    checked = [l for l in sender.approved_waiting(quiet=True) if l["id"] in ids and not nichefit.needs_check(l)]
     personalise.run(checked)
     # a lead found long ago: is its address still on its website? (read again after contacts.run,
     # which may have changed the address)

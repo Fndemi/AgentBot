@@ -116,7 +116,8 @@ def test_then_any_other_inbox_before_a_persons_address():
 
 @pytest.fixture
 def old_lead(tmp_path, monkeypatch):
-    """A waiting fintech lead found by discovery 61 days ago, scored and contact-checked."""
+    """A waiting fintech lead found by discovery 61 days ago, scored, contact-checked and given
+    its first email's variant (the prepare job's sender.choose_variant)."""
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "test.db"))
     monkeypatch.setattr(config, "USE_AI_OPENER", False)
     db.init()
@@ -127,7 +128,7 @@ def old_lead(tmp_path, monkeypatch):
     with db.conn() as c:
         c.execute("UPDATE leads SET discovered_at=?, created_at=?, score=80, scored_at=CURRENT_TIMESTAMP,"
                   " score_version=?, contact_checked_at=CURRENT_TIMESTAMP, niche_fit='fintech',"
-                  " niche_checked_at=CURRENT_TIMESTAMP WHERE id=?",
+                  " niche_checked_at=CURRENT_TIMESTAMP, template_variant='A' WHERE id=?",
                   (found, found, targeting.SCORE_VERSION, lead_id))
     return lead_id
 

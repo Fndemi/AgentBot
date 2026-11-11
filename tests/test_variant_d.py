@@ -12,7 +12,9 @@ import pytest
 import config
 import crm
 import db
+import names
 import personalise
+import prepare
 import ranking
 import rotation
 import sender
@@ -151,6 +153,16 @@ def waiting(n, industry="sacco", start=0):
     return ids
 
 
+def clear(ids):
+    """Give these leads a name beyond doubt (names.doubt): checked, from the site's own name."""
+    with db.conn() as c:
+        for i in ids:
+            c.execute("UPDATE leads SET company='Umoja Capital', display_name='Umoja Capital', website=?,"
+                      " name_source='og:site_name', name_version=? WHERE id=?",
+                      (f"umojacapital{i}.co.ke", names.NAME_VERSION, i))
+    return ids
+
+
 def variant_of(lead_id):
     with db.conn() as c:
         return c.execute("SELECT template_variant FROM leads WHERE id=?", (lead_id,)).fetchone()[0]
@@ -169,27 +181,27 @@ def history(per_variant, days_ago=30):
 
 def test_d_gets_the_same_share_not_every_lead_until_it_catches_up(world, smtp):
     history(30)   # A, B and C have 30 leads each from before D
-    ids = waiting(8)
+    ids = clear(waiting(8))
     sender.run()
     assert sorted(variant_of(i) for i in ids) == list("AABBCCDD")
 
 
 def test_once_d_has_started_shares_are_evened_from_its_first_day(world, smtp):
     history(30)
-    sender.run() if waiting(4) else None            # today: one each
+    sender.run() if clear(waiting(4)) else None     # today: one each
     assert rotation.counts("sacco", rotation.balance_from("sacco", list("ABCD"))) == dict.fromkeys("ABCD", 1)
     assert rotation.counts("sacco") == {"A": 31, "B": 31, "C": 31, "D": 1}
 
 
 def test_a_niche_limited_to_some_variants_gets_d_alongside_them(world, smtp):
     assert personalise.USES["software_agency"]["variants"] == ["A", "B", "D"]
-    ids = waiting(6, "software_agency")
+    ids = clear(waiting(6, "software_agency"))
     sender.run()
     assert sorted(variant_of(i) for i in ids) == list("AABBDD")
 
 
 def test_d_emails_go_out_plain_and_are_recorded_as_d(world, smtp, monkeypatch):
-    monkeypatch.setattr(rotation, "pick", lambda niche, available, rng=None: "D")
+    monkeypatch.setattr(rotation, "pick", lambda niche, available, rng=None, plain_ok=True: "D")
     [lead_id] = waiting(1)
     sender.run()
     assert variant_of(lead_id) == "D"
@@ -222,3 +234,141 @@ def test_crm_report_counts_replies_per_variant_d_included(world):
 def test_crm_template_editor_accepts_ds_gaps():
     for gap in ("about", "a_niche_noun", "uses_list", "first_two_uses"):
         assert gap in crm.TEMPLATE_FIELDS
+
+
+# --- Only a name beyond doubt gets D ---
+
+def named(**fields):
+    base = {"company": "Umoja Capital Ltd", "display_name": "Umoja Capital", "website": "umojacapital.co.ke",
+            "name_source": "og:site_name", "name_version": names.NAME_VERSION, "source": "search"}
+    return dict(base, **fields)
+
+
+@pytest.mark.parametrize("fields, why", [
+    ({}, None),
+    ({"source": "sasra", "imported_at": "2026-11-11", "company": "Stima Sacco Society Ltd",
+      "display_name": "Stima Sacco", "website": None, "name_source": "sasra"}, None),
+    ({"name_source": "current name, checked"}, None),
+    ({"name_version": None}, "not checked"),
+    ({"name_source": "domain", "display_name": "Umoja Capital"}, "built from the address"),
+    ({"name_source": "logo, chosen by AI"}, "picked by the AI"),
+    ({"name_source": "none"}, "no name"),
+    ({"display_name": "Umoja Capital Credit Group Holdings"}, "more than 4 words"),
+    ({"company": "Best Umoja Capital in Nairobi", "display_name": "Best Umoja Capital"}, "search phrase or page title"),
+    ({"display_name": "Umoja | Loans Fast"}, "search phrase or page title"),
+    ({"display_name": "Umoja Trusted Loans"}, "slogan"),
+    ({"display_name": "umoja capital"}, "like an address"),
+    ({"display_name": "Zawadi Loans"}, "doesn't match the address"),
+])
+def test_which_names_are_beyond_doubt(fields, why):
+    got = names.doubt(named(**fields))
+    assert got is None if why is None else why in got
+
+
+def saved(lead_id):
+    with db.conn() as c:
+        return dict(c.execute("SELECT * FROM leads WHERE id=?", (lead_id,)).fetchone())
+
+
+def test_a_doubtful_name_never_gets_d_even_when_d_is_due(world):
+    history(5, days_ago=0)        # today: D is far behind A, B and C
+    [doubtful] = waiting(1)       # "Sacco 0" on sacco0.co.ke: not checked, so in doubt
+    for _ in range(5):
+        with db.conn() as c:
+            c.execute("UPDATE leads SET template_variant=NULL WHERE id=?", (doubtful,))
+        assert sender.choose_variant(saved(doubtful)) in "ABC"
+    [clear_id] = clear(waiting(1, start=50))
+    assert sender.choose_variant(saved(clear_id)) == "D"
+
+
+def test_the_choice_is_stored_logged_and_kept(world):
+    [lead_id] = waiting(1)
+    variant = sender.choose_variant(saved(lead_id))
+    assert saved(lead_id)["template_variant"] == variant
+    with db.conn() as c:
+        event = c.execute("SELECT detail FROM lead_events WHERE lead_id=? AND event_type='variant_chosen'",
+                          (lead_id,)).fetchone()
+    assert '"not D: name not checked' in event["detail"]
+    assert sender.choose_variant(saved(lead_id)) == variant          # asked again: the same
+
+
+def test_a_d_lead_whose_name_comes_into_doubt_gets_a_b_or_c(world):
+    [lead_id] = clear(waiting(1))
+    with db.conn() as c:
+        c.execute("UPDATE leads SET template_variant='D' WHERE id=?", (lead_id,))
+    assert sender.choose_variant(saved(lead_id)) == "D"
+    with db.conn() as c:
+        c.execute("UPDATE leads SET name_source='domain' WHERE id=?", (lead_id,))
+    assert sender.choose_variant(saved(lead_id)) in "ABC"
+
+
+def test_an_emailed_lead_keeps_its_variant(world):
+    [lead_id] = waiting(1)
+    db.record_sent(lead_id, "<1@x>", "sacco_D", template_variant="D")
+    assert sender.choose_variant(saved(lead_id)) is None and saved(lead_id)["template_variant"] == "D"
+
+
+def test_the_sender_uses_the_stored_variant(world, smtp):
+    history(5)                    # B is not the least sent...
+    [lead_id] = clear(waiting(1, start=60))
+    with db.conn() as c:
+        c.execute("UPDATE leads SET template_variant='B' WHERE id=?", (lead_id,))
+    sender.run()                  # ...but it is the one stored
+    with db.conn() as c:
+        assert c.execute("SELECT template FROM sent WHERE lead_id=?", (lead_id,)).fetchone()[0] == "sacco_B"
+
+
+# --- Ready for the send, and the opener ---
+
+@pytest.fixture
+def real_prepared(monkeypatch):
+    monkeypatch.setattr(sender, "prepared", sender.REAL_PREPARED)
+    monkeypatch.setattr(config, "USE_AI_OPENER", True)
+
+
+def test_a_d_lead_is_ready_without_an_opener_a_b_c_need_one(world, real_prepared):
+    lead = named(id=1, industry="sacco", template_variant="D", confidence=None)
+    assert sender.variant_ready(lead)
+    assert not sender.variant_ready(dict(lead, template_variant="A"))
+    assert sender.variant_ready(dict(lead, template_variant="A", confidence=1))
+    assert not sender.variant_ready(dict(lead, template_variant=None, confidence=1))   # not chosen yet
+    assert not sender.variant_ready(dict(lead, name_source="domain"))                  # D, name in doubt
+    assert sender.variant_ready({"industry": "agriculture", "confidence": 1})          # no rotation
+
+
+def test_the_opener_is_never_written_for_a_d_lead(world, real_prepared, monkeypatch):
+    asked = []
+    monkeypatch.setattr(personalise, "generate", lambda lead: asked.append(lead["id"]) or
+                        {"opener": None, "uses": None, "source": None, "url": None, "note": "none"})
+    monkeypatch.setattr(ranking, "fill_years", lambda *a, **k: 0)
+    d_id, a_id = waiting(2)
+    with db.conn() as c:
+        c.execute("UPDATE leads SET template_variant='D' WHERE id=?", (d_id,))
+        c.execute("UPDATE leads SET template_variant='A' WHERE id=?", (a_id,))
+    personalise.run([saved(d_id), saved(a_id)])
+    personalise.run()             # the bot's own personalise step too
+    assert asked == [a_id]
+
+
+def test_the_prepare_job_picks_and_stores_the_variant_before_the_opener(world, real_prepared, monkeypatch):
+    import contacts
+    import nichefit
+    import targeting
+    asked = []
+    monkeypatch.setattr(personalise, "generate", lambda lead: asked.append(lead["id"]) or
+                        {"opener": None, "uses": None, "source": None, "url": None, "note": "none"})
+    monkeypatch.setattr(ranking, "fill_years", lambda *a, **k: 0)
+    monkeypatch.setattr(nichefit, "check", lambda leads: set())
+    monkeypatch.setattr(nichefit, "needs_check", lambda lead: False)
+    monkeypatch.setattr(contacts, "run", lambda leads, **k: 0)
+    monkeypatch.setattr(contacts, "recheck_addresses", lambda leads, **k: None)
+    clear_id, doubtful_id = clear(waiting(1)) + waiting(1, start=70)
+    with db.conn() as c:
+        c.execute("UPDATE leads SET score=60, score_version=?, scored_at=CURRENT_TIMESTAMP,"
+                  " contact_checked_at=CURRENT_TIMESTAMP", (targeting.SCORE_VERSION,))
+    monkeypatch.setattr(rotation, "pick", lambda niche, available, rng=None, plain_ok=True:
+                        "D" if plain_ok else "C")
+    prepare.run()
+    assert (saved(clear_id)["template_variant"], saved(doubtful_id)["template_variant"]) == ("D", "C")
+    assert asked == [doubtful_id]                       # only the C lead's opener was written
+    assert {l["id"] for l in prepare.ready()} == {clear_id, doubtful_id}

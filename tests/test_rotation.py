@@ -130,10 +130,10 @@ def test_meet_options_by_niche(niche, first):
 # --- Who gets which variant ---
 
 def test_each_new_lead_gets_the_variant_used_least(world, mail):
-    ids = waiting(8)
+    ids = waiting(9)    # names not checked: never D (tests/test_variant_d.py)
     sender.run()
     variants = [lead_variant(i) for i in ids]
-    assert sorted(variants) == list("AABBCCDD")
+    assert sorted(variants) == list("AAABBBCCC")
     for i, v in zip(ids, variants):
         assert sent_variants(i) == [v]
     assert [m["Subject"] for m in mail["messages"]][0] in {

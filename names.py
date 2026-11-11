@@ -389,6 +389,41 @@ def short_name(lead):
     return lead.get("display_name") or display(lead.get("company")) or None
 
 
+# Variant D (rotation.PLAIN_VARIANTS) names the company four times, so only a name beyond
+# doubt gets it: checked under today's rules, not built from the address, not picked by the AI
+# from names that disagreed, no search phrase, page title or slogan, at most CLEAR_MAX_WORDS
+CLEAR_MAX_WORDS = 4
+
+
+def doubt(lead):
+    """Why the lead's name isn't beyond doubt (so it gets A, B or C, never D), or None."""
+    lead = dict(lead)
+    if lead.get("name_version") != NAME_VERSION:
+        return "name not checked under today's rules"
+    source = lead.get("name_source") or ""
+    short = short_name(lead)
+    if source == NONE or not short:
+        return "no name"
+    if source.startswith("domain"):
+        return "name built from the address"
+    if "chosen by AI" in source:
+        return "the site's names disagreed (picked by the AI)"
+    if len(short.split()) > CLEAR_MAX_WORDS:
+        return f"name has more than {CLEAR_MAX_WORDS} words"
+    full = clean(lead.get("company") or short) or short
+    if SEARCH_PHRASE.search(full.lower()) or SEARCH_PHRASE.search(short.lower()):
+        return "name reads like a search phrase or page title"
+    if SLOGAN.search(short):
+        return "name reads like a slogan or description"
+    if short == short.lower():
+        return "name written like an address"
+    if not official(lead):
+        why = problem(short, domain_of(lead.get("website")), source)
+        if why:
+            return f"name {why}"
+    return None
+
+
 def home_of(website):
     return website if website.startswith("http") else f"https://{website}"
 

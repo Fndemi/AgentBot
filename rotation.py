@@ -12,6 +12,11 @@ niche (variants: [A, B]); a lead that already has one keeps it.
 D (PLAIN_VARIANTS) is plain text with no links at all: its first email and its follow-up 1 go
 out with no HTML part, no booking line, no profile line and no website; the phone number is
 in the signature only. It is written from each niche's about, noun and sms_uses in uses.yaml.
+It names the company four times, so only a lead whose name is beyond doubt (names.doubt) gets
+it; any other gets A, B or C.
+
+The prepare job picks each waiting lead's variant (sender.choose_variant) and stores it on the
+lead, so the opener is never written for a D lead, and the send uses the stored variant.
 
 Leads emailed before the rotation have no variant: they finish with their niche's old
 follow-up 1 (templates/followup/<niche>.txt) plus a meeting request, then the new follow-up 2
@@ -115,10 +120,11 @@ def balance_from(niche, options):
     return max(first.values())
 
 
-def pick(niche, available, rng=random):
+def pick(niche, available, rng=random, plain_ok=True):
     """The variant a new lead in this niche gets: of those enabled, the one sent least since
-    balance_from, a random one of them on a tie."""
-    options = enabled(niche, available)
+    balance_from, a random one of them on a tie. plain_ok=False (the lead's name isn't beyond
+    doubt: names.doubt) leaves out PLAIN_VARIANTS (D)."""
+    options = [v for v in enabled(niche, available) if plain_ok or v not in PLAIN_VARIANTS]
     if not options:
         raise RuntimeError(f"uses.yaml switches off every variant for {niche} "
                            f"(variants: {personalise.USES[niche].get('variants')})")

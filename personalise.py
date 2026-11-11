@@ -337,10 +337,13 @@ def run(leads=None, limit=None):
     Does nothing, and calls no AI, when USE_AI_OPENER is false."""
     if not config.USE_AI_OPENER:
         return 0
+    import rotation
     if leads is None:
         leads = db.leads_to_personalise(limit)
     else:
         leads = [l for l in leads if dict(l).get("confidence") is None]
+    # a D lead's email has no opener line: no AI call for it (rotation.PLAIN_VARIANTS)
+    leads = [l for l in leads if dict(l).get("template_variant") not in rotation.PLAIN_VARIANTS]
     if not leads:
         return 0
     used = 0

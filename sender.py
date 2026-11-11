@@ -109,13 +109,54 @@ def variants(lead):
 
 
 def first_variant(lead):
-    """The variant of the lead's first email: the one saved on it, otherwise the one its niche
-    has sent least (rotation.pick). None for a niche that isn't in the rotation."""
+    """The variant of the lead's first email: the one saved on it (the prepare job picks it:
+    choose_variant), otherwise the one its niche has sent least (rotation.pick; D only for a
+    name beyond doubt). None for a niche that isn't in the rotation."""
     available = variants(lead)
     if not available:
         return None
     saved = dict(lead).get("template_variant")
-    return saved if saved in available else rotation.pick(personalise.industry_key(lead), available)
+    if saved in available:
+        return saved
+    return rotation.pick(personalise.industry_key(lead), available, plain_ok=names.doubt(lead) is None)
+
+
+def choose_variant(lead):
+    """The prepare job's pick of a waiting lead's first-email variant, stored on the lead:
+    its name is checked first (names.ensure), and only a name beyond doubt (names.doubt) may
+    get D; a lead given D whose name has since come into doubt gets A, B or C instead. Shares
+    stay even (rotation.pick counts stored variants too). Returns the variant, or None for a
+    niche not in the rotation or a lead already emailed (its variant never changes)."""
+    lead = dict(lead)
+    available = variants(lead)
+    if not available or lead["id"] in db.emailed_lead_ids():
+        return None
+    lead = names.ensure(lead)
+    why = names.doubt(lead)
+    saved = lead.get("template_variant")
+    if saved in available and (saved not in rotation.PLAIN_VARIANTS or why is None):
+        return saved
+    variant = rotation.pick(personalise.industry_key(lead), available, plain_ok=why is None)
+    with db.conn() as c:
+        c.execute("UPDATE leads SET template_variant=? WHERE id=?", (variant, lead["id"]))
+        db.log_event(c, lead["id"], "variant_chosen", variant=variant, before=saved,
+                     why=f"not D: {why}" if why else None)
+    return variant
+
+
+def variant_ready(lead):
+    """Whether a lead's first-email variant is ready: none needed outside the rotation; else
+    stored, and for D a name beyond doubt, for A/B/C (with USE_AI_OPENER) the opener tried."""
+    lead = dict(lead)
+    available = variants(lead)
+    if not available:
+        return not config.USE_AI_OPENER or lead.get("confidence") is not None
+    variant = lead.get("template_variant")
+    if variant not in available:
+        return False
+    if variant in rotation.PLAIN_VARIANTS:
+        return names.doubt(lead) is None
+    return not config.USE_AI_OPENER or lead.get("confidence") is not None
 
 
 def first_subject(lead):
@@ -800,12 +841,13 @@ def prepared(lead):
     without a website), with USE_AI_OPENER its opening line tried (personalise.py), and for
     a lead found more than contacts.RECHECK_AFTER_DAYS ago, its address seen on its website
     again within contacts.RECHECK_VALID_DAYS, and for a lead from an imported list (a CBK
-    directory), its address settled against its website (contacts.settle_listed). The
-    prepare job (prepare.py) does all that, never the send."""
+    directory), its address settled against its website (contacts.settle_listed), and in a
+    rotation niche its variant chosen and stored (variant_ready: a D lead needs no opener).
+    The prepare job (prepare.py) does all that, never the send."""
     lead = dict(lead)
     return (targeting.scored(lead) and not nichefit.needs_check(lead)
             and bool(lead.get("contact_checked_at") or not lead.get("website"))
-            and (not config.USE_AI_OPENER or lead.get("confidence") is not None)
+            and variant_ready(lead)
             and not contacts.needs_address_check(lead) and not contacts.needs_list_check(lead))
 
 
