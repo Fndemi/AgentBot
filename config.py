@@ -94,6 +94,8 @@ MEETING_TIMES = env("MEETING_TIMES", "10am,11:30am,2pm,3:30pm")
 SEARCH_PROVIDER = env("SEARCH_PROVIDER", "duckduckgo").strip().lower()
 TAVILY_API_KEY = env("TAVILY_API_KEY", "")
 TAVILY_MONTHLY_CAP = int(env("TAVILY_MONTHLY_CAP", "900"))
+# Of those, how many regulator-list imports (imports.py) always leave for discovery each month
+TAVILY_DISCOVERY_RESERVE = int(env("TAVILY_DISCOVERY_RESERVE", "300"))
 # New leads discover.py looks for in one run (python main.py discover, and the daily auto run),
 # shared evenly across the niches approved and not paused in uses.yaml
 DISCOVER_PER_DAY = int(env("DISCOVER_PER_DAY", "50"))

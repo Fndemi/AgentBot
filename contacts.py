@@ -750,6 +750,25 @@ def site_candidates(result):
     return unique
 
 
+def published_address(result, lead_id=None):
+    """(address, why, page, person or None): the best of site_candidates that is no other lead's
+    (lead_id: the lead it is for), not opted out, and whose mail server answers. None if there
+    is none; "waiting" if a mail server lookup couldn't say (a timeout: try again later)."""
+    import verify
+    for email, why, page, person in site_candidates(result):
+        with db.conn() as c:
+            taken = c.execute("SELECT 1 FROM leads WHERE email=? AND id<>? UNION SELECT 1 FROM suppression"
+                              " WHERE email=?", (email, lead_id or 0, email)).fetchone()
+        if taken:
+            continue
+        answers = verify.mail_answers(db.email_domain(email))
+        if answers is None:
+            return "waiting"
+        if answers:
+            return email, why, page, person
+    return None
+
+
 def settle_listed(lead, result):
     """Settle an imported lead's address from find()'s result (None: it has no website).
     Returns "changed" (now an address the site publishes, or back to the list's), "kept"
@@ -767,18 +786,13 @@ def settle_listed(lead, result):
     if result is not None and result.get("read", True):
         with db.conn() as c:
             save_contacts(c, lead_id, result)
-        for email, why, page, person in site_candidates(result):
-            with db.conn() as c:
-                taken = c.execute("SELECT 1 FROM leads WHERE email=? AND id<>? UNION SELECT 1 FROM suppression"
-                                  " WHERE email=?", (email, lead_id, email)).fetchone()
-            if taken:
-                continue
-            answers = verify.mail_answers(db.email_domain(email))
-            if answers is None:
-                return "waiting"
-            if answers:
-                _use(lead, email, "site", why, page, person)
-                return "kept" if email == before else "changed"
+        picked = published_address(result, lead_id)
+        if picked == "waiting":
+            return "waiting"
+        if picked:
+            email, why, page, person = picked
+            _use(lead, email, "site", why, page, person)
+            return "kept" if email == before else "changed"
     # The site publishes no address that can be used: judge the list's own
     listed, site = list_address(lead), db.email_domain(lead.get("website") or "")
     domain = db.email_domain(listed)

@@ -142,3 +142,7 @@ transport:
 utility:
   approved: false
   uses: [bill reminders, outage notices, meter reading alerts, payment reminders]
+# water service providers (WASREB's register): not approved until its templates exist
+water_utility:
+  approved: false
+  uses: [bill reminders, water interruption notices, meter reading alerts, payment confirmations]

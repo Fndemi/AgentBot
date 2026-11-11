@@ -246,12 +246,16 @@ def email_type(email):
 
 
 def lead_source(row):
-    """Where the lead came from: its campaign (Group A), CBK, search, or list."""
+    """Where the lead came from: its campaign (Group A), a regulator's list by its SOURCE key
+    (sasra, cbk_psp...: imports.py), CBK (the older directory imports), search, or list."""
+    import imports
     if row["lead_id"] is None:
         return "not linked to a lead"
     if row["campaign"]:
         return row["campaign"]
     source = (row["source"] or "").strip()
+    if source in imports.SOURCES:
+        return source
     if "cbk" in source.lower():
         return "CBK"
     if source == "search":

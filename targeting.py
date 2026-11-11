@@ -165,6 +165,8 @@ def clean(entry):
         "emails": emails,
         "email": email,
         "website": ranking.urlparse_domain(listed) if listed else website_of(email),
+        # only the website the directory itself lists (imports.py never uses the email's domain)
+        "listed_website": ranking.urlparse_domain(listed) if listed else None,
         "phone": phone or None,
         "address": address.strip() or None,
         "licensed": iso_date(entry.get("licensed", "")),

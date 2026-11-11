@@ -41,6 +41,8 @@ python main.py stats
 python main.py contacts --recent 50   # how many leads got a named contact, by title and confidence
 python main.py contacts --reread --limit 50   # read waiting leads' sites again for contacts (best first; stop and rerun any time)
 python main.py list-addresses --limit 50   # CBK/imported leads: use an address their own site publishes today
+python main.py import-all --dry-run         # regulators' lists (SASRA, CBK, WASREB, IRA, EARB, CMA): what each would add
+python main.py import-list earb gazette.pdf --niche proptech   # one list, a PDF or a web page with a table
 python main.py bounces 30             # bounces in the last 30 days: by email type, lead source, step; top reasons
 python main.py export                 # leads.csv, events.csv, replies.csv (join on lead_id)
 python main.py auto                   # or leave this running: sends at 9am, tops up until 5pm, prepares leads after 5pm (resumes after a restart)

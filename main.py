@@ -25,6 +25,8 @@
   python main.py contacts [--recent N]   how many leads got a named contact, by title and confidence
   python main.py contacts --reread [--limit N]   read waiting leads' sites again for contacts (best first; resumable)
   python main.py list-addresses [--limit N]   imported leads (CBK...): use an address their site publishes today
+  python main.py import-list SOURCE FILE_OR_URL --niche NICHE [--dry-run]   a regulator's list (imports.py)
+  python main.py import-all [--dry-run]  the latest list of every source: sasra, cbk_psp, cbk_mfb, wasreb, ira, earb, cma_sandbox
   python main.py bounces [days]          bounces in the last N days (default 30): by email type, lead source, step; top reasons
   python main.py unsubscribe a@b.com     manually opt someone out
   python main.py export [folder]         write leads.csv, events.csv and replies.csv (joined on lead_id)
@@ -152,6 +154,12 @@ def main():
         if args:
             sys.exit("Usage: python main.py list-addresses [--limit N]")
         contacts.check_listed(limit)
+    elif cmd == "import-list":
+        import imports
+        imports.main(args)
+    elif cmd == "import-all":
+        import imports
+        imports.main(["all"] + args)
     elif cmd == "bounces":
         import bounces
         if args and not args[0].isdigit():
@@ -161,6 +169,11 @@ def main():
         leads, replies = db.stats()
         print("Leads:", leads or "none")
         print("Replies:", replies or "none")
+        by_source = db.list_source_stats()
+        if by_source:
+            print("By list source (leads / emailed / replied / bounced):")
+            for source, n in by_source.items():
+                print(f"  {source:12} {n['leads']:>5} {n['emailed']:>8} {n['replied']:>8} {n['bounced']:>8}")
         import config
         import sender
         emailed, bounced = db.bounce_stats(config.BOUNCE_WINDOW_DAYS)

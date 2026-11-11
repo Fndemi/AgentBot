@@ -918,6 +918,27 @@ def stats():
                            f" WHERE {real('l')} GROUP BY r.label").fetchall()
     return {r["status"]: r["n"] for r in rows}, {r["label"]: r["n"] for r in labels}
 
+def list_source_stats():
+    """{source: {"leads", "emailed", "replied", "bounced"}} for leads from a regulator's list
+    (imports.SOURCES keys, plus the older CBK directories as "CBK")."""
+    import imports
+    out = {}
+    with conn() as c:
+        rows = c.execute("""SELECT l.source, l.status,
+                 EXISTS (SELECT 1 FROM sent s WHERE s.lead_id = l.id) AS emailed,
+                 EXISTS (SELECT 1 FROM replies r WHERE r.lead_id = l.id
+                         AND r.label NOT IN ('bounce', 'out_of_office')) AS replied
+            FROM leads l WHERE l.imported_at IS NOT NULL""").fetchall()
+    for r in rows:
+        source = r["source"] if r["source"] in imports.SOURCES else "CBK" if "cbk" in (r["source"] or "").lower() else None
+        if source:
+            n = out.setdefault(source, {"leads": 0, "emailed": 0, "replied": 0, "bounced": 0})
+            n["leads"] += 1
+            n["emailed"] += bool(r["emailed"])
+            n["replied"] += bool(r["replied"])
+            n["bounced"] += r["status"] == "bounced"
+    return out
+
 # file -> (table, what its id column is called in the file). Every file has lead_id to join on.
 EXPORTS = {"leads.csv": ("leads", "lead_id"), "events.csv": ("lead_events", "event_id"),
            "replies.csv": ("replies", "reply_id")}

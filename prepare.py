@@ -70,10 +70,25 @@ def step(skip=None, score_batch=SCORE_BATCH, lead_batch=LEAD_BATCH):
 
 def run(seconds=RUN_SECONDS):
     """Steps until enough leads are ready, nothing is left to do, or `seconds` have passed."""
+    lists = list_websites()
     skip, worked, start = set(), 0, time.monotonic()
     while time.monotonic() - start < seconds:
         n = step(skip)
         if not n:
             break
         worked += n
-    return f"worked on {worked} leads; {len(ready())} ready for first emails (aiming for {target()})"
+    return (f"worked on {worked} leads; {len(ready())} ready for first emails (aiming for {target()})"
+            + (f"; {lists}" if lists else ""))
+
+
+def list_websites():
+    """Organisations from regulators' lists still waiting: today's batch of website lookups
+    and sites read again (imports.daily). An error here never stops the rest of the job."""
+    import imports
+    try:
+        n = imports.daily()
+    except Exception as e:
+        return f"list websites: FAILED ({e})"
+    if not (n["searched"] or n["retried"]):
+        return ""
+    return f"list websites: searched {n['searched']}, read again {n['retried']}, added {n['added']}"
