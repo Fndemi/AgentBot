@@ -1284,7 +1284,7 @@ def report(days: int = 0, user=Depends(admin_only)):
         return {"emailed": 0, "bounced": 0, "reachable": 0, "replied": 0, "interested": 0, "meetings": 0, "clients": 0}
 
     import rotation
-    # template: niche x variant; technique: A vs B vs C across niches. Leads emailed before
+    # template: niche x variant; technique: A vs B vs C vs D across niches. Leads emailed before
     # the rotation (no variant) are in neither.
     # opener: first email with an AI opener vs without; contact: to a named contact vs a role
     # address. Leads first emailed before these were recorded are in neither.
@@ -1332,7 +1332,7 @@ def report(days: int = 0, user=Depends(admin_only)):
         if g in order:
             items.sort(key=lambda x: order[g].index(x["name"]) if x["name"] in order[g] else 99)
         elif g in ("template", "technique"):
-            items.sort(key=lambda x: x["name"])  # niche, then A, B, C
+            items.sort(key=lambda x: x["name"])  # niche, then A, B, C, D
         else:
             items.sort(key=lambda x: (-x["emailed"], x["name"]))  # ties by name, on any database
         out[g] = items
@@ -1446,7 +1446,7 @@ def edit_user(user_id: int, body: EditUserIn, admin=Depends(admin_only)):
 # The bot reads templates/<industry>.txt (first email: a "Subject:" line, then the text),
 # templates/followup/ and templates/followup2/ (text only) every time it builds an email,
 # so a template saved here is used from the next email that goes out. A niche in the A/B/C
-# rotation (rotation.py) also has <industry>_A.txt, _B.txt and _C.txt as first emails and in
+# rotation (rotation.py) also has <industry>_A.txt, _B.txt, _C.txt and _D.txt as first emails and in
 # followup/; its plain <industry>.txt ones are then the legacy templates of leads emailed before.
 
 TEMPLATE_DIR = HERE / "templates"
@@ -1457,7 +1457,7 @@ VARIANT_NAME = re.compile(r"^([a-z0-9_]+)_([A-Z])$")  # sacco_A: one rotation va
 TEMPLATE_FIELDS = ("company", "uses", "opener", "attachment_line", "sender", "our_company", "phone", "website",
                    "profile_line", "profile_url", "industry",
                    "free_sms", "setup_days", "price_from", "slot1", "slot2", "booking_line", "meet_options",
-                   "greeting")
+                   "greeting", "about", "a_niche_noun", "uses_list", "first_two_uses")
 MAX_TEMPLATE_CHARS = 6000
 
 

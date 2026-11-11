@@ -46,7 +46,7 @@ def test_approved_with_the_listed_uses(niche):
 @pytest.mark.parametrize("niche", NICHES)
 def test_three_variants_with_follow_ups_signature_and_footer(world, niche):
     lead = {"id": 4, "company": "Duka", "industry": niche, "email": "info@duka.co.ke"}
-    assert sender.variants(lead) == ["A", "B", "C"]
+    assert sender.variants(lead) == ["A", "B", "C", "D"]   # D: tests/test_variant_d.py
     for v in "ABC":
         lead["template_variant"] = v
         first, tname = sender.build(lead)

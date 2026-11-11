@@ -1,0 +1,10 @@
+{greeting}
+
+Just following up on my earlier email. I'd be interested to understand how {company} currently sends {first_two_uses}, and whether TalkSasa could support it.
+
+Would a short 20-minute call next week work for you?
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}

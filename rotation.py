@@ -1,11 +1,17 @@
-"""A/B/C template rotation (templates v4) and the gaps every v4 email has.
+"""A/B/C/D template rotation (templates v4) and the gaps every v4 email has.
 
-A niche in rotation has three first emails, one per technique: templates/<niche>_A.txt,
-_B.txt and _C.txt, each with its own follow-up 1 (templates/followup/<niche>_<variant>.txt),
-and one follow-up 2 for all three (templates/followup2/<niche>.txt). When a lead's first email
-goes out it gets the variant sent least so far in its niche (random on a tie), saved on the
-lead and on every sent row, and keeps it for its follow-ups. uses.yaml can switch variants
-off for a niche (variants: [A, B]); a lead that already has one keeps it.
+A niche in rotation has a first email per technique: templates/<niche>_A.txt, _B.txt, _C.txt
+and _D.txt, each with its own follow-up 1 (templates/followup/<niche>_<variant>.txt), and one
+follow-up 2 for all of them (templates/followup2/<niche>.txt). When a lead's first email goes
+out it gets the variant sent least in its niche since the newest of them was first sent there
+(random on a tie), so a variant added later gets the same share as the others from then on
+instead of all the leads until it catches up. The variant is saved on the lead and on every
+sent row, and the lead keeps it for its follow-ups. uses.yaml can switch variants off for a
+niche (variants: [A, B]); a lead that already has one keeps it.
+
+D (PLAIN_VARIANTS) is plain text with no links at all: its first email and its follow-up 1 go
+out with no HTML part, no booking line, no profile line and no website; the phone number is
+in the signature only. It is written from each niche's about, noun and sms_uses in uses.yaml.
 
 Leads emailed before the rotation have no variant: they finish with their niche's old
 follow-up 1 (templates/followup/<niche>.txt) plus a meeting request, then the new follow-up 2
@@ -22,8 +28,10 @@ import config
 import db
 import personalise
 
-VARIANTS = ("A", "B", "C")
-TECHNIQUES = {"A": "Quick question", "B": "Free test", "C": "Niche angle"}
+VARIANTS = ("A", "B", "C", "D")
+TECHNIQUES = {"A": "Quick question", "B": "Free test", "C": "Niche angle", "D": "Plain intro"}
+# Variants whose first email and follow-up 1 are plain text only: no HTML part, no links
+PLAIN_VARIANTS = ("D",)
 # Niches offered a visit first; the rest are offered a video call first
 VISIT_NICHES = ("sacco", "school", "church")
 VISIT_OPTIONS = "at your office if you're in or near Nairobi, on a video call or by phone"
@@ -75,26 +83,46 @@ def enabled(niche, available):
     return [v for v in VARIANTS if v in available and v in wanted]
 
 
-def counts(niche):
-    """How many leads in this niche have had their first email from each variant."""
+def _given(niche):
+    """[(variant, day of the lead's first email or None if it hasn't gone yet)] for every lead
+    in this niche that has been given a variant."""
     with db.conn() as c:
-        rows = c.execute("SELECT industry, template_variant, COUNT(*) AS n FROM leads"
-                         " WHERE template_variant IS NOT NULL GROUP BY industry, template_variant").fetchall()
+        rows = c.execute("SELECT l.industry, l.template_variant,"
+                         " (SELECT MIN(s.sent_on) FROM sent s WHERE s.lead_id = l.id) AS first_sent"
+                         " FROM leads l WHERE l.template_variant IS NOT NULL").fetchall()
+    return [(r["template_variant"], r["first_sent"]) for r in rows if personalise.industry_key(r) == niche]
+
+
+def counts(niche, since=None):
+    """How many leads in this niche have had their first email from each variant; with
+    `since` (YYYY-MM-DD), only those first emailed that day or later (or not sent yet)."""
     out = {}
-    for r in rows:
-        if personalise.industry_key(r) == niche:
-            out[r["template_variant"]] = out.get(r["template_variant"], 0) + r["n"]
+    for variant, first in _given(niche):
+        if since is None or first is None or str(first) >= since:
+            out[variant] = out.get(variant, 0) + 1
     return out
 
 
+def balance_from(niche, options):
+    """The day the newest of these variants was first sent in this niche: shares are evened
+    out from then on. Today if one of them has never been sent (it starts level with the rest)."""
+    first = {}
+    for variant, day in _given(niche):
+        if day is not None and variant in options:
+            first[variant] = min(first.get(variant, str(day)), str(day))
+    if any(v not in first for v in options):
+        return today().isoformat()
+    return max(first.values())
+
+
 def pick(niche, available, rng=random):
-    """The variant a new lead in this niche gets: of those enabled, the one sent least so far,
-    a random one of them on a tie."""
+    """The variant a new lead in this niche gets: of those enabled, the one sent least since
+    balance_from, a random one of them on a tie."""
     options = enabled(niche, available)
     if not options:
         raise RuntimeError(f"uses.yaml switches off every variant for {niche} "
                            f"(variants: {personalise.USES[niche].get('variants')})")
-    used = counts(niche)
+    used = counts(niche, balance_from(niche, options))
     least = min(used.get(v, 0) for v in options)
     return rng.choice([v for v in options if used.get(v, 0) == least])
 

@@ -149,14 +149,16 @@ def test_lenders_get_their_own_first_email(world):
     import sender
     targeting.import_lenders("directory.pdf")
     lead = db.find_lead_by_email("info@amazecreditlimited.com")
-    msg, tname = sender.build(lead)  # one of the lenders' A/B/C first emails, no PDF
-    assert tname in ("digital_lender_A", "digital_lender_B", "digital_lender_C")
-    text = msg.get_body(("plain",)).get_content()
-    assert text.startswith("Hello,\n\n")
-    assert "TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider" in text
-    assert "Kind regards,\nFlorence\nTalkSasa Communications Ltd\n+254 762 000 008\ntalksasa.com\n" in text
-    assert 'just reply "unsubscribe"' in text
-    assert list(msg.iter_attachments()) == []
+    assert sender.build(lead)[1] in [f"digital_lender_{v}" for v in "ABCD"]   # one of the lenders' own
+    for v in "ABC":   # no PDF; D (plain text, no links) is checked in tests/test_variant_d.py
+        msg, tname = sender.build(dict(lead, template_variant=v))
+        assert tname == f"digital_lender_{v}"
+        text = msg.get_body(("plain",)).get_content()
+        assert text.startswith("Hello,\n\n")
+        assert "TalkSasa Communications Ltd, a Nairobi-based bulk SMS provider" in text
+        assert "Kind regards,\nFlorence\nTalkSasa Communications Ltd\n+254 762 000 008\ntalksasa.com\n" in text
+        assert 'just reply "unsubscribe"' in text
+        assert list(msg.iter_attachments()) == []
     # a lender emailed before the rotation: the old follow-up 1, then the new follow-up 2
     assert sender.followup_template(lead).name == "digital_lender.txt"
     assert sender.followup_template(lead, 2).name == "digital_lender.txt"

@@ -45,7 +45,7 @@ def test_uses_and_approval():
 @pytest.mark.parametrize("niche", NICHES)
 def test_three_variants_with_follow_ups_signature_and_footer(world, niche):
     lead = {"id": 4, "company": "Pesa", "industry": niche, "email": "info@pesa.co.ke"}
-    assert sender.variants(lead) == ["A", "B", "C"]
+    assert sender.variants(lead) == ["A", "B", "C", "D"]   # D: tests/test_variant_d.py
     for v in "ABC":
         lead["template_variant"] = v
         first, tname = sender.build(lead)
@@ -85,7 +85,7 @@ def test_crm_lists_niches_that_only_have_variants(world):
     crm.ensure_schema()
     listed = {t["name"]: t for t in crm.list_templates({"id": 1, "role": "admin"})["templates"]}
     for niche in NICHES:
-        assert [v["variant"] for v in listed[niche]["variants"]] == ["A", "B", "C"]
+        assert [v["variant"] for v in listed[niche]["variants"]] == ["A", "B", "C", "D"]
         assert listed[niche]["kinds"] == ["followup2"]  # no legacy first email or follow-up 1
     assert "payment_provider_A" not in listed
 

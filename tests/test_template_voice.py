@@ -42,7 +42,12 @@ def test_speaks_to_you(path):
     assert body_of(path).lstrip().startswith("{greeting}")
 
 
-@pytest.mark.parametrize("path", TEMPLATES, ids=rel)
+# Variant D is our best-performing email's own wording, kept as it was written: it names the
+# company in the subject and several times in the text (tests/test_variant_d.py checks it)
+NAMED_MORE_THAN_ONCE = re.compile(r"_D\.txt$")
+
+
+@pytest.mark.parametrize("path", [p for p in TEMPLATES if not NAMED_MORE_THAN_ONCE.search(p.name)], ids=rel)
 def test_company_is_named_once_in_the_subject_or_first_line(path):
     body = body_of(path)
     others = [l for l in body.split("\n") if "{company}" in l and l.strip() != first_line(body)]

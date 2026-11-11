@@ -1,4 +1,4 @@
-"""A/B/C template rotation (templates v4): which variant a lead gets, the meeting times every
+"""A/B/C/D template rotation (templates v4): which variant a lead gets, the meeting times every
 email suggests, the facts it quotes, and leads from before the rotation finishing with their
 old follow-up 1. Temporary database and fake mail server: nothing is sent."""
 import random
@@ -82,7 +82,7 @@ def sent_variants(lead_id):
 @pytest.mark.parametrize("niche", NICHES)
 def test_every_niche_has_three_variants_and_their_follow_ups(world, niche):
     lead = {"id": 1, "company": "Umoja", "industry": niche, "email": "info@umoja.co.ke"}
-    assert sender.variants(lead) == ["A", "B", "C"]
+    assert sender.variants(lead) == ["A", "B", "C", "D"]   # D: tests/test_variant_d.py
     for v in "ABC":
         lead["template_variant"] = v
         first, tname = sender.build(lead)
@@ -130,14 +130,14 @@ def test_meet_options_by_niche(niche, first):
 # --- Who gets which variant ---
 
 def test_each_new_lead_gets_the_variant_used_least(world, mail):
-    ids = waiting(9)
+    ids = waiting(8)
     sender.run()
     variants = [lead_variant(i) for i in ids]
-    assert sorted(variants) == list("AAABBBCCC")
+    assert sorted(variants) == list("AABBCCDD")
     for i, v in zip(ids, variants):
         assert sent_variants(i) == [v]
     assert [m["Subject"] for m in mail["messages"]][0] in {
-        sender.fill(sender.load_template("sacco", v)[1], {"company": "Sacco 0", "industry": "sacco"}) for v in "ABC"}
+        sender.fill(sender.load_template("sacco", v)[1], {"company": "Sacco 0", "industry": "sacco"}) for v in "ABCD"}
 
 
 def test_tie_is_broken_at_random(world, monkeypatch):
@@ -236,7 +236,7 @@ def test_new_leads_and_old_leads_in_one_batch(world, mail):
     old_id = old_lead()
     [new_id] = waiting(1)
     sender.run()
-    assert lead_variant(old_id) is None and lead_variant(new_id) in "ABC"
+    assert lead_variant(old_id) is None and lead_variant(new_id) in "ABCD"
 
 
 # --- The facts must be set ---
@@ -351,7 +351,8 @@ def test_crm_lists_and_edits_the_variants(world, tmp_path, monkeypatch):
     listed = {t["name"]: t for t in crm.list_templates(admin)["templates"]}
     assert "sacco_A" not in listed  # a variant is part of its industry, not an industry
     assert [(v["variant"], v["kinds"], v["enabled"]) for v in listed["sacco"]["variants"]] == \
-        [("A", ["first", "followup"], True), ("B", ["first", "followup"], True), ("C", ["first", "followup"], False)]
+        [("A", ["first", "followup"], True), ("B", ["first", "followup"], True), ("C", ["first", "followup"], False),
+         ("D", ["first", "followup"], False)]
     assert listed["default"]["variants"] == []
     t = crm.get_template("first", "sacco_B", admin)
     assert t["subject"] == "Free SMS test for {company}" and "slot1" in t["fields"]

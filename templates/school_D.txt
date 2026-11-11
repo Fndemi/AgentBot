@@ -1,0 +1,17 @@
+Subject: SMS for {company}
+{greeting}
+
+I came across {company} and {about}.
+
+I'm {sender} from TalkSasa Communications, a Nairobi-based Bulk SMS provider. We help businesses automate customer communications through Bulk SMS and API integration.
+
+For {a_niche_noun} like {company}, SMS could support {uses_list}.
+
+We also provide delivery reporting and free API integration support to help you connect our SMS gateway to your existing system.
+
+Would you be available for a brief 20-minute meeting to explore how TalkSasa could support {company}'s communication needs?
+
+Kind regards,
+{sender}
+TalkSasa Communications Ltd
+{phone}

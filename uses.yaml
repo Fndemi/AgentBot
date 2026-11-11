@@ -3,12 +3,15 @@
 #           false = the sender skips them and leaves them waiting.
 # uses: the approved SMS uses, for templates that have a {uses} slot (the first three
 #       are used). The seven approved templates name their uses in their own fixed text.
-# variants: (optional, A/B/C rotation niches only) which first emails new leads may get, e.g.
-#       variants: [A, B] switches C off. Leave it out for all three. A lead that already has
+# variants: (optional, A/B/C/D rotation niches only) which first emails new leads may get, e.g.
+#       variants: [A, B] switches C and D off. Leave it out for all four. A lead that already has
 #       a variant keeps it, and its follow-ups, whatever this says.
 # paused_until: (optional) a date, e.g. 2027-01-05. Until then the industry gets no first emails
 #       and no follow-ups; its leads stay exactly as they are. On that date (Nairobi time)
 #       sending resumes by itself where each lead left off.
+# about, noun, sms_uses: (every approved niche) variant D's words. about finishes "I came across
+#       {company} and ..."; noun is "a SACCO", "a water company"...; sms_uses are 4-5 natural
+#       phrases, joined "a, b, c and d" in the first email; follow-up 1 names the first two.
 default:
   approved: false
   uses: [customer updates, reminders, alerts, promotions]
@@ -27,6 +30,9 @@ chama:
 church:
   approved: true
   uses: [event reminders, contribution confirmations, member updates]
+  about: the ministry and community programmes you run for your congregation
+  noun: a church
+  sms_uses: [service reminders, giving confirmations, event and prayer meeting notices, updates for ministry teams, announcements to the whole congregation]
 college:
   approved: false
   uses: [fee reminders, reporting dates, exam timetables, results notices]
@@ -36,9 +42,15 @@ coworking:
 delivery_app:
   approved: true
   uses: [delivery codes, order and rider updates, OTPs]
+  about: the delivery service you run for your customers
+  noun: a delivery platform
+  sms_uses: [delivery codes, order status updates, rider arrival alerts, OTPs for sign-in, offers to your customers]
 digital_lender:
   approved: true
   uses: [loan repayment reminders, disbursement confirmations, OTPs]
+  about: the loans you offer your customers
+  noun: a digital lender
+  sms_uses: [loan repayment reminders, disbursement confirmations, OTPs for sign-in and loan approval, overdue payment notices, new loan offers]
 digital_marketing_agency:
   approved: false
   uses: [promotional campaigns, appointment reminders, event reminders]
@@ -48,9 +60,15 @@ driving_school:
 ecommerce:
   approved: true
   uses: [order confirmations, delivery updates, OTPs]
+  about: the online shopping you offer your customers
+  noun: an online store
+  sms_uses: [order confirmations, delivery updates, OTPs at checkout, abandoned cart reminders, offers to your customers]
 edtech:
   approved: true
   uses: [class reminders, payment reminders, OTPs]
+  about: the learning you offer your students
+  noun: a learning platform
+  sms_uses: [class reminders, payment reminders, OTPs for sign-in, results notices, course updates]
 events:
   approved: false
   uses: [invitations, ticket confirmations, event reminders, venue changes]
@@ -60,6 +78,9 @@ events_ticketing:
 fintech:
   approved: true
   uses: [OTPs, transaction alerts, loan repayment reminders]
+  about: the financial services you provide to your customers
+  noun: a fintech
+  sms_uses: [OTPs, transaction alerts, payment confirmations, account security alerts, updates to your customers]
 gym_salon:
   approved: false
   uses: [appointment reminders, membership renewal notices, offers]
@@ -69,15 +90,24 @@ health:
 healthtech:
   approved: true
   uses: [appointment reminders, results-ready alerts, OTPs]
+  about: the health services you provide to your patients
+  noun: a health platform
+  sms_uses: [appointment reminders, results-ready alerts, OTPs for sign-in, medication reminders, follow-up check-ins]
 hospitality:
   approved: false
   uses: [booking confirmations, check-in details, offers, event invitations]
 hr_payroll:
   approved: true
   uses: [payslip alerts, OTPs, leave approvals]
+  about: the payroll and HR services you provide to your clients
+  noun: a payroll provider
+  sms_uses: [payslip alerts, OTPs, leave approval notices, staff announcements, salary payment confirmations]
 insurance:
   approved: true
   uses: [premium reminders, policy renewal notices, claim status updates]
+  about: the cover you provide to your clients
+  noun: an insurance firm
+  sms_uses: [policy renewal reminders, premium payment confirmations, claim status updates, payment due reminders, new cover offers]
 insurtech:
   approved: false
   uses: [OTPs, premium payment alerts, renewal reminders, claim status updates]
@@ -90,6 +120,9 @@ logistics_tech:
 microfinance:
   approved: true
   uses: [loan repayment reminders, disbursement confirmations, group meeting reminders]
+  about: the loans and savings services you provide to your clients
+  noun: a microfinance institution
+  sms_uses: [loan repayment reminders, disbursement confirmations, group meeting reminders, savings deposit confirmations, new product announcements]
 ngo:
   approved: false
   uses: [meeting invitations, training invitations, programme updates, feedback requests]
@@ -99,12 +132,21 @@ professional:
 payg_energy:
   approved: true
   uses: [unlock codes, payment reminders, low-credit alerts]
+  about: the pay-as-you-go energy you provide to your customers
+  noun: a pay-as-you-go energy company
+  sms_uses: [unlock codes, payment reminders, low-credit alerts, payment confirmations, service visit notices]
 payment_provider:
   approved: true
   uses: [OTPs, payment confirmations, transfer alerts]
+  about: the payment services you provide to your customers
+  noun: a payment provider
+  sms_uses: [OTPs, payment confirmations, transfer alerts, account security alerts, merchant settlement notices]
 proptech:
   approved: true
   uses: [rent reminders, payment confirmations, viewing reminders, OTPs]
+  about: the property services you provide to your tenants and clients
+  noun: a property company
+  sms_uses: [rent reminders, payment confirmations, viewing reminders, maintenance notices, new listing alerts]
 real_estate:
   approved: false
   uses: [rent reminders, payment confirmations, maintenance notices, water and power notices]
@@ -114,28 +156,46 @@ retail:
 saas:
   approved: true
   uses: [OTPs, account alerts, customer notifications]
+  about: the software you provide to your customers
+  noun: a software platform
+  sms_uses: [OTPs, account alerts, billing reminders, customer notifications, system status updates]
 # software_agency and software_vendor: the uses are for their clients' customers
 software_agency:
   approved: true
   uses: [OTPs, reminders, alerts]
-  variants: [A, B]
+  about: the software you build for your clients
+  noun: a software agency
+  sms_uses: [OTPs in the apps you build, notifications to your clients' customers, payment confirmations, appointment reminders, system alerts]
+  variants: [A, B, D]
 software_vendor:
   approved: true
   uses: [OTPs, reminders, alerts]
-  variants: [A, B]
+  about: the software you provide to your clients
+  noun: a software company
+  sms_uses: [OTPs, payment reminders, account alerts, transaction confirmations, customer notifications]
+  variants: [A, B, D]
 sacco:
   approved: true
   uses: [loan reminders, deposit confirmations, AGM notices]
+  about: the savings and loan services you provide to your members
+  noun: a SACCO
+  sms_uses: [loan repayment reminders, deposit confirmations, dividend notices, AGM notices, OTPs for mobile banking]
 school:
   approved: true
   paused_until: 2027-01-05
   uses: [fee reminders, parent alerts, exam results]
+  about: the education you provide to your students
+  noun: a school
+  sms_uses: [fee reminders, parent alerts, exam results, opening and closing dates, event notices]
 security:
   approved: false
   uses: [incident alerts, shift notices, payment reminders, deployment notices]
 tech_startup:
   approved: true
   uses: [OTPs, account alerts, customer notifications]
+  about: the product you're building for your customers
+  noun: a tech company
+  sms_uses: [OTPs, account alerts, customer notifications, payment confirmations, product updates]
 transport:
   approved: false
   uses: [booking confirmations, departure reminders, schedule changes, delivery alerts]
@@ -146,3 +206,6 @@ utility:
 water_utility:
   approved: true
   uses: [bill reminders, water interruption notices, meter reading alerts, payment confirmations]
+  about: the water services you provide to your customers
+  noun: a water company
+  sms_uses: [bill reminders, water interruption notices, payment confirmations, meter reading alerts, new connection updates]

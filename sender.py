@@ -178,9 +178,34 @@ def fill(text, lead, attached=False, for_html=False, extra=None):
         profile_line=profile_line(),
         # {free_sms} {setup_days} {price_from} {slot1} {slot2} {booking_line} {meet_options}
         **rotation.gaps(lead),
+        # {about} {a_niche_noun} {uses_list} {first_two_uses}: variant D's (uses.yaml)
+        **niche_phrases(lead),
     )
     values.update(extra or {})
+    text = text.replace("{company}'s", "{company_s}")   # "Advent Valuers'", not "Advent Valuers's"
+    values["company_s"] = values["company"] + ("'" if values["company"].endswith("s") else "'s")
     return text.format(**values)
+
+
+def join_and(items):
+    """"a, b and c"."""
+    items = list(items)
+    return " and ".join(items) if len(items) < 3 else ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def niche_phrases(lead):
+    """{about}, {a_niche_noun}, {uses_list} and {first_two_uses} from the niche's about, noun
+    and sms_uses in uses.yaml ("" for a niche without them: only variant D uses them)."""
+    entry = personalise.USES.get(personalise.industry_key(lead)) or {}
+    uses = [str(u) for u in entry.get("sms_uses") or []]
+    return {"about": entry.get("about", ""), "a_niche_noun": entry.get("noun", ""),
+            "uses_list": join_and(uses), "first_two_uses": join_and(uses[:2])}
+
+
+def plain_only(lead, followup=0):
+    """Whether this email goes out as plain text alone, with no HTML part (and so no links):
+    the first email and follow-up 1 of a lead on a PLAIN_VARIANTS variant (D)."""
+    return followup in (0, 1) and dict(lead).get("template_variant") in rotation.PLAIN_VARIANTS
 
 
 def _link(m):
@@ -212,7 +237,8 @@ def build(lead):
     variant = first_variant(lead)
     if variant:
         tname, subject, body = load_template(lead["industry"], variant)
-        return compose(lead, fill_subject(subject, lead), body), tname
+        plain = variant in rotation.PLAIN_VARIANTS
+        return compose(lead, fill_subject(subject, lead), body, plain=plain), tname
     tname, subject, body = load_template(lead["industry"])
     return compose(lead, fill_subject(subject, lead), body, attachment()), tname
 
@@ -223,9 +249,9 @@ def variant_of(tname):
     return m.group(1) if m else None
 
 
-def compose(lead, subject, body, pdf=None, in_reply_to=None, extra=None, references=None):
-    """The email itself: the template body filled in for this lead, as plain text and HTML,
-    with our unsubscribe footer, and the PDF if given. in_reply_to (a Message-ID) makes it
+def compose(lead, subject, body, pdf=None, in_reply_to=None, extra=None, references=None, plain=False):
+    """The email itself: the template body filled in for this lead, as plain text and HTML
+    (plain text alone with plain=True), with our unsubscribe footer, and the PDF if given. in_reply_to (a Message-ID) makes it
     part of that email's thread; references lists the thread's Message-IDs oldest first
     (default: in_reply_to alone). `extra` is passed on to fill."""
     def tidy(t):
@@ -245,7 +271,8 @@ def compose(lead, subject, body, pdf=None, in_reply_to=None, extra=None, referen
         msg["References"] = " ".join(references or [in_reply_to])
     msg["List-Unsubscribe"] = f"<mailto:{config.FROM_EMAIL}?subject=unsubscribe>"
     msg.set_content(text)
-    msg.add_alternative(html_body, subtype="html")
+    if not plain:
+        msg.add_alternative(html_body, subtype="html")
     if pdf:  # turns the message into multipart/mixed: (plain + HTML) + PDF
         msg.add_attachment(pdf.read_bytes(), maintype="application", subtype="pdf", filename=pdf.name)
     return msg
@@ -365,8 +392,8 @@ def build_followup(lead, n=1):
     subject = first if first.lower().startswith("re:") else f"Re: {first}"
     ids = [r["message_id"] for r in thread if r["message_id"]] or [lead.get("message_id")]
     ids = [i for i in ids if i]
-    msg = compose(lead, subject, body,
-                  in_reply_to=ids[-1] if ids else None, references=ids, extra=followup_extra(lead, n, first))
+    msg = compose(lead, subject, body, in_reply_to=ids[-1] if ids else None, references=ids,
+                  extra=followup_extra(lead, n, first), plain=plain_only(lead, n))
     return msg, f"{path.parent.name}/{path.stem}"
 
 
@@ -522,7 +549,8 @@ def plain_of(msg):
 
 
 def html_of(msg):
-    return msg.get_body(("html",)).get_content()
+    part = msg.get_body(("html",))
+    return part.get_content() if part is not None else "(none: this email is plain text only)"
 
 
 def personal_lines(lead):

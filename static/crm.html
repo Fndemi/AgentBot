@@ -1417,7 +1417,7 @@ async function loadReport() {
         ${repTable("By industry", "", d.groups.segment)}
         ${d.groups.template.length ? repTable("By template", "Each industry's A, B and C first emails, with the follow-ups that go with them. Leads emailed before the rotation aren't counted here.", d.groups.template)
           : `<div class="panel"><h3>By template</h3><p class="lead2" style="padding-bottom:14px">No leads emailed from the A/B/C templates in this period yet.</p></div>`}
-        ${d.groups.technique.length ? repTable("By technique", "A (quick question) vs B (free test) vs C (niche angle), across every industry.", d.groups.technique) : ""}
+        ${d.groups.technique.length ? repTable("By technique", "A (quick question) vs B (free test) vs C (niche angle) vs D (plain intro, no links), across every industry.", d.groups.technique) : ""}
         ${d.groups.opener.length ? repTable("Opener vs none", "First emails with a checked opener about a fact on their own website, against those without. Only emails sent since this was recorded.", d.groups.opener)
           : `<div class="panel"><h3>Opener vs none</h3><p class="lead2" style="padding-bottom:14px">No first emails recorded with or without an opener in this period yet.</p></div>`}
         ${d.groups.campaign.length > 1 ? repTable("By campaign", "Each named-contact campaign (python main.py send-group) against the bot's own emails: sent, replied, interested and meetings.", d.groups.campaign) : ""}
