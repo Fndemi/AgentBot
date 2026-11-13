@@ -28,6 +28,8 @@
   python main.py import-list SOURCE FILE_OR_URL --niche NICHE [--dry-run]   a regulator's list (imports.py)
   python main.py import-all [--dry-run]  the latest list of every source: sasra, cbk_psp, cbk_mfb, wasreb, ira, earb, cma_sandbox
   python main.py bounces [days]          bounces in the last N days (default 30): by email type, lead source, step; top reasons
+  python main.py score-report [days]     emailed, replied, interested, meetings by score band, scoring reason,
+                                         niche, source, variant, contact type, company age (default all time)
   python main.py unsubscribe a@b.com     manually opt someone out
   python main.py export [folder]         write leads.csv, events.csv and replies.csv (joined on lead_id)
 """
@@ -165,6 +167,11 @@ def main():
         if args and not args[0].isdigit():
             sys.exit("Usage: python main.py bounces [days]")
         bounces.report(int(args[0]) if args else bounces.DAYS)
+    elif cmd == "score-report":
+        import score_report
+        if len(args) > 1 or (args and (not args[0].isdigit() or int(args[0]) < 1)):
+            sys.exit("Usage: python main.py score-report [days]")
+        score_report.report(int(args[0]) if args else None)
     elif cmd == "stats":
         leads, replies = db.stats()
         print("Leads:", leads or "none")
